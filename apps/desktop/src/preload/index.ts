@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { Checkpoint } from "@loom/core";
-import type { Canvas, LoomEvent, Verdict } from "@loom/schema";
+import type { Canvas, LoomEvent, Memory, Verdict } from "@loom/schema";
 
 export type EventRecord = { event: LoomEvent; verdict: Verdict };
 
@@ -10,6 +10,17 @@ const api = {
   checkpoints: (): Promise<Checkpoint[]> => ipcRenderer.invoke("loom:checkpoints"),
   checkpoint: (label: string): Promise<Checkpoint> => ipcRenderer.invoke("loom:checkpoint", label),
   rollback: (id: string): Promise<boolean> => ipcRenderer.invoke("loom:rollback", id),
+  memories: (): Promise<Memory[]> => ipcRenderer.invoke("loom:memories"),
+  addMemory: (nodeId: string | null, kind: Memory["kind"], content: string): Promise<Memory | null> =>
+    ipcRenderer.invoke("loom:addMemory", nodeId, kind, content),
+  setMemoryStatus: (id: string, status: Memory["status"]): Promise<Memory> =>
+    ipcRenderer.invoke("loom:setMemoryStatus", id, status),
+  exportSkill: (nodeId: string): Promise<string> => ipcRenderer.invoke("loom:exportSkill", nodeId),
+  onMemoryDrafts(cb: (drafts: Memory[]) => void) {
+    const listener = (_e: unknown, drafts: Memory[]) => cb(drafts);
+    ipcRenderer.on("loom:memoryDrafts", listener);
+    return () => void ipcRenderer.off("loom:memoryDrafts", listener);
+  },
   canvas: (): Promise<Canvas> => ipcRenderer.invoke("loom:canvas"),
   setActive: (nodeId: string | null): Promise<void> => ipcRenderer.invoke("loom:setActive", nodeId),
   installHooks: (): Promise<string> => ipcRenderer.invoke("loom:installHooks"),

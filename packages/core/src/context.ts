@@ -1,24 +1,22 @@
-import type { Canvas, CanvasNode } from "@loom/schema";
+import type { Canvas, CanvasNode, Memory } from "@loom/schema";
 
 const list = (items: string[]) => (items.length ? items.map((i) => `- ${i}`).join("\n") : "- （无）");
 const files = (n: CanvasNode) => n.files.map((f) => `\`${f}\``).join("、") || "（未绑定）";
+const KIND_LABEL: Record<Memory["kind"], string> = { decision: "决策", constraint: "约束", pitfall: "踩过的坑", preference: "偏好" };
 
 /**
- * The context an agent gets for one node: the node itself, the interface of its
- * direct neighbours, and the rules Loom will enforce. Never the whole repository.
+ * Everything an agent should know to work on one node, without a specific task:
+ * the node, the interface of its direct neighbours, its approved memories and the
+ * rules Loom enforces. Never the whole repository. Used for dispatch and skill export.
  */
-export function buildNodeContext(canvas: Canvas, nodeId: string, task: string): string {
+export function buildNodeGuide(canvas: Canvas, nodeId: string, memories: Memory[] = []): string {
   const node = canvas.nodes.find((n) => n.id === nodeId);
   if (!node) throw new Error(`unknown node: ${nodeId}`);
   const byId = (id: string) => canvas.nodes.find((n) => n.id === id)!;
   const dependsOn = canvas.edges.filter((e) => e.from === nodeId).map((e) => byId(e.to));
   const usedBy = canvas.edges.filter((e) => e.to === nodeId).map((e) => byId(e.from));
 
-  return `# 任务
-
-${task.trim() || "（未填写，请按节点的任务清单推进）"}
-
-## 当前节点：${node.title}
+  return `## 节点：${node.title}
 
 - 目标：${node.intent.goal || "（未填写）"}
 - 可以修改的文件：${files(node)}
@@ -41,6 +39,10 @@ ${list(dependsOn.map((n) => `${n.title}：${n.intent.goal || "（无目标说明
 
 ${list(usedBy.map((n) => `${n.title}：文件 ${files(n)}`))}
 
+## 已审批的记忆
+
+${list(memories.map((m) => `（${KIND_LABEL[m.kind]}）${m.content}`))}
+
 ## Loom 会检查的规则
 
 - 只修改本节点的文件；越界写入会被拦截，需要向用户说明理由。
@@ -48,4 +50,10 @@ ${list(usedBy.map((n) => `${n.title}：文件 ${files(n)}`))}
 - 不要靠跳过测试或删除断言让测试通过。
 - 同一个命令反复失败时，停下来总结原因，换思路或询问用户。
 `;
+}
+
+/** The context file handed to a dispatched agent: the task, then the node guide. */
+export function buildNodeContext(canvas: Canvas, nodeId: string, task: string, memories: Memory[] = []): string {
+  const guide = buildNodeGuide(canvas, nodeId, memories);
+  return `# 任务\n\n${task.trim() || "（未填写，请按节点的任务清单推进）"}\n\n${guide}`;
 }

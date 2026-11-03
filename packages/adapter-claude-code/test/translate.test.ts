@@ -2,7 +2,27 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { cleanEnv, installHooks, toHookOutput, toLoomEvent } from "@loom/adapter-claude-code";
+import { cleanEnv, exportSkill, installHooks, skillName, toHookOutput, toLoomEvent } from "@loom/adapter-claude-code";
+
+describe("exportSkill", () => {
+  it("writes SKILL.md with a valid name and a description saying when to use it", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "loom-skill-"));
+    const node = {
+      id: "login-form",
+      kind: "feature" as const,
+      title: "登录表单",
+      intent: { goal: "邮箱密码登录", acceptance: [], tasks: [] },
+      files: ["src/auth/**"],
+      status: "todo" as const,
+    };
+    const file = exportSkill(root, node, "## 节点：登录表单\n");
+    const text = fs.readFileSync(file, "utf8");
+    expect(file).toContain(path.join(".claude", "skills", "loom-login-form", "SKILL.md"));
+    expect(text).toMatch(/^---\nname: loom-login-form\ndescription: "Work on \\"登录表单\\": 邮箱密码登录. Use when changing src\/auth\/\*\*."\n---/);
+    expect(text).toContain("## 节点：登录表单");
+    expect(skillName("Weird ID!")).toBe("loom-weird-id-");
+  });
+});
 
 describe("cleanEnv", () => {
   it("drops host-session CLAUDE* variables and keeps the user's ANTHROPIC_* settings", () => {

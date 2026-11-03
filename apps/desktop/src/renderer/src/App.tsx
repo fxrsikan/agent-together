@@ -3,6 +3,7 @@ import { Background, Controls, MarkerType, ReactFlow, type Edge } from "@xyflow/
 import { strongest, type Canvas, type Level, type LoomEvent } from "@loom/schema";
 import type { EventRecord } from "../../preload";
 import { CheckpointsPanel } from "./CheckpointsPanel";
+import { MemoryPanel } from "./MemoryPanel";
 import { NodeCard, type NodeCardType } from "./NodeCard";
 
 const nodeTypes = { card: NodeCard };
@@ -37,9 +38,14 @@ export function App() {
       if (r.event.kind === "turn.end") setVersion((v) => v + 1);
     });
     const offActive = window.loom.onActive(setActiveId);
+    const offDrafts = window.loom.onMemoryDrafts((drafts) => {
+      setNotice(`观察者生成了 ${drafts.length} 条记忆草稿，点开对应节点审批`);
+      setVersion((v) => v + 1);
+    });
     return () => {
       offEvent();
       offActive();
+      offDrafts();
     };
   }, []);
 
@@ -89,6 +95,8 @@ export function App() {
   const selected = canvas?.nodes.find((n) => n.id === selectedId) ?? null;
 
   const install = async () => setNotice(`已写入 ${await window.loom.installHooks()}`);
+
+  const exportSkill = async (nodeId: string) => setNotice(`已导出 ${await window.loom.exportSkill(nodeId)}`);
 
   const dispatch = async (nodeId: string) => {
     try {
@@ -158,10 +166,15 @@ export function App() {
                 ) : (
                   <button onClick={() => window.loom.setActive(selected.id)}>设为当前节点</button>
                 )}
+                <button onClick={() => exportSkill(selected.id)}>导出为 Skill</button>
               </div>
+              <MemoryPanel nodeId={selected.id} version={version} onChange={changed} />
             </section>
           ) : (
-            <p className="muted">点击节点查看意图；设为当前节点后，观察者按它的范围检查 agent。</p>
+            <>
+              <p className="muted">点击节点查看意图；设为当前节点后，观察者按它的范围检查 agent。</p>
+              <MemoryPanel nodeId={null} version={version} onChange={changed} />
+            </>
           )}
           {info?.hasGit ? (
             <CheckpointsPanel version={version} onChange={changed} />

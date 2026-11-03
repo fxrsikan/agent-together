@@ -1,8 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { app, BrowserWindow, dialog, ipcMain } from "electron";
-import { dispatchPrompt, installHooks, launchInTerminal } from "@loom/adapter-claude-code";
-import { buildNodeContext, Checkpoints, Daemon } from "@loom/core";
+import { dispatchPrompt, exportSkill, installHooks, launchInTerminal } from "@loom/adapter-claude-code";
+import { buildNodeContext, buildNodeGuide, Checkpoints, Daemon } from "@loom/core";
+import type { Memory } from "@loom/schema";
 
 /** Project to open: LOOM_PROJECT, else the bundled demo, else ask. */
 async function pickProject(): Promise<string | null> {
@@ -32,6 +33,7 @@ async function main() {
   });
   daemon.on("event", (record) => win.webContents.send("loom:event", record));
   daemon.on("active", (nodeId) => win.webContents.send("loom:active", nodeId));
+  daemon.on("memory", (drafts) => win.webContents.send("loom:memoryDrafts", drafts));
 
   ipcMain.handle("loom:info", () => ({ root, port, hasGit, activeNodeId: daemon.observer.activeNodeId }));
   ipcMain.handle("loom:canvas", () => daemon.canvas);
@@ -44,13 +46,32 @@ async function main() {
   // Dispatch: checkpoint first, make the node active, write its neighbourhood context, open Claude Code on it.
   ipcMain.handle("loom:dispatch", (_e, nodeId: string, task: string) => {
     if (hasGit) checkpoints.create("派发前", nodeId);
-    const file = daemon.store.writeContext(nodeId, buildNodeContext(daemon.canvas, nodeId, task));
+    const context = buildNodeContext(daemon.canvas, nodeId, task, daemon.memory.forNode(nodeId));
+    const file = daemon.store.writeContext(nodeId, context);
     daemon.setActiveNode(nodeId);
     launchInTerminal(root, dispatchPrompt(file), `Loom - ${nodeId}`);
     return file;
   });
 
-  ipcMain.handle("loom:checkpoints", () => (hasGit ? checkpoints.list() : []));
+  // Memories: approving or retiring one re-syncs the Loom block in CLAUDE.md.
+  ipcMain.handle("loom:memories", () => daemon.memory.list());
+  ipcMain.handle("loom:addMemory", (_e, nodeId: string | null, kind: Memory["kind"], content: string) => {
+    const m = daemon.memory.add({ nodeId, kind, content, status: "active", source: "user" });
+    daemon.memory.syncClaudeMd(daemon.canvas);
+    return m;
+  });
+  ipcMain.handle("loom:setMemoryStatus", (_e, id: string, status: Memory["status"]) => {
+    const m = daemon.memory.update(id, { status });
+    daemon.memory.syncClaudeMd(daemon.canvas);
+    return m;
+  });
+  ipcMain.handle("loom:exportSkill", (_e, nodeId: string) => {
+    const node = daemon.canvas.nodes.find((n) => n.id === nodeId);
+    if (!node) throw new Error(`unknown node: ${nodeId}`);
+    return exportSkill(root, node, buildNodeGuide(daemon.canvas, nodeId, daemon.memory.forNode(nodeId)));
+  });
+
+  ipcMain.handle("loom:checkpoints",() => (hasGit ? checkpoints.list() : []));
   ipcMain.handle("loom:checkpoint", (_e, label: string) => checkpoints.create(label, daemon.observer.activeNodeId));
   ipcMain.handle("loom:rollback", async (_e, id: string) => {
     const target = checkpoints.list().find((c) => c.id === id);

@@ -15,6 +15,10 @@ export class Observer {
     public activeNodeId: string | null = null,
   ) {}
 
+  get canvasNow(): Canvas {
+    return this.canvas;
+  }
+
   setCanvas(canvas: Canvas) {
     this.canvas = canvas;
   }

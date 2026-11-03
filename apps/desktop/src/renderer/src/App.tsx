@@ -22,6 +22,7 @@ export function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [feed, setFeed] = useState<EventRecord[]>([]);
   const [notice, setNotice] = useState("");
+  const [task, setTask] = useState("");
 
   useEffect(() => {
     window.loom.info().then((i) => {
@@ -75,6 +76,16 @@ export function App() {
 
   const install = async () => setNotice(`已写入 ${await window.loom.installHooks()}`);
 
+  const dispatch = async (nodeId: string) => {
+    try {
+      const file = await window.loom.dispatch(nodeId, task);
+      setNotice(`已在新窗口启动 Claude Code，上下文：${file}`);
+      setTask("");
+    } catch (err) {
+      setNotice(`派发失败：${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+
   return (
     <div className="app">
       <header className="bar">
@@ -116,11 +127,24 @@ export function App() {
                   <ul>{selected.intent.tasks.map((t) => <li key={t}>{t}</li>)}</ul>
                 </>
               )}
-              {selected.id === activeId ? (
-                <button onClick={() => window.loom.setActive(null)}>取消当前节点</button>
-              ) : (
-                <button onClick={() => window.loom.setActive(selected.id)}>设为当前节点</button>
-              )}
+              <h4>派发任务</h4>
+              <textarea
+                className="task"
+                rows={3}
+                placeholder="这次要做什么（留空则按任务清单推进）"
+                value={task}
+                onChange={(e) => setTask(e.target.value)}
+              />
+              <div className="actions">
+                <button className="primary" onClick={() => dispatch(selected.id)}>
+                  派发给 Claude Code
+                </button>
+                {selected.id === activeId ? (
+                  <button onClick={() => window.loom.setActive(null)}>取消当前节点</button>
+                ) : (
+                  <button onClick={() => window.loom.setActive(selected.id)}>设为当前节点</button>
+                )}
+              </div>
             </section>
           ) : (
             <p className="muted">点击节点查看意图；设为当前节点后，观察者按它的范围检查 agent。</p>

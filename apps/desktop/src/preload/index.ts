@@ -8,6 +8,7 @@ const api = {
   canvas: (): Promise<Canvas> => ipcRenderer.invoke("loom:canvas"),
   setActive: (nodeId: string | null): Promise<void> => ipcRenderer.invoke("loom:setActive", nodeId),
   installHooks: (): Promise<string> => ipcRenderer.invoke("loom:installHooks"),
+  dispatch: (nodeId: string, task: string): Promise<string> => ipcRenderer.invoke("loom:dispatch", nodeId, task),
   onEvent(cb: (record: EventRecord) => void) {
     const listener = (_e: unknown, record: EventRecord) => cb(record);
     ipcRenderer.on("loom:event", listener);

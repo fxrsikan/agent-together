@@ -2,7 +2,14 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { installHooks, toHookOutput, toLoomEvent } from "@loom/adapter-claude-code";
+import { cleanEnv, installHooks, toHookOutput, toLoomEvent } from "@loom/adapter-claude-code";
+
+describe("cleanEnv", () => {
+  it("drops host-session CLAUDE* variables and keeps the user's ANTHROPIC_* settings", () => {
+    const env = cleanEnv({ CLAUDECODE: "1", CLAUDE_CODE_SESSION_ID: "x", ANTHROPIC_API_KEY: "k", PATH: "p" });
+    expect(env).toEqual({ ANTHROPIC_API_KEY: "k", PATH: "p" });
+  });
+});
 
 const base = { session_id: "s1", cwd: "/proj" };
 

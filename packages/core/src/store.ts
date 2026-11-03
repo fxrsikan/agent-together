@@ -9,6 +9,7 @@ import { Canvas, type CanvasEdge, type Level, type LoomEvent } from "@loom/schem
  *   canvas/<id>.json     one file per node
  *   rules.json           { "<rule id>": "<level>" } overrides
  *   events/<date>.jsonl  event log (git-ignored)
+ *   context/<id>.md      context handed to the last agent dispatched on a node (git-ignored)
  *   runtime.json         daemon port (git-ignored)
  */
 export class LoomStore {
@@ -58,6 +59,14 @@ export class LoomStore {
     fs.mkdirSync(eventsDir, { recursive: true });
     const day = record.event.at.slice(0, 10);
     fs.appendFileSync(path.join(eventsDir, `${day}.jsonl`), JSON.stringify(record) + "\n");
+  }
+
+  /** Writes the dispatch context for a node; returns its project-relative path. */
+  writeContext(nodeId: string, markdown: string): string {
+    const contextDir = path.join(this.dir, "context");
+    fs.mkdirSync(contextDir, { recursive: true });
+    fs.writeFileSync(path.join(contextDir, `${nodeId}.md`), markdown);
+    return `.loom/context/${nodeId}.md`;
   }
 
   writeRuntime(runtime: { port: number; pid: number }): void {

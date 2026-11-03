@@ -36,6 +36,9 @@ button {
   cursor: pointer;
 }
 button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.task { width: 100%; font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--text); resize: vertical; }
+.actions { display: flex; gap: 8px; margin-top: 8px; }
 
 .app { display: flex; flex-direction: column; height: 100vh; }
 .bar { display: flex; align-items: center; gap: 12px; padding: 8px 16px; border-bottom: 1px solid var(--line); background: var(--panel); }

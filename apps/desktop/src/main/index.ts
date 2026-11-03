@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { app, BrowserWindow, dialog, ipcMain } from "electron";
-import { installHooks } from "@loom/adapter-claude-code";
-import { Daemon } from "@loom/core";
+import { dispatchPrompt, installHooks, launchInTerminal } from "@loom/adapter-claude-code";
+import { buildNodeContext, Daemon } from "@loom/core";
 
 /** Project to open: LOOM_PROJECT, else the bundled demo, else ask. */
 async function pickProject(): Promise<string | null> {
@@ -38,6 +38,13 @@ async function main() {
     // Dev layout: the hook program is built in the sibling workspace package.
     const hook = path.resolve(app.getAppPath(), "../../packages/hook/dist/loom-hook.js");
     return installHooks(root, `node "${hook}"`);
+  });
+  // Dispatch: make the node active, write its neighbourhood context, open Claude Code on it.
+  ipcMain.handle("loom:dispatch", (_e, nodeId: string, task: string) => {
+    const file = daemon.store.writeContext(nodeId, buildNodeContext(daemon.canvas, nodeId, task));
+    daemon.setActiveNode(nodeId);
+    launchInTerminal(root, dispatchPrompt(file), `Loom - ${nodeId}`);
+    return file;
   });
 
   if (process.env.ELECTRON_RENDERER_URL) await win.loadURL(process.env.ELECTRON_RENDERER_URL);

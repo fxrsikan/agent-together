@@ -15,5 +15,7 @@ export const Memory = z.object({
   /** Where it came from, e.g. "observer:design-guard session 1a2b" or "user". */
   source: z.string(),
   createdAt: z.string(),
+  /** The raw observation a refined memory was written from, kept for review. */
+  evidence: z.string().optional(),
 });
 export type Memory = z.infer<typeof Memory>;

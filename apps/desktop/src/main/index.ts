@@ -3,7 +3,16 @@ import path from "node:path";
 import { app, BrowserWindow, dialog, ipcMain } from "electron";
 import { exportSkill, installHooks } from "@loom/adapter-claude-code";
 import { installCodexHooks } from "@loom/adapter-codex";
-import { buildNodeContext, buildNodeGuide, Checkpoints, Daemon, dispatchPrompt, openTerminal } from "@loom/core";
+import {
+  buildNodeContext,
+  buildNodeGuide,
+  Checkpoints,
+  createLlm,
+  Daemon,
+  dispatchPrompt,
+  loadLlmConfig,
+  openTerminal,
+} from "@loom/core";
 import type { Memory } from "@loom/schema";
 
 /** Project to open: LOOM_PROJECT, else the bundled demo, else ask. */
@@ -21,7 +30,9 @@ async function main() {
   const root = await pickProject();
   if (!root) return app.quit();
 
-  const daemon = new Daemon(root);
+  const llmConfig = loadLlmConfig(root);
+  const llm = createLlm(llmConfig);
+  const daemon = new Daemon(root, { llm, maxL2CallsPerSession: llmConfig.maxCallsPerSession });
   const port = await daemon.start();
   const checkpoints = new Checkpoints(root);
   const hasGit = checkpoints.available();
@@ -35,8 +46,10 @@ async function main() {
   daemon.on("event", (record) => win.webContents.send("loom:event", record));
   daemon.on("active", (nodeId) => win.webContents.send("loom:active", nodeId));
   daemon.on("memory", (drafts) => win.webContents.send("loom:memoryDrafts", drafts));
+  daemon.on("judgment", (j) => win.webContents.send("loom:judgment", j));
+  daemon.on("l2error", (e) => win.webContents.send("loom:l2error", e));
 
-  ipcMain.handle("loom:info", () => ({ root, port, hasGit, activeNodeId: daemon.observer.activeNodeId }));
+  ipcMain.handle("loom:info", () => ({ root, port, hasGit, l2: llm?.name ?? null, activeNodeId: daemon.observer.activeNodeId }));
   ipcMain.handle("loom:canvas", () => daemon.canvas);
   ipcMain.handle("loom:setActive", (_e, nodeId: string | null) => daemon.setActiveNode(nodeId));
   ipcMain.handle("loom:installHooks", () => {

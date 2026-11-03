@@ -10,8 +10,10 @@ const BLOCK_END = "<!-- loom:memory:end -->";
 const KIND_LABEL: Record<Memory["kind"], string> = { decision: "决策", constraint: "约束", pitfall: "踩过的坑", preference: "偏好" };
 
 function serialize(m: Memory): string {
-  const head = FIELDS.map((k) => `${k}: ${m[k] ?? "null"}`).join("\n");
-  return `---\n${head}\n---\n${m.content.trim()}\n`;
+  const head = FIELDS.map((k) => `${k}: ${m[k] ?? "null"}`);
+  // Evidence can hold quotes and newlines: store it as one JSON string line.
+  if (m.evidence) head.push(`evidence: ${JSON.stringify(m.evidence)}`);
+  return `---\n${head.join("\n")}\n---\n${m.content.trim()}\n`;
 }
 
 function parse(text: string): Memory {
@@ -22,7 +24,7 @@ function parse(text: string): Memory {
     const i = line.indexOf(":");
     if (i > 0) {
       const value = line.slice(i + 1).trim();
-      fields[line.slice(0, i).trim()] = value === "null" ? null : value;
+      fields[line.slice(0, i).trim()] = value === "null" ? null : value.startsWith('"') ? JSON.parse(value) : value;
     }
   }
   return Memory.parse({ ...fields, content: match[2].trim() });
@@ -59,7 +61,7 @@ export class MemoryStore {
     return memory;
   }
 
-  update(id: string, patch: Partial<Pick<Memory, "status" | "content" | "kind" | "nodeId">>): Memory {
+  update(id: string, patch: Partial<Pick<Memory, "status" | "content" | "kind" | "nodeId" | "evidence">>): Memory {
     const current = this.list().find((m) => m.id === id);
     if (!current) throw new Error(`unknown memory: ${id}`);
     const next = Memory.parse({ ...current, ...patch });

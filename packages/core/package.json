@@ -6,11 +6,19 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "bin": { "loom-daemon": "dist/cli.js", "loom-init": "dist/init-cli.js" },
-  "scripts": { "build": "tsc -b" },
+  "bin": {
+    "loom-daemon": "dist/cli.js",
+    "loom-init": "dist/init-cli.js"
+  },
+  "scripts": {
+    "build": "tsc -b"
+  },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.4.0",
     "@loom/schema": "0.0.1",
     "picomatch": "^4.0.2"
   },
-  "devDependencies": { "@types/picomatch": "^3.0.1" }
+  "devDependencies": {
+    "@types/picomatch": "^3.0.1"
+  }
 }

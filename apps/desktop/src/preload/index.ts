@@ -1,12 +1,23 @@
 import { contextBridge, ipcRenderer } from "electron";
-import type { Checkpoint } from "@loom/core";
+import type { Checkpoint, Judgment } from "@loom/core";
 import type { Canvas, LoomEvent, Memory, Verdict } from "@loom/schema";
 
 export type EventRecord = { event: LoomEvent; verdict: Verdict };
+export type { Judgment };
 
 const api = {
-  info: (): Promise<{ root: string; port: number; hasGit: boolean; activeNodeId: string | null }> =>
+  info: (): Promise<{ root: string; port: number; hasGit: boolean; l2: string | null; activeNodeId: string | null }> =>
     ipcRenderer.invoke("loom:info"),
+  onJudgment(cb: (j: Judgment) => void) {
+    const listener = (_e: unknown, j: Judgment) => cb(j);
+    ipcRenderer.on("loom:judgment", listener);
+    return () => void ipcRenderer.off("loom:judgment", listener);
+  },
+  onL2Error(cb: (message: string) => void) {
+    const listener = (_e: unknown, message: string) => cb(message);
+    ipcRenderer.on("loom:l2error", listener);
+    return () => void ipcRenderer.off("loom:l2error", listener);
+  },
   checkpoints: (): Promise<Checkpoint[]> => ipcRenderer.invoke("loom:checkpoints"),
   checkpoint: (label: string): Promise<Checkpoint> => ipcRenderer.invoke("loom:checkpoint", label),
   rollback: (id: string): Promise<boolean> => ipcRenderer.invoke("loom:rollback", id),

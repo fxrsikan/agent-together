@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Background, Controls, MarkerType, ReactFlow, type Edge } from "@xyflow/react";
 import { strongest, type Canvas, type Level, type LoomEvent } from "@loom/schema";
-import type { EventRecord } from "../../preload";
+import type { EventRecord, Judgment } from "../../preload";
 import { CheckpointsPanel } from "./CheckpointsPanel";
 import { MemoryPanel } from "./MemoryPanel";
 import { NodeCard, type NodeCardType } from "./NodeCard";
@@ -18,7 +18,8 @@ function describe(event: LoomEvent): string {
 }
 
 export function App() {
-  const [info, setInfo] = useState<{ root: string; port: number; hasGit: boolean } | null>(null);
+  const [info, setInfo] = useState<{ root: string; port: number; hasGit: boolean; l2: string | null } | null>(null);
+  const [judgments, setJudgments] = useState<Judgment[]>([]);
   const [version, setVersion] = useState(0); // bumped when files may have changed under us
   const [canvas, setCanvas] = useState<Canvas | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -40,13 +41,17 @@ export function App() {
     });
     const offActive = window.loom.onActive(setActiveId);
     const offDrafts = window.loom.onMemoryDrafts((drafts) => {
-      setNotice(`观察者生成了 ${drafts.length} 条记忆草稿，点开对应节点审批`);
+      setNotice(`有 ${drafts.length} 条记忆草稿待审批，点开对应节点查看`);
       setVersion((v) => v + 1);
     });
+    const offJudgment = window.loom.onJudgment((j) => setJudgments((js) => [j, ...js].slice(0, FEED_LIMIT)));
+    const offL2Error = window.loom.onL2Error((e) => setNotice(`L2 判断没能运行：${e}`));
     return () => {
       offEvent();
       offActive();
       offDrafts();
+      offJudgment();
+      offL2Error();
     };
   }, []);
 
@@ -59,16 +64,15 @@ export function App() {
     setVersion((v) => v + 1);
   };
 
-  // A node's light shows the strongest finding about it in the recent feed.
+  // A node's light shows the strongest finding about it in the recent feed; an L2 "off track" counts as warn.
   const signals = useMemo(() => {
     const byNode = new Map<string, Level>();
-    for (const { verdict } of feed) {
-      for (const f of verdict.findings) {
-        if (f.nodeId) byNode.set(f.nodeId, strongest([f, { ...f, level: byNode.get(f.nodeId) ?? "off" }]));
-      }
-    }
+    const raise = (nodeId: string, level: Level) =>
+      byNode.set(nodeId, strongest([{ rule: "", message: "", level }, { rule: "", message: "", level: byNode.get(nodeId) ?? "off" }]));
+    for (const { verdict } of feed) for (const f of verdict.findings) if (f.nodeId) raise(f.nodeId, f.level);
+    for (const j of judgments) if (!j.onTrack) raise(j.nodeId, "warn");
     return byNode;
-  }, [feed]);
+  }, [feed, judgments]);
 
   const nodes: NodeCardType[] = useMemo(
     () =>
@@ -116,6 +120,7 @@ export function App() {
         <strong>Loom</strong>
         <span className="muted">{info ? `${info.root} · 守护进程 127.0.0.1:${info.port}` : "启动中…"}</span>
         <span className="spacer" />
+        <span className="muted">L2：{info ? info.l2 ?? "关闭" : "…"}</span>
         <span className="muted">当前节点：{canvas?.nodes.find((n) => n.id === activeId)?.title ?? "无"}</span>
         <button onClick={install}>安装 hooks</button>
       </header>
@@ -186,6 +191,20 @@ export function App() {
             <CheckpointsPanel version={version} onChange={changed} />
           ) : (
             <p className="muted">项目不在 git 仓库中，检查点不可用。</p>
+          )}
+          {judgments.length > 0 && (
+            <>
+              <h4>L2 定向判断</h4>
+              <ol className="feed">
+                {judgments.slice(0, 5).map((j) => (
+                  <li key={j.at + j.nodeId}>
+                    <span className="muted">{j.at.slice(11, 19)}</span>{" "}
+                    <span className={j.onTrack ? "" : "finding-warn"}>{j.onTrack ? "没有偏离" : "可能偏离"}</span>
+                    ：{j.reason}
+                  </li>
+                ))}
+              </ol>
+            </>
           )}
           <h4>观察者事件</h4>
           {feed.length === 0 && <p className="muted">暂无事件。安装 hooks 后在本项目里运行 Claude Code。</p>}

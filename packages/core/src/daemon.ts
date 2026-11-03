@@ -2,34 +2,63 @@ import { EventEmitter } from "node:events";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import type { Canvas, Finding, LoomEvent, Memory, Verdict } from "@loom/schema";
+import { judgeTurn, refineMemory, turnWorthJudging } from "./judge.js";
+import type { Llm } from "./llm.js";
 import { draftsFromFindings, MemoryStore } from "./memory.js";
 import { Observer } from "./observer.js";
 import { LoomStore } from "./store.js";
 
+/** An L2 verdict on one agent turn. */
+export interface Judgment {
+  sessionId: string;
+  nodeId: string;
+  at: string;
+  onTrack: boolean;
+  reason: string;
+  by: string;
+}
+
 export interface DaemonEvents {
   event: [{ event: LoomEvent; verdict: Verdict }];
   active: [string | null];
-  /** New memory drafts written at the end of an agent turn. */
+  /** Memory drafts written, or refined by L2, at the end of an agent turn. */
   memory: [Memory[]];
+  judgment: [Judgment];
+  /** L2 could not run (model missing, timeout…); judging is skipped, agents are never blocked. */
+  l2error: [string];
+}
+
+export interface DaemonOptions {
+  /** L2 model; without one, Loom runs on L0 rules only. */
+  llm?: Llm | null;
+  maxL2CallsPerSession?: number;
 }
 
 /**
  * The local daemon. Hooks POST unified events to /event and get a verdict back.
  * It listens on 127.0.0.1 only and announces its port in .loom/runtime.json.
+ * L2 work (refining memories, judging turns) runs after the hook has its answer,
+ * so a slow model never slows the agent down.
  */
 export class Daemon extends EventEmitter<DaemonEvents> {
   readonly store: LoomStore;
   readonly observer: Observer;
   readonly memory: MemoryStore;
+  readonly llm: Llm | null;
   private server: http.Server | null = null;
-  /** Findings of each agent session since its last turn ended. */
-  private pending = new Map<string, Finding[]>();
+  /** Findings and events of each agent session since its last turn ended. */
+  private pending = new Map<string, { findings: Finding[]; events: LoomEvent[] }>();
+  private l2Calls = new Map<string, number>();
+  private background = new Set<Promise<void>>();
+  private readonly maxL2Calls: number;
 
-  constructor(root: string) {
+  constructor(root: string, options: DaemonOptions = {}) {
     super();
     this.store = new LoomStore(root);
     this.memory = new MemoryStore(root);
     this.observer = new Observer(root, this.store.loadCanvas(), this.store.loadRuleLevels());
+    this.llm = options.llm ?? null;
+    this.maxL2Calls = options.maxL2CallsPerSession ?? 20;
   }
 
   get canvas(): Canvas {
@@ -49,18 +78,60 @@ export class Daemon extends EventEmitter<DaemonEvents> {
   handle(event: LoomEvent): Verdict {
     const verdict = this.observer.evaluate(event);
     this.store.appendEvent({ event, verdict });
-    const findings = [...(this.pending.get(event.sessionId) ?? []), ...verdict.findings];
-    this.pending.set(event.sessionId, findings);
+    const turn = this.pending.get(event.sessionId) ?? { findings: [], events: [] };
+    turn.findings.push(...verdict.findings);
+    turn.events.push(event);
+    this.pending.set(event.sessionId, turn);
     this.emit("event", { event, verdict });
     if (event.kind === "turn.end") {
       // 记忆官: what the observer caught this turn becomes drafts waiting for approval.
       this.pending.delete(event.sessionId);
-      const drafts = draftsFromFindings(this.observer.canvasNow, findings, event.sessionId)
+      const drafts = draftsFromFindings(this.observer.canvasNow, turn.findings, event.sessionId)
         .map((d) => this.memory.add(d))
         .filter((m): m is Memory => m !== null);
       if (drafts.length) this.emit("memory", drafts);
+      if (this.llm) this.inBackground(this.runL2(event.sessionId, drafts, turn.events));
     }
     return verdict;
+  }
+
+  /** Resolves when all background L2 work has finished (tests, shutdown). */
+  async settled(): Promise<void> {
+    while (this.background.size) await Promise.all([...this.background]);
+  }
+
+  private inBackground(work: Promise<void>) {
+    const tracked = work.catch((err) => void this.emit("l2error", String(err?.message ?? err))).finally(() => this.background.delete(tracked));
+    this.background.add(tracked);
+  }
+
+  /** Spends one L2 call of the session's budget; false when the budget is used up. */
+  private spend(sessionId: string): boolean {
+    const used = this.l2Calls.get(sessionId) ?? 0;
+    if (used >= this.maxL2Calls) return false;
+    this.l2Calls.set(sessionId, used + 1);
+    return true;
+  }
+
+  private async runL2(sessionId: string, drafts: Memory[], events: LoomEvent[]) {
+    const llm = this.llm!;
+    const canvas = this.observer.canvasNow;
+    const refined: Memory[] = [];
+    for (const draft of drafts) {
+      if (!this.spend(sessionId)) break;
+      const node = canvas.nodes.find((n) => n.id === draft.nodeId) ?? null;
+      const text = await refineMemory(llm, draft.content, node);
+      if (text) refined.push(this.memory.update(draft.id, { content: text, evidence: draft.content }));
+    }
+    if (refined.length) this.emit("memory", refined);
+
+    const node = canvas.nodes.find((n) => n.id === this.observer.activeNodeId);
+    if (!node || !turnWorthJudging(events) || !this.spend(sessionId)) return;
+    const verdict = await judgeTurn(llm, node, this.store.readTask(node.id), events);
+    if (!verdict) return;
+    const judgment: Judgment = { sessionId, nodeId: node.id, at: new Date().toISOString(), by: llm.name, ...verdict };
+    this.store.appendJudgment(judgment);
+    this.emit("judgment", judgment);
   }
 
   async start(port = 0): Promise<number> {

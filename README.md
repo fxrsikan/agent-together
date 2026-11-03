@@ -16,6 +16,7 @@ AI 编码 agent 的画布控制台：人在画布上表达意图，agent 按节�
 | 生成初始画布 | `loom-init`：按顶层目录（monorepo 按子包）建节点，按 import 关系连线 |
 | 检查点与回滚 | 派发前自动保存，可一键回滚；快照存为 `refs/loom/checkpoints/*`，不碰分支和暂存区，回滚本身可撤销 |
 | 记忆 | 每轮结束时观察者的拦截生成草稿，人工批准后进入派发上下文，并同步到项目 `CLAUDE.md` 的 Loom 区块；也可手动添加 |
+| L2 语义判断（v0.2） | 每轮结束后在后台运行，不拖慢 agent：把记忆草稿提炼成一句中文经验（原始记录保留为 evidence）；对照节点目标和派发任务判断这一轮是否跑偏，结果显示在画布信号灯和"L2 定向判断"中 |
 | 导出 Skill | 节点（目标、文件范围、依赖、已批准记忆、规则）导出为 `.claude/skills/loom-<节点>/SKILL.md` |
 | 派发任务 | 选中节点 → 填任务 → 生成节点邻域上下文 `.loom/context/<节点>.md`，在新终端窗口启动 Claude Code（v0.1 仅 Windows） |
 | 干预 | `ask` 让 Claude Code 询问用户，`block` 拒绝，`warn` 注入提醒 |
@@ -65,6 +66,16 @@ node packages/core/dist/cli.js examples/demo login-form
 ```bash
 node packages/hook/dist/loom-hook.js install <你的项目目录> --platform codex
 ```
+
+## L2 模型
+
+默认 `auto`：设置了 `ANTHROPIC_API_KEY` 时用 Claude API（`claude-haiku-5-5`），否则用已登录的 `claude` 命令行（Haiku），都没有则关闭 L2、只跑 L0 规则。可在 `.loom/llm.json` 中指定（不要写密钥）：
+
+```json
+{ "provider": "claude-cli", "maxCallsPerSession": 20 }
+```
+
+`provider` 可选 `auto` / `off` / `anthropic` / `claude-cli` / `openai-compatible`（另需 `baseUrl`、`model`，如本地 Ollama 的 `http://localhost:11434/v1`；密钥放环境变量 `LOOM_LLM_API_KEY`）。环境变量 `LOOM_LLM_PROVIDER` 可临时覆盖。
 
 ## 规则级别
 

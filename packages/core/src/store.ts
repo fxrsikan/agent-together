@@ -61,6 +61,21 @@ export class LoomStore {
     fs.appendFileSync(path.join(eventsDir, `${day}.jsonl`), JSON.stringify(record) + "\n");
   }
 
+  /** Appends an L2 judgment to the same daily log as events. */
+  appendJudgment(judgment: { at: string }): void {
+    const eventsDir = path.join(this.dir, "events");
+    fs.mkdirSync(eventsDir, { recursive: true });
+    fs.appendFileSync(path.join(eventsDir, `${judgment.at.slice(0, 10)}.jsonl`), JSON.stringify({ judgment }) + "\n");
+  }
+
+  /** The task text of the last dispatch to a node (the "# 任务" section of its context file), if any. */
+  readTask(nodeId: string): string | null {
+    const file = path.join(this.dir, "context", `${nodeId}.md`);
+    if (!fs.existsSync(file)) return null;
+    const match = /^# 任务\s*\n([\s\S]*?)\n## /m.exec(fs.readFileSync(file, "utf8"));
+    return match ? match[1].trim() : null;
+  }
+
   /** Writes the dispatch context for a node; returns its project-relative path. */
   writeContext(nodeId: string, markdown: string): string {
     const contextDir = path.join(this.dir, "context");

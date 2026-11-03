@@ -1,4 +1,6 @@
-export { Daemon, type DaemonEvents } from "./daemon.js";
+export { Daemon, type DaemonEvents, type DaemonOptions, type Judgment } from "./daemon.js";
+export { createLlm, loadLlmConfig, type Llm, type LlmConfig } from "./llm.js";
+export { judgeTurn, parseJsonObject, refineMemory, turnWorthJudging, type TurnJudgment } from "./judge.js";
 export { Observer } from "./observer.js";
 export { builtinRules, type Rule, type RuleContext } from "./rules/index.js";
 export { LoomStore } from "./store.js";

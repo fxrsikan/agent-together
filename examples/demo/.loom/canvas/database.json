@@ -1,0 +1,13 @@
+{
+  "id": "database",
+  "kind": "module",
+  "title": "数据库",
+  "intent": {
+    "goal": "用户表的读写",
+    "acceptance": [],
+    "tasks": []
+  },
+  "files": ["src/db/**"],
+  "status": "done",
+  "position": { "x": 640, "y": 0 }
+}

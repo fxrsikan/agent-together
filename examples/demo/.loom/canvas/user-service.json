@@ -1,0 +1,13 @@
+{
+  "id": "user-service",
+  "kind": "module",
+  "title": "用户服务",
+  "intent": {
+    "goal": "按邮箱查询用户并校验密码",
+    "acceptance": [],
+    "tasks": []
+  },
+  "files": ["src/services/**"],
+  "status": "done",
+  "position": { "x": 320, "y": 0 }
+}

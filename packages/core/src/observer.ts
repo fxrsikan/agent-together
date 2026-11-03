@@ -1,0 +1,46 @@
+import { strongest, type Canvas, type Finding, type Level, type LoomEvent, type Verdict } from "@loom/schema";
+import { builtinRules, type Rule } from "./rules/index.js";
+
+const HISTORY_LIMIT = 500;
+
+/** Runs every rule on every event and keeps a short per-session history. */
+export class Observer {
+  private sessions = new Map<string, LoomEvent[]>();
+
+  constructor(
+    private readonly root: string,
+    private canvas: Canvas,
+    private levels: Record<string, Level> = {},
+    private readonly rules: Rule[] = builtinRules,
+    public activeNodeId: string | null = null,
+  ) {}
+
+  setCanvas(canvas: Canvas) {
+    this.canvas = canvas;
+  }
+
+  setLevels(levels: Record<string, Level>) {
+    this.levels = levels;
+  }
+
+  evaluate(event: LoomEvent): Verdict {
+    const history = this.sessions.get(event.sessionId) ?? [];
+    const ctx = {
+      root: this.root,
+      canvas: this.canvas,
+      activeNode: this.canvas.nodes.find((n) => n.id === this.activeNodeId) ?? null,
+      history,
+    };
+    const findings: Finding[] = [];
+    for (const rule of this.rules) {
+      const level = this.levels[rule.id] ?? rule.defaultLevel;
+      if (level === "off") continue;
+      const hit = rule.check(event, ctx);
+      if (hit) findings.push({ rule: rule.id, level, ...hit });
+    }
+    history.push(event);
+    if (history.length > HISTORY_LIMIT) history.shift();
+    this.sessions.set(event.sessionId, history);
+    return { level: strongest(findings), findings };
+  }
+}

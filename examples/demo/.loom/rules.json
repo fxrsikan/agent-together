@@ -1,0 +1,6 @@
+{
+  "scope-fence": "ask",
+  "test-tampering": "ask",
+  "repeated-failure": "warn",
+  "repeated-read": "warn"
+}

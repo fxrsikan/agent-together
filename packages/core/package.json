@@ -1,0 +1,16 @@
+{
+  "name": "@loom/core",
+  "version": "0.0.1",
+  "description": "Loom daemon: .loom store, observer engine, local hook server",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": { "loom-daemon": "dist/cli.js" },
+  "scripts": { "build": "tsc -b" },
+  "dependencies": {
+    "@loom/schema": "0.0.1",
+    "picomatch": "^4.0.2"
+  },
+  "devDependencies": { "@types/picomatch": "^3.0.1" }
+}

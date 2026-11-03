@@ -1,0 +1,23 @@
+{
+  "name": "loom",
+  "private": true,
+  "description": "Canvas control plane for AI coding agents (working name: Loom)",
+  "license": "Apache-2.0",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w @loom/schema -w @loom/core -w @loom/adapter-claude-code -w @loom/hook",
+    "build:desktop": "npm run build -w @loom/desktop",
+    "dev": "npm run dev -w @loom/desktop",
+    "test": "vitest run",
+    "typecheck": "tsc -b"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  }
+}

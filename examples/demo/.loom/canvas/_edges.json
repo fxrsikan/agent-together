@@ -1,0 +1,4 @@
+[
+  { "from": "login-form", "to": "user-service", "label": "调用" },
+  { "from": "user-service", "to": "database", "label": "查询" }
+]

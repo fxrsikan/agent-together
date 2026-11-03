@@ -1,0 +1,14 @@
+{
+  "id": "login-form",
+  "kind": "feature",
+  "title": "登录表单",
+  "intent": {
+    "goal": "用户可以用邮箱和密码登录",
+    "acceptance": ["邮箱格式错误时提示", "密码长度不少于 8 位"],
+    "tasks": ["实现 validateLogin()", "为校验写单元测试"]
+  },
+  "files": ["src/auth/**"],
+  "status": "in_progress",
+  "executor": "claude-code",
+  "position": { "x": 0, "y": 0 }
+}

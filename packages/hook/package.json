@@ -1,0 +1,15 @@
+{
+  "name": "@loom/hook",
+  "version": "0.0.1",
+  "description": "loom-hook: the tiny program agent hooks call; asks the local Loom daemon for a verdict",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "dist/loom-hook.js",
+  "bin": { "loom-hook": "dist/loom-hook.js" },
+  "scripts": { "build": "tsc -b" },
+  "dependencies": {
+    "@loom/adapter-claude-code": "0.0.1",
+    "@loom/core": "0.0.1",
+    "@loom/schema": "0.0.1"
+  }
+}

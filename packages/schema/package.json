@@ -1,0 +1,11 @@
+{
+  "name": "@loom/schema",
+  "version": "0.0.1",
+  "description": "Canvas, event and verdict types shared by every Loom package",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": { "build": "tsc -b" },
+  "dependencies": { "zod": "^4.6.7" }
+}

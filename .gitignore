@@ -4,3 +4,4 @@ out/
 *.tsbuildinfo
 **/.loom/runtime.json
 **/.loom/events/
+**/.claude/settings.local.json

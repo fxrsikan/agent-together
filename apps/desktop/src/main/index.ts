@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { app, BrowserWindow, dialog, ipcMain } from "electron";
 import { dispatchPrompt, installHooks, launchInTerminal } from "@loom/adapter-claude-code";
-import { buildNodeContext, Daemon } from "@loom/core";
+import { buildNodeContext, Checkpoints, Daemon } from "@loom/core";
 
 /** Project to open: LOOM_PROJECT, else the bundled demo, else ask. */
 async function pickProject(): Promise<string | null> {
@@ -21,6 +21,8 @@ async function main() {
 
   const daemon = new Daemon(root);
   const port = await daemon.start();
+  const checkpoints = new Checkpoints(root);
+  const hasGit = checkpoints.available();
 
   const win = new BrowserWindow({
     width: 1280,
@@ -31,7 +33,7 @@ async function main() {
   daemon.on("event", (record) => win.webContents.send("loom:event", record));
   daemon.on("active", (nodeId) => win.webContents.send("loom:active", nodeId));
 
-  ipcMain.handle("loom:info", () => ({ root, port, activeNodeId: daemon.observer.activeNodeId }));
+  ipcMain.handle("loom:info", () => ({ root, port, hasGit, activeNodeId: daemon.observer.activeNodeId }));
   ipcMain.handle("loom:canvas", () => daemon.canvas);
   ipcMain.handle("loom:setActive", (_e, nodeId: string | null) => daemon.setActiveNode(nodeId));
   ipcMain.handle("loom:installHooks", () => {
@@ -39,12 +41,31 @@ async function main() {
     const hook = path.resolve(app.getAppPath(), "../../packages/hook/dist/loom-hook.js");
     return installHooks(root, `node "${hook}"`);
   });
-  // Dispatch: make the node active, write its neighbourhood context, open Claude Code on it.
+  // Dispatch: checkpoint first, make the node active, write its neighbourhood context, open Claude Code on it.
   ipcMain.handle("loom:dispatch", (_e, nodeId: string, task: string) => {
+    if (hasGit) checkpoints.create("派发前", nodeId);
     const file = daemon.store.writeContext(nodeId, buildNodeContext(daemon.canvas, nodeId, task));
     daemon.setActiveNode(nodeId);
     launchInTerminal(root, dispatchPrompt(file), `Loom - ${nodeId}`);
     return file;
+  });
+
+  ipcMain.handle("loom:checkpoints", () => (hasGit ? checkpoints.list() : []));
+  ipcMain.handle("loom:checkpoint", (_e, label: string) => checkpoints.create(label, daemon.observer.activeNodeId));
+  ipcMain.handle("loom:rollback", async (_e, id: string) => {
+    const target = checkpoints.list().find((c) => c.id === id);
+    const { response } = await dialog.showMessageBox(win, {
+      type: "warning",
+      buttons: ["回滚", "取消"],
+      defaultId: 1,
+      cancelId: 1,
+      message: `把项目文件回滚到"${target?.label ?? id}"？`,
+      detail: "当前状态会先自动存为一个检查点，回滚之后还可以再回来。被 git 忽略的文件不受影响。",
+    });
+    if (response !== 0) return false;
+    checkpoints.rollback(id);
+    daemon.reload();
+    return true;
   });
 
   if (process.env.ELECTRON_RENDERER_URL) await win.loadURL(process.env.ELECTRON_RENDERER_URL);

@@ -13,6 +13,8 @@ AI 编码 agent 的画布控制台：人在画布上表达意图，agent 按节�
 | --- | --- |
 | 画布数据格式 | `.loom/canvas/<节点>.json` + `_edges.json`，zod 校验 |
 | 观察者 L0 规则 | 越界写入、设计守护（import 必须沿画布连线）、篡改测试、重复失败、重复读取 |
+| 生成初始画布 | `loom-init`：按顶层目录（monorepo 按子包）建节点，按 import 关系连线 |
+| 检查点与回滚 | 派发前自动保存，可一键回滚；快照存为 `refs/loom/checkpoints/*`，不碰分支和暂存区，回滚本身可撤销 |
 | 派发任务 | 选中节点 → 填任务 → 生成节点邻域上下文 `.loom/context/<节点>.md`，在新终端窗口启动 Claude Code（v0.1 仅 Windows） |
 | 干预 | `ask` 让 Claude Code 询问用户，`block` 拒绝，`warn` 注入提醒 |
 | Claude Code 适配器 | hook 载荷 ↔ 统一事件，写入 `.claude/settings.local.json` |
@@ -38,6 +40,12 @@ npm install
 npm run build
 npm test
 npm run dev
+```
+
+给自己的项目生成画布（之后再改节点名称、目标和连线）：
+
+```bash
+node packages/core/dist/init-cli.js <你的项目目录>
 ```
 
 `npm run dev` 默认打开 `examples/demo`；设置环境变量 `LOOM_PROJECT` 可打开其他带 `.loom/` 的项目。

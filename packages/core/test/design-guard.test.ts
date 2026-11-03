@@ -47,6 +47,16 @@ describe("design-guard", () => {
     expect(rules(write("src/auth/form.ts", `${line}\nexport {};`, line))).toEqual([]);
   });
 
+  it("resolves a directory import past a root-level glob", () => {
+    const withRoot = Canvas.parse({
+      ...canvas,
+      nodes: [...canvas.nodes, { id: "src", kind: "module", title: "src root", files: ["src/*"] }],
+    });
+    const o = new Observer(root, withRoot, { "scope-fence": "off" });
+    const verdict = o.evaluate(write("src/auth/form.ts", `import { db } from "../db";`));
+    expect(verdict.findings[0]?.message).toContain("Database");
+  });
+
   it("ignores packages and imports inside the same node", () => {
     expect(rules(write("src/auth/form.ts", `import React from "react";\nimport { a } from "./a";`))).toEqual([]);
   });

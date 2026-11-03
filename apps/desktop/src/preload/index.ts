@@ -1,10 +1,15 @@
 import { contextBridge, ipcRenderer } from "electron";
+import type { Checkpoint } from "@loom/core";
 import type { Canvas, LoomEvent, Verdict } from "@loom/schema";
 
 export type EventRecord = { event: LoomEvent; verdict: Verdict };
 
 const api = {
-  info: (): Promise<{ root: string; port: number; activeNodeId: string | null }> => ipcRenderer.invoke("loom:info"),
+  info: (): Promise<{ root: string; port: number; hasGit: boolean; activeNodeId: string | null }> =>
+    ipcRenderer.invoke("loom:info"),
+  checkpoints: (): Promise<Checkpoint[]> => ipcRenderer.invoke("loom:checkpoints"),
+  checkpoint: (label: string): Promise<Checkpoint> => ipcRenderer.invoke("loom:checkpoint", label),
+  rollback: (id: string): Promise<boolean> => ipcRenderer.invoke("loom:rollback", id),
   canvas: (): Promise<Canvas> => ipcRenderer.invoke("loom:canvas"),
   setActive: (nodeId: string | null): Promise<void> => ipcRenderer.invoke("loom:setActive", nodeId),
   installHooks: (): Promise<string> => ipcRenderer.invoke("loom:installHooks"),

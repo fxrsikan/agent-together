@@ -1,14 +1,9 @@
+import fs from "node:fs";
 import path from "node:path";
+import { importCandidates, importSpecifiers, SOURCE_FILE } from "../imports.js";
 import { mayDepend, ownerOf } from "../owners.js";
 import { relativeToRoot } from "../paths.js";
 import type { Rule } from "./types.js";
-
-const SOURCE = /\.[cm]?[jt]sx?$/;
-// import x from "y" · import "y" · export * from "y" · require("y") · import("y")
-const SPECIFIER = /(?:\bfrom\s*|\bimport\s*|\brequire\s*\(\s*|\bimport\s*\(\s*)["']([^"']+)["']/g;
-const EXTENSIONS = ["", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", "/index.ts", "/index.tsx", "/index.js"];
-
-const specifiers = (code: string | undefined) => new Set([...(code ?? "").matchAll(SPECIFIER)].map((m) => m[1]));
 
 /**
  * 设计守护: an import may only cross node boundaries along a canvas edge.
@@ -21,16 +16,16 @@ export const designGuard: Rule = {
     if (event.kind !== "tool.before" || event.action.type !== "write") return null;
     const { path: file, before, after } = event.action;
     const rel = relativeToRoot(root, file);
-    if (!rel || !SOURCE.test(rel)) return null;
+    if (!rel || !SOURCE_FILE.test(rel)) return null;
     const from = ownerOf(canvas, rel);
     if (!from) return null;
 
-    const old = specifiers(before);
+    const old = importSpecifiers(before);
+    const exists = (p: string) => fs.existsSync(path.join(root, p));
     const violations: string[] = [];
-    for (const spec of specifiers(after)) {
-      if (old.has(spec) || !spec.startsWith(".")) continue;
-      const target = path.posix.normalize(path.posix.join(path.posix.dirname(rel), spec));
-      const to = EXTENSIONS.map((ext) => ownerOf(canvas, target + ext)).find(Boolean);
+    for (const spec of importSpecifiers(after)) {
+      if (old.has(spec)) continue;
+      const to = importCandidates(rel, spec, exists).map((c) => ownerOf(canvas, c)).find(Boolean);
       if (to && !mayDepend(canvas, from.id, to.id)) violations.push(`"${spec}" (${to.title})`);
     }
     if (!violations.length) return null;

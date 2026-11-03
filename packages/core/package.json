@@ -6,7 +6,7 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "bin": { "loom-daemon": "dist/cli.js" },
+  "bin": { "loom-daemon": "dist/cli.js", "loom-init": "dist/init-cli.js" },
   "scripts": { "build": "tsc -b" },
   "dependencies": {
     "@loom/schema": "0.0.1",

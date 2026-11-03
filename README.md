@@ -20,6 +20,7 @@ AI 编码 agent 的画布控制台：人在画布上表达意图，agent 按节�
 | 派发任务 | 选中节点 → 填任务 → 生成节点邻域上下文 `.loom/context/<节点>.md`，在新终端窗口启动 Claude Code（v0.1 仅 Windows） |
 | 干预 | `ask` 让 Claude Code 询问用户，`block` 拒绝，`warn` 注入提醒 |
 | Claude Code 适配器 | hook 载荷 ↔ 统一事件，写入 `.claude/settings.local.json` |
+| Codex 适配器（v0.2） | 解析 `apply_patch`（一个补丁多个文件各自检查），`ask` 转为拒绝并要求 agent 询问用户，退出码从会话记录读取；hooks 写入 git 仓库根目录的 `.codex/hooks.json`，需在 Codex 的 `/hooks` 中信任 |
 | 桌面应用 | Electron + React Flow：画布、节点信号灯、当前节点、事件流 |
 
 ## 目录
@@ -57,6 +58,12 @@ node packages/core/dist/init-cli.js <你的项目目录>
 
 ```bash
 node packages/core/dist/cli.js examples/demo login-form
+```
+
+给 Codex 安装 hooks（之后在项目里运行 `codex`，用 `/hooks` 信任它们）：
+
+```bash
+node packages/hook/dist/loom-hook.js install <你的项目目录> --platform codex
 ```
 
 ## 规则级别

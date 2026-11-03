@@ -73,11 +73,12 @@ export class MemoryStore {
   }
 
   /**
-   * Mirrors active memories into a Loom-managed block of <root>/CLAUDE.md, so
-   * agents started without Loom still see them. Text outside the block is kept.
+   * Mirrors active memories into a Loom-managed block of the project's agent
+   * instruction files — CLAUDE.md (Claude Code) and AGENTS.md (Codex, Cursor,
+   * Grok Build) — so agents started without Loom still see them. Text outside
+   * the block is kept. Returns the files written.
    */
-  syncClaudeMd(canvas: Canvas): string {
-    const file = path.join(this.root, "CLAUDE.md");
+  syncAgentFiles(canvas: Canvas): string[] {
     const active = this.list().filter((m) => m.status === "active");
     const title = (id: string | null) => (id ? canvas.nodes.find((n) => n.id === id)?.title ?? id : "全项目");
     const groups = new Map<string, Memory[]>();
@@ -87,15 +88,18 @@ export class MemoryStore {
       .join("\n\n");
     const block = `${BLOCK_START}\n## Loom 记忆（由 Loom 维护，请在 Loom 中修改）\n\n${body || "（暂无）"}\n${BLOCK_END}`;
 
-    const existing = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
-    const start = existing.indexOf(BLOCK_START);
-    const end = existing.indexOf(BLOCK_END);
-    const next =
-      start >= 0 && end > start
-        ? existing.slice(0, start) + block + existing.slice(end + BLOCK_END.length)
-        : `${existing}${existing && !existing.endsWith("\n") ? "\n" : ""}${existing ? "\n" : ""}${block}\n`;
-    fs.writeFileSync(file, next);
-    return file;
+    return ["CLAUDE.md", "AGENTS.md"].map((name) => {
+      const file = path.join(this.root, name);
+      const existing = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
+      const start = existing.indexOf(BLOCK_START);
+      const end = existing.indexOf(BLOCK_END);
+      const next =
+        start >= 0 && end > start
+          ? existing.slice(0, start) + block + existing.slice(end + BLOCK_END.length)
+          : `${existing}${existing && !existing.endsWith("\n") ? "\n" : ""}${existing ? "\n" : ""}${block}\n`;
+      fs.writeFileSync(file, next);
+      return file;
+    });
   }
 
   private write(m: Memory) {

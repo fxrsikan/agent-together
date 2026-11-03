@@ -8,3 +8,4 @@ export { buildNodeContext, buildNodeGuide } from "./context.js";
 export { draftsFromFindings, MemoryStore } from "./memory.js";
 export { generateCanvas, initProject, listFiles } from "./init.js";
 export { Checkpoints, type Checkpoint } from "./checkpoints.js";
+export { cleanEnv, dispatchPrompt, openTerminal } from "./terminal.js";

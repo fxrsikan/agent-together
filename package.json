@@ -9,7 +9,7 @@
     "apps/*"
   ],
   "scripts": {
-    "build": "npm run build -w @loom/schema -w @loom/core -w @loom/adapter-claude-code -w @loom/hook",
+    "build": "npm run build -w @loom/schema -w @loom/core -w @loom/adapter-claude-code -w @loom/adapter-codex -w @loom/hook",
     "build:desktop": "npm run build -w @loom/desktop",
     "dev": "npm run dev -w @loom/desktop",
     "test": "vitest run",

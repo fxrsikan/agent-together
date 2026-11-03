@@ -4,6 +4,7 @@
     { "path": "packages/schema" },
     { "path": "packages/core" },
     { "path": "packages/adapter-claude-code" },
+    { "path": "packages/adapter-codex" },
     { "path": "packages/hook" }
   ]
 }

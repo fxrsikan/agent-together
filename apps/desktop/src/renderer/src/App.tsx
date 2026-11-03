@@ -26,6 +26,7 @@ export function App() {
   const [feed, setFeed] = useState<EventRecord[]>([]);
   const [notice, setNotice] = useState("");
   const [task, setTask] = useState("");
+  const [agent, setAgent] = useState<"claude-code" | "codex">("claude-code");
 
   useEffect(() => {
     window.loom.info().then((i) => {
@@ -94,14 +95,15 @@ export function App() {
 
   const selected = canvas?.nodes.find((n) => n.id === selectedId) ?? null;
 
-  const install = async () => setNotice(`已写入 ${await window.loom.installHooks()}`);
+  const install = async () =>
+    setNotice(`已写入 ${(await window.loom.installHooks()).join("、")}。Codex 需要在项目里运行 codex 并用 /hooks 信任后才生效。`);
 
   const exportSkill = async (nodeId: string) => setNotice(`已导出 ${await window.loom.exportSkill(nodeId)}`);
 
   const dispatch = async (nodeId: string) => {
     try {
-      const file = await window.loom.dispatch(nodeId, task);
-      changed(`已存检查点并在新窗口启动 Claude Code，上下文：${file}`);
+      const file = await window.loom.dispatch(nodeId, task, agent);
+      changed(`已存检查点并在新窗口启动 ${agent === "codex" ? "Codex" : "Claude Code"}，上下文：${file}`);
       setTask("");
     } catch (err) {
       setNotice(`派发失败：${err instanceof Error ? err.message : String(err)}`);
@@ -115,7 +117,7 @@ export function App() {
         <span className="muted">{info ? `${info.root} · 守护进程 127.0.0.1:${info.port}` : "启动中…"}</span>
         <span className="spacer" />
         <span className="muted">当前节点：{canvas?.nodes.find((n) => n.id === activeId)?.title ?? "无"}</span>
-        <button onClick={install}>安装 Claude Code hooks</button>
+        <button onClick={install}>安装 hooks</button>
       </header>
       {notice && <div className="notice">{notice}</div>}
       <main className="body">
@@ -158,8 +160,12 @@ export function App() {
                 onChange={(e) => setTask(e.target.value)}
               />
               <div className="actions">
+                <select value={agent} onChange={(e) => setAgent(e.target.value as typeof agent)}>
+                  <option value="claude-code">Claude Code</option>
+                  <option value="codex">Codex</option>
+                </select>
                 <button className="primary" onClick={() => dispatch(selected.id)}>
-                  派发给 Claude Code
+                  派发
                 </button>
                 {selected.id === activeId ? (
                   <button onClick={() => window.loom.setActive(null)}>取消当前节点</button>

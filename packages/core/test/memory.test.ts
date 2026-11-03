@@ -37,18 +37,19 @@ describe("MemoryStore", () => {
     expect(store.forNode("login-form").map((m) => m.content).sort()).toEqual(["a", "global"]);
   });
 
-  it("keeps a Loom-managed block in CLAUDE.md and leaves the rest alone", () => {
+  it("keeps a Loom-managed block in CLAUDE.md (and AGENTS.md) and leaves the rest alone", () => {
     const root = tmp();
     fs.writeFileSync(path.join(root, "CLAUDE.md"), "# My project\n\nOwn notes.\n");
     const store = new MemoryStore(root);
     store.update(store.add({ ...base, content: "不要直连数据库" })!.id, { status: "active" });
-    store.syncClaudeMd(canvas);
-    store.syncClaudeMd(canvas);
+    store.syncAgentFiles(canvas);
+    store.syncAgentFiles(canvas);
     const md = fs.readFileSync(path.join(root, "CLAUDE.md"), "utf8");
     expect(md.startsWith("# My project\n\nOwn notes.\n")).toBe(true);
     expect(md.match(/loom:memory:start/g)).toHaveLength(1);
     expect(md).toContain("### 登录表单");
     expect(md).toContain("（踩过的坑）不要直连数据库");
+    expect(fs.readFileSync(path.join(root, "AGENTS.md"), "utf8")).toContain("（踩过的坑）不要直连数据库");
   });
 });
 

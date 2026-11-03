@@ -6,3 +6,4 @@ out/
 **/.loom/events/
 **/.loom/context/
 **/.claude/settings.local.json
+**/.codex/hooks.json

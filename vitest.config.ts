@@ -9,6 +9,7 @@ export default defineConfig({
       "@loom/schema": src("schema"),
       "@loom/core": src("core"),
       "@loom/adapter-claude-code": src("adapter-claude-code"),
+      "@loom/adapter-codex": src("adapter-codex"),
     },
   },
   test: {

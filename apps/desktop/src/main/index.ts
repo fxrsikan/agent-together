@@ -1,8 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { app, BrowserWindow, dialog, ipcMain } from "electron";
-import { dispatchPrompt, exportSkill, installHooks, launchInTerminal } from "@loom/adapter-claude-code";
-import { buildNodeContext, buildNodeGuide, Checkpoints, Daemon } from "@loom/core";
+import { exportSkill, installHooks } from "@loom/adapter-claude-code";
+import { installCodexHooks } from "@loom/adapter-codex";
+import { buildNodeContext, buildNodeGuide, Checkpoints, Daemon, dispatchPrompt, openTerminal } from "@loom/core";
 import type { Memory } from "@loom/schema";
 
 /** Project to open: LOOM_PROJECT, else the bundled demo, else ask. */
@@ -41,15 +42,16 @@ async function main() {
   ipcMain.handle("loom:installHooks", () => {
     // Dev layout: the hook program is built in the sibling workspace package.
     const hook = path.resolve(app.getAppPath(), "../../packages/hook/dist/loom-hook.js");
-    return installHooks(root, `node "${hook}"`);
+    return [installHooks(root, `node "${hook}"`), installCodexHooks(root, `node "${hook}" --platform codex`)];
   });
-  // Dispatch: checkpoint first, make the node active, write its neighbourhood context, open Claude Code on it.
-  ipcMain.handle("loom:dispatch", (_e, nodeId: string, task: string) => {
-    if (hasGit) checkpoints.create("派发前", nodeId);
+  // Dispatch: checkpoint first, make the node active, write its neighbourhood context, open the agent on it.
+  ipcMain.handle("loom:dispatch", (_e, nodeId: string, task: string, agent: "claude-code" | "codex") => {
+    if (hasGit) checkpoints.create(`派发前（${agent}）`, nodeId);
     const context = buildNodeContext(daemon.canvas, nodeId, task, daemon.memory.forNode(nodeId));
     const file = daemon.store.writeContext(nodeId, context);
     daemon.setActiveNode(nodeId);
-    launchInTerminal(root, dispatchPrompt(file), `Loom - ${nodeId}`);
+    const cli = agent === "codex" ? "codex" : "claude";
+    openTerminal(root, `${cli} "${dispatchPrompt(file)}"`, `Loom - ${nodeId} - ${agent}`);
     return file;
   });
 
@@ -57,12 +59,12 @@ async function main() {
   ipcMain.handle("loom:memories", () => daemon.memory.list());
   ipcMain.handle("loom:addMemory", (_e, nodeId: string | null, kind: Memory["kind"], content: string) => {
     const m = daemon.memory.add({ nodeId, kind, content, status: "active", source: "user" });
-    daemon.memory.syncClaudeMd(daemon.canvas);
+    daemon.memory.syncAgentFiles(daemon.canvas);
     return m;
   });
   ipcMain.handle("loom:setMemoryStatus", (_e, id: string, status: Memory["status"]) => {
     const m = daemon.memory.update(id, { status });
-    daemon.memory.syncClaudeMd(daemon.canvas);
+    daemon.memory.syncAgentFiles(daemon.canvas);
     return m;
   });
   ipcMain.handle("loom:exportSkill", (_e, nodeId: string) => {

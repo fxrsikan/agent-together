@@ -2,7 +2,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { cleanEnv, exportSkill, installHooks, skillName, toHookOutput, toLoomEvent } from "@loom/adapter-claude-code";
+import { exportSkill, installHooks, skillName, toHookOutput, toLoomEvent } from "@loom/adapter-claude-code";
+import { cleanEnv } from "@loom/core";
 
 describe("exportSkill", () => {
   it("writes SKILL.md with a valid name and a description saying when to use it", () => {

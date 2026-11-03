@@ -1,0 +1,11 @@
+{
+  "name": "@loom/adapter-codex",
+  "version": "0.0.1",
+  "description": "Codex CLI adapter: hook payloads (incl. apply_patch) to Loom events, verdicts to hook output, hook installer, launcher",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": { "build": "tsc -b" },
+  "dependencies": { "@loom/schema": "0.0.1" }
+}

@@ -9,6 +9,7 @@
   "scripts": { "build": "tsc -b" },
   "dependencies": {
     "@loom/adapter-claude-code": "0.0.1",
+    "@loom/adapter-codex": "0.0.1",
     "@loom/core": "0.0.1",
     "@loom/schema": "0.0.1"
   }

@@ -1,12 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
 import { app, BrowserWindow, dialog, ipcMain } from "electron";
-import { exportSkill, installHooks } from "@loom/adapter-claude-code";
-import { installCodexHooks } from "@loom/adapter-codex";
+import { claudeCodeCompiler, installHooks } from "@loom/adapter-claude-code";
+import { agentSkillsCompiler, installCodexHooks } from "@loom/adapter-codex";
+import { cursorRulesCompiler } from "@loom/adapter-cursor";
 import {
   buildNodeContext,
-  buildNodeGuide,
+  capabilityFromNode,
   Checkpoints,
+  compileCapabilities,
   createLlm,
   Daemon,
   dispatchPrompt,
@@ -14,6 +16,8 @@ import {
   openTerminal,
 } from "@loom/core";
 import type { Memory } from "@loom/schema";
+
+const compilers = [claudeCodeCompiler, agentSkillsCompiler, cursorRulesCompiler];
 
 /** Project to open: LOOM_PROJECT, else the bundled demo, else ask. */
 async function pickProject(): Promise<string | null> {
@@ -80,10 +84,18 @@ async function main() {
     daemon.memory.syncAgentFiles(daemon.canvas);
     return m;
   });
-  ipcMain.handle("loom:exportSkill", (_e, nodeId: string) => {
-    const node = daemon.canvas.nodes.find((n) => n.id === nodeId);
-    if (!node) throw new Error(`unknown node: ${nodeId}`);
-    return exportSkill(root, node, buildNodeGuide(daemon.canvas, nodeId, daemon.memory.forNode(nodeId)));
+  // Node gene: save the node as a capability unit, then compile every capability for every platform.
+  ipcMain.handle("loom:exportCapability", (_e, nodeId: string) => {
+    const previous = daemon.capabilities.list().find((c) => c.nodeId === nodeId);
+    const capability = daemon.capabilities.save(
+      capabilityFromNode(daemon.canvas, nodeId, daemon.memory.forNode(nodeId), previous),
+    );
+    const [report] = compileCapabilities(root, [capability], compilers);
+    return report;
+  });
+  ipcMain.handle("loom:compileCapabilities", () => {
+    daemon.reload(); // observer capabilities take effect right away
+    return compileCapabilities(root, daemon.capabilities.list(), compilers);
   });
 
   ipcMain.handle("loom:checkpoints",() => (hasGit ? checkpoints.list() : []));

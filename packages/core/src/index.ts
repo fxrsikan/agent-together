@@ -11,3 +11,13 @@ export { draftsFromFindings, MemoryStore } from "./memory.js";
 export { generateCanvas, initProject, listFiles } from "./init.js";
 export { Checkpoints, type Checkpoint } from "./checkpoints.js";
 export { cleanEnv, dispatchPrompt, openTerminal } from "./terminal.js";
+export {
+  CapabilityStore,
+  capabilityFromNode,
+  capabilityRules,
+  checkCapability,
+  compileCapabilities,
+  type CheckResult,
+  type CompileReport,
+} from "./capabilities.js";
+export { formatFrontmatter, parseFrontmatter } from "./frontmatter.js";

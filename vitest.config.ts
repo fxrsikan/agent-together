@@ -10,6 +10,7 @@ export default defineConfig({
       "@loom/core": src("core"),
       "@loom/adapter-claude-code": src("adapter-claude-code"),
       "@loom/adapter-codex": src("adapter-codex"),
+      "@loom/adapter-cursor": src("adapter-cursor"),
     },
   },
   test: {

@@ -1,0 +1,11 @@
+{
+  "name": "@loom/adapter-cursor",
+  "version": "0.0.1",
+  "description": "Cursor adapter: capability units compiled to .cursor/rules/*.mdc (hooks come in v0.3)",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": { "build": "tsc -b" },
+  "dependencies": { "@loom/schema": "0.0.1" }
+}

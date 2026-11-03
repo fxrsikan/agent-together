@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
-import type { Checkpoint, Judgment } from "@loom/core";
+import type { Checkpoint, CompileReport, Judgment } from "@loom/core";
 import type { Canvas, LoomEvent, Memory, Verdict } from "@loom/schema";
 
 export type EventRecord = { event: LoomEvent; verdict: Verdict };
@@ -26,7 +26,8 @@ const api = {
     ipcRenderer.invoke("loom:addMemory", nodeId, kind, content),
   setMemoryStatus: (id: string, status: Memory["status"]): Promise<Memory> =>
     ipcRenderer.invoke("loom:setMemoryStatus", id, status),
-  exportSkill: (nodeId: string): Promise<string> => ipcRenderer.invoke("loom:exportSkill", nodeId),
+  exportCapability: (nodeId: string): Promise<CompileReport> => ipcRenderer.invoke("loom:exportCapability", nodeId),
+  compileCapabilities: (): Promise<CompileReport[]> => ipcRenderer.invoke("loom:compileCapabilities"),
   onMemoryDrafts(cb: (drafts: Memory[]) => void) {
     const listener = (_e: unknown, drafts: Memory[]) => cb(drafts);
     ipcRenderer.on("loom:memoryDrafts", listener);

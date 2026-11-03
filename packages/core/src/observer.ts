@@ -11,7 +11,7 @@ export class Observer {
     private readonly root: string,
     private canvas: Canvas,
     private levels: Record<string, Level> = {},
-    private readonly rules: Rule[] = builtinRules,
+    private rules: Rule[] = builtinRules,
     public activeNodeId: string | null = null,
   ) {}
 
@@ -21,6 +21,10 @@ export class Observer {
 
   setCanvas(canvas: Canvas) {
     this.canvas = canvas;
+  }
+
+  setRules(rules: Rule[]) {
+    this.rules = rules;
   }
 
   setLevels(levels: Record<string, Level>) {

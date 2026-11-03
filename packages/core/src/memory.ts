@@ -2,32 +2,19 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { Memory, type Canvas, type Finding } from "@loom/schema";
+import { formatFrontmatter, parseFrontmatter } from "./frontmatter.js";
 
-const FIELDS = ["id", "nodeId", "kind", "status", "source", "createdAt"] as const;
+const FIELDS = ["id", "nodeId", "kind", "status", "source", "createdAt", "evidence"] as const;
 const BLOCK_START = "<!-- loom:memory:start -->";
 const BLOCK_END = "<!-- loom:memory:end -->";
 
 const KIND_LABEL: Record<Memory["kind"], string> = { decision: "决策", constraint: "约束", pitfall: "踩过的坑", preference: "偏好" };
 
-function serialize(m: Memory): string {
-  const head = FIELDS.map((k) => `${k}: ${m[k] ?? "null"}`);
-  // Evidence can hold quotes and newlines: store it as one JSON string line.
-  if (m.evidence) head.push(`evidence: ${JSON.stringify(m.evidence)}`);
-  return `---\n${head.join("\n")}\n---\n${m.content.trim()}\n`;
-}
+const serialize = (m: Memory) => formatFrontmatter(FIELDS.map((k) => [k, m[k]]), m.content);
 
 function parse(text: string): Memory {
-  const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/.exec(text);
-  if (!match) throw new Error("memory file has no frontmatter");
-  const fields: Record<string, string | null> = {};
-  for (const line of match[1].split(/\r?\n/)) {
-    const i = line.indexOf(":");
-    if (i > 0) {
-      const value = line.slice(i + 1).trim();
-      fields[line.slice(0, i).trim()] = value === "null" ? null : value.startsWith('"') ? JSON.parse(value) : value;
-    }
-  }
-  return Memory.parse({ ...fields, content: match[2].trim() });
+  const { fields, body } = parseFrontmatter(text);
+  return Memory.parse({ ...fields, content: body });
 }
 
 /**

@@ -1,10 +1,23 @@
 {
   "files": [],
   "references": [
-    { "path": "packages/schema" },
-    { "path": "packages/core" },
-    { "path": "packages/adapter-claude-code" },
-    { "path": "packages/adapter-codex" },
-    { "path": "packages/hook" }
+    {
+      "path": "packages/schema"
+    },
+    {
+      "path": "packages/core"
+    },
+    {
+      "path": "packages/adapter-claude-code"
+    },
+    {
+      "path": "packages/adapter-codex"
+    },
+    {
+      "path": "packages/adapter-cursor"
+    },
+    {
+      "path": "packages/hook"
+    }
   ]
 }

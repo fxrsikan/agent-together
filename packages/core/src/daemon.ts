@@ -2,7 +2,9 @@ import { EventEmitter } from "node:events";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import type { Canvas, Finding, LoomEvent, Memory, Verdict } from "@loom/schema";
+import { CapabilityStore, capabilityRules } from "./capabilities.js";
 import { judgeTurn, refineMemory, turnWorthJudging } from "./judge.js";
+import { builtinRules } from "./rules/index.js";
 import type { Llm } from "./llm.js";
 import { draftsFromFindings, MemoryStore } from "./memory.js";
 import { Observer } from "./observer.js";
@@ -44,6 +46,7 @@ export class Daemon extends EventEmitter<DaemonEvents> {
   readonly store: LoomStore;
   readonly observer: Observer;
   readonly memory: MemoryStore;
+  readonly capabilities: CapabilityStore;
   readonly llm: Llm | null;
   private server: http.Server | null = null;
   /** Findings and events of each agent session since its last turn ended. */
@@ -56,7 +59,8 @@ export class Daemon extends EventEmitter<DaemonEvents> {
     super();
     this.store = new LoomStore(root);
     this.memory = new MemoryStore(root);
-    this.observer = new Observer(root, this.store.loadCanvas(), this.store.loadRuleLevels());
+    this.capabilities = new CapabilityStore(root);
+    this.observer = new Observer(root, this.store.loadCanvas(), this.store.loadRuleLevels(), this.rules());
     this.llm = options.llm ?? null;
     this.maxL2Calls = options.maxL2CallsPerSession ?? 20;
   }
@@ -65,9 +69,15 @@ export class Daemon extends EventEmitter<DaemonEvents> {
     return this.store.loadCanvas();
   }
 
+  /** Built-in L0 rules plus the project's observer capabilities. */
+  private rules() {
+    return [...builtinRules, ...capabilityRules(this.capabilities.list())];
+  }
+
   reload() {
     this.observer.setCanvas(this.store.loadCanvas());
     this.observer.setLevels(this.store.loadRuleLevels());
+    this.observer.setRules(this.rules());
   }
 
   setActiveNode(nodeId: string | null) {

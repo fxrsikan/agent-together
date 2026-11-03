@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Background, Controls, MarkerType, ReactFlow, type Edge } from "@xyflow/react";
 import { strongest, type Canvas, type Level, type LoomEvent } from "@loom/schema";
+import type { CompileReport } from "@loom/core";
 import type { EventRecord, Judgment } from "../../preload";
 import { CheckpointsPanel } from "./CheckpointsPanel";
 import { MemoryPanel } from "./MemoryPanel";
@@ -102,7 +103,21 @@ export function App() {
   const install = async () =>
     setNotice(`已写入 ${(await window.loom.installHooks()).join("、")}。Codex 需要在项目里运行 codex 并用 /hooks 信任后才生效。`);
 
-  const exportSkill = async (nodeId: string) => setNotice(`已导出 ${await window.loom.exportSkill(nodeId)}`);
+  const describeReport = (r: CompileReport) =>
+    r.errors.length
+      ? `${r.id} 未编译：${r.errors.join("；")}`
+      : r.kind === "observer"
+        ? `${r.id} → 由 Loom 观察者对所有 agent 执行`
+        : `${r.id} → ${Object.values(r.written).flat().join("、")}` +
+        (r.warnings.length ? `（提醒：${r.warnings.join("；")}）` : "");
+
+  const exportCapability = async (nodeId: string) =>
+    setNotice(`已保存为能力单元并编译：${describeReport(await window.loom.exportCapability(nodeId))}`);
+
+  const compileAll = async () => {
+    const reports = await window.loom.compileCapabilities();
+    setNotice(reports.length ? reports.map(describeReport).join(" · ") : "还没有能力单元（.loom/capabilities/ 为空）");
+  };
 
   const dispatch = async (nodeId: string) => {
     try {
@@ -122,6 +137,7 @@ export function App() {
         <span className="spacer" />
         <span className="muted">L2：{info ? info.l2 ?? "关闭" : "…"}</span>
         <span className="muted">当前节点：{canvas?.nodes.find((n) => n.id === activeId)?.title ?? "无"}</span>
+        <button onClick={compileAll}>编译能力</button>
         <button onClick={install}>安装 hooks</button>
       </header>
       {notice && <div className="notice">{notice}</div>}
@@ -177,7 +193,7 @@ export function App() {
                 ) : (
                   <button onClick={() => window.loom.setActive(selected.id)}>设为当前节点</button>
                 )}
-                <button onClick={() => exportSkill(selected.id)}>导出为 Skill</button>
+                <button onClick={() => exportCapability(selected.id)}>导出为能力单元</button>
               </div>
               <MemoryPanel nodeId={selected.id} version={version} onChange={changed} />
             </section>

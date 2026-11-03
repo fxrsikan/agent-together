@@ -5,12 +5,18 @@
   "license": "Apache-2.0",
   "type": "module",
   "main": "dist/loom-hook.js",
-  "bin": { "loom-hook": "dist/loom-hook.js" },
-  "scripts": { "build": "tsc -b" },
+  "bin": {
+    "loom-hook": "dist/loom-hook.js",
+    "loom-compile": "dist/loom-compile.js"
+  },
+  "scripts": {
+    "build": "tsc -b"
+  },
   "dependencies": {
     "@loom/adapter-claude-code": "0.0.1",
     "@loom/adapter-codex": "0.0.1",
     "@loom/core": "0.0.1",
-    "@loom/schema": "0.0.1"
+    "@loom/schema": "0.0.1",
+    "@loom/adapter-cursor": "0.0.1"
   }
 }

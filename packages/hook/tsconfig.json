@@ -1,6 +1,27 @@
 {
   "extends": "../../tsconfig.base.json",
-  "compilerOptions": { "rootDir": "src", "outDir": "dist" },
-  "include": ["src"],
-  "references": [{ "path": "../schema" }, { "path": "../core" }, { "path": "../adapter-claude-code" }, { "path": "../adapter-codex" }]
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "include": [
+    "src"
+  ],
+  "references": [
+    {
+      "path": "../schema"
+    },
+    {
+      "path": "../core"
+    },
+    {
+      "path": "../adapter-claude-code"
+    },
+    {
+      "path": "../adapter-codex"
+    },
+    {
+      "path": "../adapter-cursor"
+    }
+  ]
 }

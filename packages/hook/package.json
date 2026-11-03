@@ -7,7 +7,8 @@
   "main": "dist/loom-hook.js",
   "bin": {
     "loom-hook": "dist/loom-hook.js",
-    "loom-compile": "dist/loom-compile.js"
+    "loom-compile": "dist/loom-compile.js",
+    "loom-race": "dist/loom-race.js"
   },
   "scripts": {
     "build": "tsc -b"

@@ -1,0 +1,4 @@
+{
+  "testCommand": "node --test src/auth/validate.test.ts",
+  "timeoutMs": 600000
+}

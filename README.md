@@ -18,6 +18,7 @@ AI 编码 agent 的画布控制台：人在画布上表达意图，agent 按节�
 | 记忆 | 每轮结束时观察者的拦截生成草稿，人工批准后进入派发上下文，并同步到项目 `CLAUDE.md` 的 Loom 区块；也可手动添加 |
 | L2 语义判断（v0.2） | 每轮结束后在后台运行，不拖慢 agent：把记忆草稿提炼成一句中文经验（原始记录保留为 evidence）；对照节点目标和派发任务判断这一轮是否跑偏，结果显示在画布信号灯和"L2 定向判断"中 |
 | 能力单元（v0.2） | `.loom/capabilities/<id>.md` 写一次，编译到各平台：skill → `.claude/skills/`、`.agents/skills/`（Codex、Grok Build 等开放标准）、`.cursor/rules/*.mdc`；agent 角色 → `.claude/agents/`；observer（范围 + 禁止出现的正则）由 Loom 观察者对所有 agent 执行。编译前校验，节点可"导出为能力单元"，内容变化时自动升版本 |
+| 多 agent 赛马（v0.3） | 同一节点、同一任务、同一起点，Claude Code 与 Codex 在各自的 git worktree 里并行跑；按测试、观察者回放（越界、依赖、篡改测试等）、改动大小打分并列出每一项；花费与耗时只展示。采用胜者前自动存检查点，之后清理 worktree |
 | 派发任务 | 选中节点 → 填任务 → 生成节点邻域上下文 `.loom/context/<节点>.md`，在新终端窗口启动 Claude Code（v0.1 仅 Windows） |
 | 干预 | `ask` 让 Claude Code 询问用户，`block` 拒绝，`warn` 注入提醒 |
 | Claude Code 适配器 | hook 载荷 ↔ 统一事件，写入 `.claude/settings.local.json` |
@@ -85,6 +86,16 @@ forbid: "console\\.log"
 level: ask
 ---
 认证代码里不许留 console.log（会泄露邮箱等敏感信息），需要日志请用 logger。
+```
+
+赛马（测试命令写在 `.loom/race.json` 的 `testCommand`）：
+
+```bash
+node packages/hook/dist/loom-race.js <你的项目目录> <节点id> "任务描述" --claude-model haiku
+```
+
+```bash
+node packages/hook/dist/loom-race.js adopt <你的项目目录> <赛马id> <claude-code|codex>
 ```
 
 ## L2 模型

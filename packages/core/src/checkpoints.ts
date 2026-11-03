@@ -57,9 +57,14 @@ export class Checkpoints {
     }
   }
 
+  /** A commit of the project's current files that no ref points at yet; callers keep it alive with their own ref. */
+  snapshot(message: string): string {
+    return this.git(["commit-tree", this.snapshotTree(), "-m", message]);
+  }
+
   create(label: string, nodeId: string | null = null): Checkpoint {
     const at = new Date().toISOString();
-    const commit = this.git(["commit-tree", this.snapshotTree(), "-m", JSON.stringify({ label, nodeId, at })]);
+    const commit = this.snapshot(JSON.stringify({ label, nodeId, at }));
     const id = `${at.replace(/[-:.]/g, "").replace("T", "-").slice(0, 15)}-${commit.slice(0, 7)}`;
     this.git(["update-ref", REF_PREFIX + id, commit]);
     return { id, commit, at, label, nodeId };

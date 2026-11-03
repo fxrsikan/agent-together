@@ -6,6 +6,11 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "scripts": { "build": "tsc -b" },
-  "dependencies": { "@loom/schema": "0.0.1" }
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@loom/schema": "0.0.1",
+    "@loom/core": "0.0.1"
+  }
 }

@@ -46,15 +46,18 @@ export function parseGrokResult(stdout: string, code: number | null, durationMs:
 export function grokRunner(model?: string): AgentRunner {
   return {
     id: "grok-build",
-    async run(cwd, prompt, timeoutMs): Promise<RunResult> {
+    async run(cwd, prompt, timeoutMs, options = {}): Promise<RunResult> {
       const promptFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "agent-together-grok-")), "prompt.md");
       fs.writeFileSync(promptFile, prompt);
       const args = ["--prompt-file", promptFile, "--output-format", "json", "--trust", "--allow", "Edit", "--allow", "Write", "--disallowed-tools", "run_terminal_command,monitor", ...(model ? ["-m", model] : [])];
       try {
-        const r = await execCli(grokAgentCommand(), args, { cwd, env: cleanEnv(process.env), input: "", timeoutMs });
+        const r = await execCli(grokAgentCommand(), args, { cwd, env: cleanEnv(process.env), input: "", timeoutMs, signal: options.signal });
+        if (r.aborted) return { ok: false, summary: "已停止", durationMs: r.durationMs };
         if (r.timedOut) return { ok: false, summary: `timed out after ${Math.round(timeoutMs / 1000)}s`, durationMs: r.durationMs };
         try {
-          return parseGrokResult(r.stdout, r.code, r.durationMs, r.stderr);
+          const result = parseGrokResult(r.stdout, r.code, r.durationMs, r.stderr);
+          options.onText?.(result.summary); // Grok's JSON output arrives whole at the end
+          return result;
         } catch {
           return { ok: false, summary: (r.stderr || r.stdout).trim().slice(0, 500), durationMs: r.durationMs };
         }

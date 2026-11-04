@@ -2,15 +2,29 @@ import { execCli } from "@agent-together/core";
 import type { AgentRunner, RunResult } from "@agent-together/schema";
 
 /**
- * Codex headless: `codex exec --json` with a workspace-write sandbox. Reads the
- * last agent message and the token usage from the JSONL event stream.
+ * Codex headless: `codex exec --json` with a workspace-write sandbox. Agent messages
+ * stream to `onText`; the last one and the token usage come from the JSONL events.
  */
 export function codexRunner(model?: string): AgentRunner {
   return {
     id: "codex",
-    async run(cwd, prompt, timeoutMs): Promise<RunResult> {
+    async run(cwd, prompt, timeoutMs, options = {}): Promise<RunResult> {
       const args = ["exec", "--json", "--skip-git-repo-check", "-s", "workspace-write", ...(model ? ["-m", model] : []), "-"];
-      const r = await execCli("codex", args, { cwd, env: process.env, input: prompt, timeoutMs });
+      const r = await execCli("codex", args, {
+        cwd,
+        env: process.env,
+        input: prompt,
+        timeoutMs,
+        signal: options.signal,
+        onLine: (line) => {
+          if (!options.onText) return;
+          try {
+            const e = JSON.parse(line);
+            if (e.type === "item.completed" && e.item?.type === "agent_message" && e.item.text) options.onText(e.item.text);
+          } catch {}
+        },
+      });
+      if (r.aborted) return { ok: false, summary: "已停止", durationMs: r.durationMs };
       if (r.timedOut) return { ok: false, summary: `timed out after ${Math.round(timeoutMs / 1000)}s`, durationMs: r.durationMs };
       let summary = "";
       let inputTokens: number | undefined;

@@ -8,7 +8,9 @@ export { relativeToRoot } from "./paths.js";
 export { mayDepend, ownerOf } from "./owners.js";
 export { buildNodeContext, buildNodeGuide, contextSections, estimateTokens } from "./context.js";
 export { draftsFromFindings, MemoryStore } from "./memory.js";
-export { generateCanvas, initProject, listFiles } from "./init.js";
+export { generateCanvas, initProject, layoutCanvas, listFiles } from "./init.js";
+export { createProject, newNodeId, openProject, readProjectInfo, writeProjectInfo, type ProjectInfo } from "./project.js";
+export { canvasFromDraft, planCanvas, planPrompt, type CanvasPlan } from "./planner.js";
 export { Checkpoints, type Checkpoint } from "./checkpoints.js";
 export { cleanEnv, dispatchPrompt, openTerminal } from "./terminal.js";
 export {
@@ -22,4 +24,6 @@ export {
 } from "./capabilities.js";
 export { formatFrontmatter, parseFrontmatter } from "./frontmatter.js";
 export { execCli, type ExecResult } from "./exec.js";
+export { streamJsonResult, streamJsonText } from "./stream.js";
+export { runProjectTests, testCommandFor, testCounts, testHistory, type TestHistory, type TestRun } from "./tests.js";
 export { loadRaceConfig, Race, scoreContestant, type ContestantResult, type RaceConfig, type RaceReport, type ScorePart } from "./race.js";

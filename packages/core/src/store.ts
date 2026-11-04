@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { Canvas, type CanvasEdge, type Level, type AgentEvent } from "@agent-together/schema";
+import { Canvas, CanvasNode, type CanvasEdge, type Level, type AgentEvent } from "@agent-together/schema";
 
 /**
  * Everything Agent Together knows lives in files under <project>/.agent-together so it can be
@@ -47,6 +47,56 @@ export class ProjectStore {
       throw new Error(`invalid canvas in ${canvasDir}\n${issues.join("\n")}`);
     }
     return parsed.data;
+  }
+
+  private get canvasDir() {
+    return path.join(this.dir, "canvas");
+  }
+
+  /** Validates the whole canvas as it would be after a change, then writes only what changed. */
+  private check(canvas: Canvas): Canvas {
+    const parsed = Canvas.safeParse(canvas);
+    if (!parsed.success) throw new Error(parsed.error.issues.map((i) => i.message).join("; "));
+    return parsed.data;
+  }
+
+  /** Adds or replaces one node (its own file). */
+  saveNode(input: unknown): CanvasNode {
+    const node = CanvasNode.parse(input);
+    const canvas = this.loadCanvas();
+    this.check({ ...canvas, nodes: [...canvas.nodes.filter((n) => n.id !== node.id), node] });
+    fs.mkdirSync(this.canvasDir, { recursive: true });
+    fs.writeFileSync(path.join(this.canvasDir, `${node.id}.json`), JSON.stringify(node, null, 2) + "\n");
+    return node;
+  }
+
+  /** Removes a node and every edge that touches it. */
+  deleteNode(id: string): void {
+    const canvas = this.loadCanvas();
+    this.saveEdges(canvas.edges.filter((e) => e.from !== id && e.to !== id));
+    fs.rmSync(path.join(this.canvasDir, `${id}.json`), { force: true });
+  }
+
+  /** Replaces the edge list; every end must be an existing node, no duplicates or self-loops. */
+  saveEdges(edges: CanvasEdge[]): CanvasEdge[] {
+    const seen = new Set<string>();
+    const unique = edges.filter((e) => e.from !== e.to && !seen.has(`${e.from}>${e.to}`) && seen.add(`${e.from}>${e.to}`));
+    const canvas = this.check({ ...this.loadCanvas(), edges: unique });
+    fs.mkdirSync(this.canvasDir, { recursive: true });
+    fs.writeFileSync(path.join(this.canvasDir, "_edges.json"), JSON.stringify(canvas.edges, null, 2) + "\n");
+    return canvas.edges;
+  }
+
+  /** Replaces the whole canvas (a generated plan). */
+  writeCanvas(input: Canvas): Canvas {
+    const canvas = this.check(input);
+    fs.rmSync(this.canvasDir, { recursive: true, force: true });
+    fs.mkdirSync(this.canvasDir, { recursive: true });
+    for (const node of canvas.nodes) {
+      fs.writeFileSync(path.join(this.canvasDir, `${node.id}.json`), JSON.stringify(node, null, 2) + "\n");
+    }
+    fs.writeFileSync(path.join(this.canvasDir, "_edges.json"), JSON.stringify(canvas.edges, null, 2) + "\n");
+    return canvas;
   }
 
   loadRuleLevels(): Record<string, Level> {

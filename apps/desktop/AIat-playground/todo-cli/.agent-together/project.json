@@ -1,0 +1,6 @@
+{
+  "name": "todo-cli",
+  "createdAt": "",
+  "description": "一个命令行待办清单：可以添加、完成、删除、列出待办，数据存在当前目录的 todos.json 里。用 Node.js + TypeScript 写，node --test 跑测试，不用任何第三方依赖。",
+  "stack": "Node.js 22.18 及以上，TypeScript 源码由 Node 原生类型剥离直接运行（无需 tsc，不做类型检查），导入路径带 .ts 后缀，不使用 enum 和 namespace；测试用 node:test 通过 node --test 运行，零第三方依赖。"
+}

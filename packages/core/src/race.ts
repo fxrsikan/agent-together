@@ -6,6 +6,8 @@ import type { AgentRunner, Finding, AgentEvent, Memory, RunResult } from "@agent
 import { capabilityRules, CapabilityStore } from "./capabilities.js";
 import { Checkpoints } from "./checkpoints.js";
 import { buildNodeContext } from "./context.js";
+import { readProjectInfo } from "./project.js";
+import { testCommandFor } from "./tests.js";
 import { Observer } from "./observer.js";
 import { builtinRules } from "./rules/index.js";
 import { ProjectStore } from "./store.js";
@@ -13,7 +15,7 @@ import { dispatchPrompt } from "./terminal.js";
 
 /** .agent-together/race.json */
 export interface RaceConfig {
-  /** Run in each contestant's copy of the project after it finishes, e.g. "npm test". */
+  /** Run in each contestant's copy of the project after it finishes, e.g. "npm test"; default: the project's test command. */
   testCommand?: string;
   /** Per agent, default 15 minutes. */
   timeoutMs?: number;
@@ -149,12 +151,13 @@ export class Race {
     contextOverride?: string,
   ): Promise<RaceReport> {
     const config = loadRaceConfig(this.root);
+    const testCommand = config.testCommand ?? testCommandFor(this.root);
     const canvas = this.store.loadCanvas();
     const startedAt = new Date().toISOString();
     const id = `${startedAt.replace(/[-:.]/g, "").replace("T", "-").slice(0, 15)}-${nodeId}`.slice(0, 80);
     const base = new Checkpoints(this.root).snapshot(`赛马起点 ${id}`);
     git(this.top, ["update-ref", `refs/agent-together/races/${id}/base`, base]);
-    const context = contextOverride ?? buildNodeContext(canvas, nodeId, task, memories);
+    const context = contextOverride ?? buildNodeContext(canvas, nodeId, task, memories, readProjectInfo(this.root));
 
     const contestants = await Promise.all(
       runners.map(async (runner): Promise<ContestantResult> => {
@@ -183,8 +186,8 @@ export class Race {
           .filter((f): f is { path: string; added: number; removed: number } => f.path !== null && !SKIP(f.path));
 
         const findings = this.replay(project, nodeId, base, files.map((f) => f.path), runner.id);
-        const tests = config.testCommand
-          ? { command: config.testCommand, ...(await runShell(config.testCommand, project, 5 * 60_000)) }
+        const tests = testCommand
+          ? { command: testCommand, ...(await runShell(testCommand, project, 5 * 60_000)) }
           : null;
         const result = { id: runner.id, commit, worktree, run, files, findings, tests };
         return { ...result, score: scoreContestant(result) };

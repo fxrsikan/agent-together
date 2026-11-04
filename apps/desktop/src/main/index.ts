@@ -1,124 +1,301 @@
 import fs from "node:fs";
 import path from "node:path";
 import { app, BrowserWindow, dialog, ipcMain } from "electron";
-import { claudeCodeCompiler, claudeCodeRunner, installHooks } from "@agent-together/adapter-claude-code";
-import { agentSkillsCompiler, codexRunner, installCodexHooks } from "@agent-together/adapter-codex";
-import { cursorRulesCompiler, cursorRunner, installCursorHooks } from "@agent-together/adapter-cursor";
-import { grokRunner } from "@agent-together/adapter-grok";
+import { claudeCodeCompiler, claudeCodeRunner } from "@agent-together/adapter-claude-code";
+import { agentSkillsCompiler, codexRunner } from "@agent-together/adapter-codex";
+import { cursorAgentCommand, cursorRulesCompiler, cursorRunner } from "@agent-together/adapter-cursor";
+import { grokAgentCommand, grokRunner } from "@agent-together/adapter-grok";
 import {
   buildNodeContext,
   capabilityFromNode,
-  Checkpoints,
   compileCapabilities,
   contextSections,
-  createLlm,
-  Daemon,
+  createProject,
   dispatchPrompt,
   estimateTokens,
-  loadLlmConfig,
   loadRaceConfig,
+  newNodeId,
+  openProject,
   openTerminal,
-  Race,
+  planCanvas,
+  readProjectInfo,
+  runProjectTests,
+  testCommandFor,
+  testHistory,
+  writeProjectInfo,
 } from "@agent-together/core";
-import type { AgentRunner, Memory } from "@agent-together/schema";
+import type { AgentRunner, CanvasEdge, CanvasNode, Memory } from "@agent-together/schema";
+import { Session } from "./session";
 
 const compilers = [claudeCodeCompiler, agentSkillsCompiler, cursorRulesCompiler];
+const runners: Record<string, (model?: string) => AgentRunner> = { "claude-code": claudeCodeRunner, codex: codexRunner, cursor: cursorRunner, "grok-build": grokRunner };
+type Agent = "claude-code" | "codex" | "cursor" | "grok-build";
 
-/** Project to open: AGENT_TOGETHER_PROJECT, else the bundled demo, else ask. */
-async function pickProject(): Promise<string | null> {
-  const fromEnv = process.env.AGENT_TOGETHER_PROJECT;
-  if (fromEnv && fs.existsSync(path.join(fromEnv, ".agent-together"))) return path.resolve(fromEnv);
-  const demo = path.resolve(app.getAppPath(), "../../examples/demo");
-  if (fs.existsSync(path.join(demo, ".agent-together"))) return demo;
-  const res = await dialog.showOpenDialog({ title: "选择包含 .agent-together 的项目", properties: ["openDirectory"] });
-  return res.canceled ? null : res.filePaths[0];
+/** Dev layout: the hook program is built in the sibling workspace package. */
+const hookProgram = () => path.resolve(app.getAppPath(), "../../packages/hook/dist/agent-together-hook.js");
+
+/** Interactive command line that starts each agent on a prompt in a new terminal window. */
+function agentCommandLine(agent: Agent, prompt: string): string {
+  const quoted = `"${prompt}"`;
+  switch (agent) {
+    case "codex":
+      return `codex ${quoted}`;
+    case "cursor":
+      return `"${cursorAgentCommand()}" ${quoted}`;
+    case "grok-build":
+      return `"${grokAgentCommand()}" ${quoted}`;
+    default:
+      return `claude ${quoted}`;
+  }
+}
+
+// Recent projects live in the app's own folder, newest first.
+const recentFile = () => path.join(app.getPath("userData"), "recent-projects.json");
+function recentProjects(): string[] {
+  try {
+    return JSON.parse(fs.readFileSync(recentFile(), "utf8"));
+  } catch {
+    return [];
+  }
+}
+function remember(root: string) {
+  const list = [root, ...recentProjects().filter((r) => r !== root)].slice(0, 12);
+  fs.mkdirSync(path.dirname(recentFile()), { recursive: true });
+  fs.writeFileSync(recentFile(), JSON.stringify(list, null, 2));
 }
 
 async function main() {
   await app.whenReady();
-  const root = await pickProject();
-  if (!root) return app.quit();
-
-  const llmConfig = loadLlmConfig(root);
-  const llm = createLlm(llmConfig);
-  const daemon = new Daemon(root, { llm, maxL2CallsPerSession: llmConfig.maxCallsPerSession });
-  const port = await daemon.start();
-  const checkpoints = new Checkpoints(root);
-  const hasGit = checkpoints.available();
-
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
     title: "Agent Together",
     webPreferences: { preload: path.join(__dirname, "../preload/index.js") },
   });
-  daemon.on("event", (record) => win.webContents.send("agent-together:event", record));
-  daemon.on("active", (nodeId) => win.webContents.send("agent-together:active", nodeId));
-  daemon.on("memory", (drafts) => win.webContents.send("agent-together:memoryDrafts", drafts));
-  daemon.on("judgment", (j) => win.webContents.send("agent-together:judgment", j));
-  daemon.on("l2error", (e) => win.webContents.send("agent-together:l2error", e));
 
-  ipcMain.handle("agent-together:info", () => ({ root, port, hasGit, l2: llm?.name ?? null, activeNodeId: daemon.observer.activeNodeId }));
-  ipcMain.handle("agent-together:canvas", () => daemon.canvas);
-  ipcMain.handle("agent-together:setActive", (_e, nodeId: string | null) => daemon.setActiveNode(nodeId));
-  ipcMain.handle("agent-together:installHooks", () => {
-    // Dev layout: the hook program is built in the sibling workspace package.
-    const hook = path.resolve(app.getAppPath(), "../../packages/hook/dist/agent-together-hook.js");
-    return [
-      installHooks(root, `node "${hook}"`),
-      installCodexHooks(root, `node "${hook}" --platform codex`),
-      ...installCursorHooks(root, `node "${hook}" --platform cursor`),
-    ];
+  let session: Session | null = null;
+  const need = (): Session => {
+    if (!session) throw new Error("还没有打开项目");
+    return session;
+  };
+  const switchTo = async (root: string) => {
+    await session?.close();
+    session = null;
+    session = await Session.open(root, win);
+    remember(root);
+    win.setTitle(`${session.name} - Agent Together`);
+    win.webContents.send("agent-together:project", session.info());
+    return session.info();
+  };
+
+  // Projects: start screen, create, open, switch.
+  ipcMain.handle("agent-together:recentProjects", () =>
+    recentProjects().map((root) => {
+      const exists = fs.existsSync(path.join(root, ".agent-together"));
+      return { root, exists, name: exists ? readProjectInfo(root).name : path.basename(root) };
+    }),
+  );
+  ipcMain.handle("agent-together:chooseFolder", async (_e, title: string) => {
+    const res = await dialog.showOpenDialog(win, { title, properties: ["openDirectory", "createDirectory"] });
+    return res.canceled ? null : res.filePaths[0];
   });
-  // Dispatch: checkpoint first, make the node active, write its neighbourhood context, open the agent on it.
+  ipcMain.handle("agent-together:createProject", async (_e, parent: string, name: string, description: string) => {
+    const folder = name.trim().replace(/[<>:"/\\|?*]+/g, "-");
+    if (!folder) throw new Error("请填写项目名");
+    const root = createProject(path.join(parent, folder), name.trim());
+    if (description.trim()) writeProjectInfo(root, { description: description.trim() });
+    const info = await switchTo(root);
+    need().installHooks(hookProgram());
+    return info;
+  });
+  ipcMain.handle("agent-together:openProject", async (_e, dir: string) => {
+    const { root, created } = openProject(dir);
+    const info = await switchTo(root);
+    if (created) need().installHooks(hookProgram());
+    return info;
+  });
+  ipcMain.handle("agent-together:closeProject", async () => {
+    await session?.close();
+    session = null;
+    win.setTitle("Agent Together");
+  });
+  ipcMain.handle("agent-together:info", () => session?.info() ?? null);
+  ipcMain.handle("agent-together:projectInfo", () => readProjectInfo(need().root));
+  ipcMain.handle("agent-together:saveProjectInfo", (_e, patch: { description?: string; stack?: string; testCommand?: string }) =>
+    writeProjectInfo(need().root, patch),
+  );
+
+  // Canvas: AI plan, then edit by hand. Every change is validated and written to .agent-together/canvas/.
+  ipcMain.handle("agent-together:planCanvas", async (_e, description: string) => {
+    const s = need();
+    if (!s.llm) throw new Error("没有可用的模型：登录 claude 命令行，或设置 ANTHROPIC_API_KEY，或在 .agent-together/llm.json 里配置");
+    const plan = await planCanvas(s.llm, description);
+    s.daemon.store.writeCanvas(plan.canvas);
+    writeProjectInfo(s.root, { description: description.trim(), stack: plan.stack, ...(plan.testCommand ? { testCommand: plan.testCommand } : {}) });
+    s.canvasChanged();
+    return plan;
+  });
+  ipcMain.handle("agent-together:canvas", () => need().daemon.canvas);
+  ipcMain.handle("agent-together:addNode", (_e, title: string, kind: CanvasNode["kind"], position?: { x: number; y: number }) => {
+    const s = need();
+    const id = newNodeId(title, s.daemon.canvas.nodes.map((n) => n.id));
+    const node = s.daemon.store.saveNode({ id, kind, title, position });
+    s.canvasChanged();
+    return node;
+  });
+  ipcMain.handle("agent-together:saveNode", (_e, node: CanvasNode) => {
+    const s = need();
+    const saved = s.daemon.store.saveNode(node);
+    s.canvasChanged();
+    return saved;
+  });
+  ipcMain.handle("agent-together:moveNodes", (_e, moves: { id: string; x: number; y: number }[]) => {
+    const s = need();
+    const nodes = s.daemon.canvas.nodes;
+    for (const m of moves) {
+      const node = nodes.find((n) => n.id === m.id);
+      if (node) s.daemon.store.saveNode({ ...node, position: { x: Math.round(m.x), y: Math.round(m.y) } });
+    }
+    s.daemon.reload(); // positions only: no redraw needed
+  });
+  ipcMain.handle("agent-together:deleteNode", async (_e, id: string) => {
+    const s = need();
+    const node = s.daemon.canvas.nodes.find((n) => n.id === id);
+    const { response } = await dialog.showMessageBox(win, {
+      type: "warning",
+      buttons: ["删除", "取消"],
+      defaultId: 1,
+      cancelId: 1,
+      message: `删除节点"${node?.title ?? id}"？`,
+      detail: "只删除画布上的节点和它的连线，不删除代码文件。",
+    });
+    if (response !== 0) return false;
+    s.daemon.store.deleteNode(id);
+    if (s.daemon.observer.activeNodeId === id) s.daemon.setActiveNode(null);
+    s.canvasChanged();
+    return true;
+  });
+  ipcMain.handle("agent-together:saveEdges", (_e, edges: CanvasEdge[]) => {
+    const s = need();
+    const saved = s.daemon.store.saveEdges(edges);
+    s.canvasChanged();
+    return saved;
+  });
+
+  ipcMain.handle("agent-together:setActive", (_e, nodeId: string | null) => need().daemon.setActiveNode(nodeId));
+  ipcMain.handle("agent-together:installHooks", () => need().installHooks(hookProgram()));
+
   // Context inspector: what the agent would get, with sizes; memories can be left out per dispatch.
-  const nodeMemories = (nodeId: string, without: string[] = []) => daemon.memory.forNode(nodeId).filter((m) => !without.includes(m.id));
+  const nodeMemories = (s: Session, nodeId: string, without: string[] = []) => s.daemon.memory.forNode(nodeId).filter((m) => !without.includes(m.id));
+  const contextFor = (s: Session, nodeId: string, task: string, without: string[] = []) =>
+    buildNodeContext(s.daemon.canvas, nodeId, task, nodeMemories(s, nodeId, without), readProjectInfo(s.root));
   ipcMain.handle("agent-together:previewContext", (_e, nodeId: string, task: string, without: string[]) => {
-    const markdown = buildNodeContext(daemon.canvas, nodeId, task, nodeMemories(nodeId, without));
-    return { markdown, memories: daemon.memory.forNode(nodeId) };
+    const s = need();
+    return { markdown: contextFor(s, nodeId, task, without), memories: s.daemon.memory.forNode(nodeId) };
   });
   ipcMain.handle("agent-together:measureContext", (_e, markdown: string) => ({ tokens: estimateTokens(markdown), sections: contextSections(markdown) }));
+  // Dispatch: checkpoint first, make the node active, write its context, open the agent on it.
   // `context`, when given, is the inspector's (possibly edited) text and is handed out as is.
-  ipcMain.handle("agent-together:dispatch", (_e, nodeId: string, task: string, agent: "claude-code" | "codex", context?: string) => {
-    if (hasGit) checkpoints.create(`派发前（${agent}）`, nodeId);
-    context ??= buildNodeContext(daemon.canvas, nodeId, task, nodeMemories(nodeId));
-    const file = daemon.store.writeContext(nodeId, context);
-    daemon.setActiveNode(nodeId);
-    const cli = agent === "codex" ? "codex" : "claude";
-    openTerminal(root, `${cli} "${dispatchPrompt(file)}"`, `Agent Together - ${nodeId} - ${agent}`);
+  ipcMain.handle("agent-together:dispatch", (_e, nodeId: string, task: string, agent: Agent, context?: string) => {
+    const s = need();
+    if (s.hasGit) s.checkpoints.create(`派发前（${agent}）`, nodeId);
+    const file = s.daemon.store.writeContext(nodeId, context ?? contextFor(s, nodeId, task));
+    s.daemon.setActiveNode(nodeId);
+    const node = s.daemon.canvas.nodes.find((n) => n.id === nodeId);
+    if (node && node.status === "todo") {
+      s.daemon.store.saveNode({ ...node, status: "in_progress", executor: agent });
+      s.canvasChanged();
+    }
+    openTerminal(s.root, agentCommandLine(agent, dispatchPrompt(file)), `Agent Together - ${nodeId} - ${agent}`);
     return file;
   });
 
-  // Memories: approving or retiring one re-syncs the Agent Together block in CLAUDE.md.
-  ipcMain.handle("agent-together:memories", () => daemon.memory.list());
+  /**
+   * Tests after an agent's work: run the project's test command, and when it passes
+   * save a checkpoint, so a green state is always one click away.
+   */
+  const testAndCheckpoint = async (s: Session, nodeId: string | null) => {
+    const tests = await runProjectTests(s.root, nodeId);
+    win.webContents.send("agent-together:tests", tests);
+    const title = s.daemon.canvas.nodes.find((n) => n.id === nodeId)?.title ?? "项目";
+    const checkpoint = tests?.passed && s.hasGit ? s.checkpoints.create(`测试通过：${title}`, nodeId) : null;
+    return { tests, checkpoint };
+  };
+  ipcMain.handle("agent-together:runTests", (_e, nodeId: string | null) => testAndCheckpoint(need(), nodeId));
+  ipcMain.handle("agent-together:testHistory", () => testHistory(need().root));
+  ipcMain.handle("agent-together:testCommand", () => testCommandFor(need().root));
+
+  // In-app dispatch: the agent runs headless in the project, its words stream to the window,
+  // its actions go through the hooks to the observer as usual; then the tests run.
+  ipcMain.handle("agent-together:runAgent", async (_e, nodeId: string, task: string, agent: Agent, context?: string) => {
+    const s = need();
+    if (s.running) throw new Error(`已有 agent 在运行（${s.running.nodeId}）`);
+    if (s.hasGit) s.checkpoints.create(`派发前（${agent}）`, nodeId);
+    const file = s.daemon.store.writeContext(nodeId, context ?? contextFor(s, nodeId, task));
+    s.daemon.setActiveNode(nodeId);
+    const node = s.daemon.canvas.nodes.find((n) => n.id === nodeId);
+    if (node && node.status === "todo") s.daemon.store.saveNode({ ...node, status: "in_progress", executor: agent });
+    s.canvasChanged();
+    const stop = new AbortController();
+    s.running = { nodeId, agent, stop };
+    const send = (channel: string, payload: unknown) => win.webContents.send(`agent-together:${channel}`, payload);
+    send("agentStatus", { nodeId, agent, state: "running" });
+    try {
+      const model = loadRaceConfig(s.root).models?.[agent];
+      const run = await runners[agent](model).run(s.root, dispatchPrompt(file), 30 * 60_000, {
+        signal: stop.signal,
+        onText: (text) => send("agentText", { nodeId, text }),
+      });
+      send("agentStatus", { nodeId, agent, state: "testing" });
+      const { tests, checkpoint } = run.summary === "已停止" ? { tests: null, checkpoint: null } : await testAndCheckpoint(s, nodeId);
+      s.canvasChanged();
+      return { run, tests, checkpoint };
+    } finally {
+      s.running = null;
+      send("agentStatus", { nodeId, agent, state: "idle" });
+    }
+  });
+  ipcMain.handle("agent-together:stopAgent", () => need().running?.stop.abort());
+
+  // Memories: approving or retiring one re-syncs the Agent Together block in CLAUDE.md and AGENTS.md.
+  ipcMain.handle("agent-together:memories", () => need().daemon.memory.list());
   ipcMain.handle("agent-together:addMemory", (_e, nodeId: string | null, kind: Memory["kind"], content: string) => {
+    const { daemon } = need();
     const m = daemon.memory.add({ nodeId, kind, content, status: "active", source: "user" });
     daemon.memory.syncAgentFiles(daemon.canvas);
     return m;
   });
   ipcMain.handle("agent-together:setMemoryStatus", (_e, id: string, status: Memory["status"]) => {
+    const { daemon } = need();
     const m = daemon.memory.update(id, { status });
     daemon.memory.syncAgentFiles(daemon.canvas);
     return m;
   });
   // Node gene: save the node as a capability unit, then compile every capability for every platform.
   ipcMain.handle("agent-together:exportCapability", (_e, nodeId: string) => {
+    const { daemon, root } = need();
     const previous = daemon.capabilities.list().find((c) => c.nodeId === nodeId);
-    const capability = daemon.capabilities.save(
-      capabilityFromNode(daemon.canvas, nodeId, daemon.memory.forNode(nodeId), previous),
-    );
+    const capability = daemon.capabilities.save(capabilityFromNode(daemon.canvas, nodeId, daemon.memory.forNode(nodeId), previous));
     const [report] = compileCapabilities(root, [capability], compilers);
     return report;
   });
   ipcMain.handle("agent-together:compileCapabilities", () => {
+    const { daemon, root } = need();
     daemon.reload(); // observer capabilities take effect right away
     return compileCapabilities(root, daemon.capabilities.list(), compilers);
   });
 
-  ipcMain.handle("agent-together:checkpoints",() => (hasGit ? checkpoints.list() : []));
-  ipcMain.handle("agent-together:checkpoint", (_e, label: string) => checkpoints.create(label, daemon.observer.activeNodeId));
+  ipcMain.handle("agent-together:checkpoints", () => {
+    const s = need();
+    return s.hasGit ? s.checkpoints.list() : [];
+  });
+  ipcMain.handle("agent-together:checkpoint", (_e, label: string) => {
+    const s = need();
+    return s.checkpoints.create(label, s.daemon.observer.activeNodeId);
+  });
   ipcMain.handle("agent-together:rollback", async (_e, id: string) => {
-    const target = checkpoints.list().find((c) => c.id === id);
+    const s = need();
+    const target = s.checkpoints.list().find((c) => c.id === id);
     const { response } = await dialog.showMessageBox(win, {
       type: "warning",
       buttons: ["回滚", "取消"],
@@ -128,36 +305,38 @@ async function main() {
       detail: "当前状态会先自动存为一个检查点，回滚之后还可以再回来。被 git 忽略的文件不受影响。",
     });
     if (response !== 0) return false;
-    checkpoints.rollback(id);
-    daemon.reload();
+    s.checkpoints.rollback(id);
+    s.canvasChanged();
     return true;
   });
 
-  // Races: both agents in their own worktrees; the report is kept, the human adopts one or discards all.
-  const race = hasGit ? new Race(root) : null;
-  let racing: string | null = null; // node id while a race runs; one at a time
-  const factories: Record<string, (model?: string) => AgentRunner> = { "claude-code": claudeCodeRunner, codex: codexRunner, cursor: cursorRunner, "grok-build": grokRunner };
-  const raceAgents = () => (loadRaceConfig(root).agents ?? ["claude-code", "codex"]).filter((a) => factories[a]);
-  ipcMain.handle("agent-together:races", () => ({ running: racing, reports: race?.list() ?? [], agents: raceAgents() }));
+  // Races: every agent in its own worktree; the report is kept, the human adopts one or discards all.
+  const raceAgents = (root: string) => (loadRaceConfig(root).agents ?? ["claude-code", "codex"]).filter((a) => runners[a]);
+  ipcMain.handle("agent-together:races", () => {
+    const s = need();
+    return { running: s.racing, reports: s.race?.list() ?? [], agents: raceAgents(s.root) };
+  });
   ipcMain.handle("agent-together:race", async (_e, nodeId: string, task: string, context?: string) => {
-    if (!race) throw new Error("项目不在 git 仓库中，无法赛马");
-    if (racing) throw new Error(`已有一场赛马在进行（${racing}）`);
-    racing = nodeId;
-    const models = loadRaceConfig(root).models ?? {};
+    const s = need();
+    if (!s.race) throw new Error("项目不在 git 仓库中，无法赛马");
+    if (s.racing) throw new Error(`已有一场赛马在进行（${s.racing}）`);
+    s.racing = nodeId;
+    const models = loadRaceConfig(s.root).models ?? {};
     try {
-      return await race.run(
+      return await s.race.run(
         nodeId,
         task,
-        raceAgents().map((a) => factories[a](models[a])),
-        daemon.memory.forNode(nodeId),
+        raceAgents(s.root).map((a) => runners[a](models[a])),
+        s.daemon.memory.forNode(nodeId),
         (message) => win.webContents.send("agent-together:raceProgress", message),
         context,
       );
     } finally {
-      racing = null;
+      s.racing = null;
     }
   });
   ipcMain.handle("agent-together:adoptRace", async (_e, id: string, contestantId: string) => {
+    const s = need();
     const { response } = await dialog.showMessageBox(win, {
       type: "question",
       buttons: ["采用", "取消"],
@@ -167,16 +346,20 @@ async function main() {
       detail: "应用前会自动存一个检查点，之后可以回滚。其他参赛者的 worktree 会被清理。",
     });
     if (response !== 0) return false;
-    race!.adopt(id, contestantId);
-    daemon.reload();
+    s.race!.adopt(id, contestantId);
+    s.canvasChanged();
     return true;
   });
-  ipcMain.handle("agent-together:discardRace", (_e, id: string) => race!.discard(id));
+  ipcMain.handle("agent-together:discardRace", (_e, id: string) => need().race!.discard(id));
 
   if (process.env.ELECTRON_RENDERER_URL) await win.loadURL(process.env.ELECTRON_RENDERER_URL);
   else await win.loadFile(path.join(__dirname, "../renderer/index.html"));
 
-  app.on("window-all-closed", () => daemon.stop().then(() => app.quit()));
+  // AGENT_TOGETHER_PROJECT opens a project straight away (development, scripts); otherwise the start screen.
+  const fromEnv = process.env.AGENT_TOGETHER_PROJECT;
+  if (fromEnv) await switchTo(openProject(fromEnv).root);
+
+  app.on("window-all-closed", () => (session ? session.close() : Promise.resolve()).then(() => app.quit()));
 }
 
 main();

@@ -3,7 +3,7 @@
 AI 编码 agent 的画布控制台：人在画布上表达意图，agent 按节点领任务，观察者实时检查是否跑偏。
 支持 Claude Code、Codex、Cursor（编辑器与命令行）、Grok Build。
 
-## 当前状态：v0.3
+## 当前状态：v1（第一版）
 
 已跑通一条线：**Claude Code hook → agent-together-hook → 本地守护进程 → 观察者规则 → 裁决回给 Claude Code，同时显示在画布上。**
 
@@ -24,7 +24,10 @@ AI 编码 agent 的画布控制台：人在画布上表达意图，agent 按节�
 | Codex 适配器（v0.2） | 解析 `apply_patch`（一个补丁多个文件各自检查），`ask` 转为拒绝并要求 agent 询问用户，退出码从会话记录读取；hooks 写入 git 仓库根目录的 `.codex/hooks.json`，需在 Codex 的 `/hooks` 中信任 |
 | Cursor 适配器（v0.3） | hooks 写入项目的 `.cursor/hooks.json`（工作区需信任）；`ask` 转为拒绝并要求 agent 询问用户；Windows 上 Cursor 经 PowerShell 传入的数据会被按 GBK 转码导致中文乱码，适配器会还原后再检查（个别紧挨空格或引号的中文字可能损坏，不影响路径、命令和 import 检查）；回复一律用纯 ASCII；守护进程不在时明确放行。编辑器从打开的文件夹读 hooks，`cursor-agent` 命令行从 git 仓库根目录读，安装时两处都写。已在 Cursor 3.19 编辑器和 cursor-agent 2026.10.22 中实测；命令行的 `-p` 模式不发"一轮结束"事件，所以不会生成记忆草稿 |
 | Grok Build | Grok Build 会执行项目里 Claude Code 的 hooks（`.claude/settings.local.json`），所以装好 Claude Code 的 hooks 就同时管住了 Grok；适配器识别 Grok 的工具名（`search_replace`、`write`、`read_file`、`run_terminal_command`），事件标记为 grok-build，支持"询问"。已用 Grok Build 1.0.70 实测：范围内修改放行，越界新建在无界面模式下被拒绝。赛马可用 `--agents grok-build`（去掉了命令行和 monitor 工具，测试由 Agent Together 来跑），但还没跑出一场正常结束的赛马 |
-| 桌面应用 | Electron + React Flow：画布、节点信号灯、当前节点、事件流、记忆、检查点、赛马 |
+| 项目 | 启动页新建或打开项目，最近项目列表，切换不用重启；新项目自动 `git init`、写 `.gitignore`、装好各平台 hooks |
+| AI 规划画布 | 一段产品描述 → 节点（目标、验收标准、任务、文件范围）+ 依赖连线 + 技术栈；描述和技术栈写进 `.agent-together/project.json`，每次派发都带上 |
+| 画布编辑 | 增删改节点、拖线建依赖、Delete 删连线、拖动保存位置、节点状态；每次修改都按 schema 校验后写回 `.agent-together/canvas/` |
+| 桌面应用 | Electron + React Flow：画布、节点信号灯、当前节点、事件流、记忆、检查点、赛马、上下文检查器 |
 
 ## 目录
 
@@ -39,25 +42,29 @@ examples/demo                 示例项目（登录表单 → 用户服务 → �
 
 ## 开始
 
-需要 Node 22+。
+需要 Node 22+、git，以及至少一个已登录的 agent 命令行（Claude Code、Codex、Cursor 或 Grok Build）。
 
 ```bash
 npm install
 npm run build
-npm test
 npm run dev
 ```
 
-给自己的项目生成画布（之后再改节点名称、目标和连线）：
+### 用 Agent Together 做一个项目
+
+1. **新建项目**：启动页填项目名、选位置、写一段产品描述，点"创建"。会建文件夹、`git init`，并装好 Claude Code、Codex、Cursor 的 hooks（Grok Build 读 Claude Code 的）。已有代码的文件夹用"打开文件夹…"，第一次打开会按目录结构生成画布。
+2. **规划画布**：空画布上点"AI 生成画布"，模型把描述拆成节点（目标、验收标准、任务、拥有的文件）和依赖连线。用 `.agent-together/llm.json` 选模型，默认用已登录的 `claude` 命令行（Haiku）。
+3. **修改画布**：点节点在右侧编辑；拖动调整位置；从节点右侧圆点拖到另一个节点表示依赖，选中连线按 Delete 删除；"＋ 节点"手动添加。
+4. **派发**：选中节点，写这次的任务（可留空），选 agent，点"派发"。会先存检查点，把节点设为当前节点，生成只含该节点邻域的上下文，在新终端窗口里启动 agent（目前仅 Windows）。节点状态变为"进行中"。
+5. **看着它**：agent 的每个动作出现在"观察者事件"里；越界写入、违反依赖、改测试会被拦下或要求确认；跑偏可以回滚到检查点。做完把节点状态改成"完成"，再派发下一个。
+
+其他方式打开项目：环境变量 `AGENT_TOGETHER_PROJECT=<目录>` 启动时直接打开；命令行生成画布：
 
 ```bash
 node packages/core/dist/init-cli.js <你的项目目录>
 ```
 
-`npm run dev` 默认打开 `examples/demo`；设置环境变量 `AGENT_TOGETHER_PROJECT` 可打开其他带 `.agent-together/` 的项目。
-
-在应用里点"安装 Claude Code hooks"，选中节点后点"设为当前节点"，然后在该项目目录里运行 Claude Code。
-不开桌面应用时也可以只跑守护进程：
+不开桌面应用时也可以只跑守护进程（之后在该目录里运行 agent）：
 
 ```bash
 node packages/core/dist/cli.js examples/demo login-form

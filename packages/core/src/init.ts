@@ -124,12 +124,12 @@ export function generateCanvas(root: string, files: string[]): Canvas {
     return { from, to, label: `${n} 处引用` };
   });
 
-  layout(nodes, edges);
+  layoutCanvas(nodes, edges);
   return Canvas.parse({ version: 1, nodes, edges });
 }
 
 /** Columns by dependency depth (callers left, dependencies right), rows in order. */
-function layout(nodes: CanvasNode[], edges: CanvasEdge[]) {
+export function layoutCanvas(nodes: CanvasNode[], edges: CanvasEdge[]) {
   const level = new Map(nodes.map((n) => [n.id, 0]));
   for (let pass = 0; pass < nodes.length; pass++) {
     let changed = false;

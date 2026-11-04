@@ -1,0 +1,92 @@
+import { exec } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
+import { readProjectInfo } from "./project.js";
+
+/** One run of the project's tests, kept per node in .agent-together/tests.json (git-ignored). */
+export interface TestRun {
+  command: string;
+  passed: boolean;
+  /** Counts when the runner's summary could be read (node:test, Vitest, Jest). */
+  pass?: number;
+  fail?: number;
+  /** The tail of the output, enough to see what failed. */
+  output: string;
+  /** The node whose work the run checked, if any. */
+  nodeId: string | null;
+  at: string;
+  durationMs: number;
+}
+
+export interface TestHistory {
+  last?: TestRun;
+  byNode: Record<string, TestRun>;
+}
+
+const historyFile = (root: string) => path.join(root, ".agent-together", "tests.json");
+
+/**
+ * The command that tests the project: project.json `testCommand`, else
+ * race.json `testCommand`, else `npm test` when package.json defines a real test script.
+ */
+export function testCommandFor(root: string): string | null {
+  const fromProject = readProjectInfo(root).testCommand?.trim();
+  if (fromProject) return fromProject;
+  try {
+    const race = JSON.parse(fs.readFileSync(path.join(root, ".agent-together", "race.json"), "utf8"));
+    if (typeof race.testCommand === "string" && race.testCommand.trim()) return race.testCommand.trim();
+  } catch {}
+  try {
+    const script = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).scripts?.test;
+    if (typeof script === "string" && !script.includes("no test specified")) return "npm test";
+  } catch {}
+  return null;
+}
+
+/** Pass/fail counts from the summaries of node:test, Vitest and Jest; undefined when none matches. */
+export function testCounts(output: string): { pass?: number; fail?: number } {
+  const num = (re: RegExp) => {
+    const m = re.exec(output);
+    return m ? Number(m[1]) : undefined;
+  };
+  const nodePass = num(/^(?:ℹ|#) pass (\d+)/m);
+  if (nodePass !== undefined) return { pass: nodePass, fail: num(/^(?:ℹ|#) fail (\d+)/m) ?? 0 };
+  const summary = /^\s*Tests:?\s+(.*)$/m.exec(output)?.[1]; // "Tests  3 passed (3)" / "Tests: 1 failed, 3 passed, 4 total"
+  if (!summary) return {};
+  return { pass: Number(/(\d+) passed/.exec(summary)?.[1] ?? 0), fail: Number(/(\d+) failed/.exec(summary)?.[1] ?? 0) };
+}
+
+export function testHistory(root: string): TestHistory {
+  try {
+    return JSON.parse(fs.readFileSync(historyFile(root), "utf8"));
+  } catch {
+    return { byNode: {} };
+  }
+}
+
+/** Runs the project's tests (null when it has no test command) and records the result. */
+export function runProjectTests(root: string, nodeId: string | null, timeoutMs = 5 * 60_000): Promise<TestRun | null> {
+  const command = testCommandFor(root);
+  if (!command) return Promise.resolve(null);
+  const started = Date.now();
+  return new Promise((resolve) =>
+    exec(command, { cwd: root, timeout: timeoutMs, maxBuffer: 16 * 1024 * 1024 }, (err, stdout, stderr) => {
+      const output = `${stdout}${stderr}`.trim();
+      const run: TestRun = {
+        command,
+        passed: !err,
+        ...testCounts(output),
+        output: output.slice(-3000),
+        nodeId,
+        at: new Date().toISOString(),
+        durationMs: Date.now() - started,
+      };
+      const history = testHistory(root);
+      history.last = run;
+      if (nodeId) history.byNode[nodeId] = run;
+      fs.mkdirSync(path.dirname(historyFile(root)), { recursive: true });
+      fs.writeFileSync(historyFile(root), JSON.stringify(history, null, 2));
+      resolve(run);
+    }),
+  );
+}

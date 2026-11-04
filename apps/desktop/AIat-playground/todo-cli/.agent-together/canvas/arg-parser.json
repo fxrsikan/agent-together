@@ -1,0 +1,26 @@
+{
+  "id": "arg-parser",
+  "kind": "module",
+  "title": "命令行参数解析",
+  "intent": {
+    "goal": "把 argv 解析为结构化的命令对象，纯函数，无副作用。",
+    "acceptance": [
+      "parseArgs 识别 add <标题...>、done <id>、rm <id>、ls [--all|--pending|--done]，返回 Command 联合类型",
+      "缺参数、未知命令或 id 不是正整数时返回 kind 为 error 的对象（含中文 message），而不是抛出异常",
+      "无参数、help 或 --help 时返回 help 命令"
+    ],
+    "tasks": [
+      "定义 Command 联合类型与 parseArgs(argv: string[]) 函数",
+      "实现各子命令的参数校验与中文错误信息",
+      "在 src/parser/parser.test.ts 中覆盖每个命令和各类错误输入"
+    ]
+  },
+  "files": [
+    "src/parser/**"
+  ],
+  "status": "todo",
+  "position": {
+    "x": 320,
+    "y": 160
+  }
+}

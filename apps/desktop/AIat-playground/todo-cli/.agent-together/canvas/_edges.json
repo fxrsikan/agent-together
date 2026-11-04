@@ -1,0 +1,22 @@
+[
+  {
+    "from": "todo-store",
+    "to": "todo-core",
+    "label": "使用类型"
+  },
+  {
+    "from": "cli-commands",
+    "to": "todo-store",
+    "label": "读写数据"
+  },
+  {
+    "from": "cli-commands",
+    "to": "arg-parser",
+    "label": "解析参数"
+  },
+  {
+    "from": "cli-commands",
+    "to": "todo-core",
+    "label": "调用逻辑"
+  }
+]

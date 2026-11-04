@@ -53,9 +53,17 @@ ${list(memories.map((m) => `（${KIND_LABEL[m.kind]}）${m.content}`))}
 }
 
 /** The context file handed to a dispatched agent: the task, then the node guide. */
-export function buildNodeContext(canvas: Canvas, nodeId: string, task: string, memories: Memory[] = []): string {
+export function buildNodeContext(
+  canvas: Canvas,
+  nodeId: string,
+  task: string,
+  memories: Memory[] = [],
+  project?: { name: string; description?: string; stack?: string },
+): string {
   const guide = buildNodeGuide(canvas, nodeId, memories);
-  return `# 任务\n\n${task.trim() || "（未填写，请按节点的任务清单推进）"}\n\n${guide}`;
+  const about = [project?.description?.trim(), project?.stack?.trim() && `技术栈：${project.stack.trim()}`].filter(Boolean);
+  const projectSection = project && about.length ? `## 项目：${project.name}\n\n${about.join("\n\n")}\n\n` : "";
+  return `# 任务\n\n${task.trim() || "（未填写，请按节点的任务清单推进）"}\n\n${projectSection}${guide}`;
 }
 
 /**

@@ -1,0 +1,26 @@
+{
+  "id": "todo-core",
+  "kind": "module",
+  "title": "待办核心逻辑",
+  "intent": {
+    "goal": "用纯函数实现待办的增、完成、删除、列出，不做任何文件 IO。",
+    "acceptance": [
+      "addTodo 返回新列表、不修改入参，新 id 大于现有最大 id；标题为空或全是空白时抛出错误",
+      "completeTodo 将指定 id 标记为已完成，重复完成保持幂等；id 不存在时抛出错误",
+      "removeTodo 删除指定 id，id 不存在时抛出错误；listTodos 支持 all、pending、done 三种过滤"
+    ],
+    "tasks": [
+      "定义 Todo 类型（id、title、done、createdAt）与 TodoList 类型",
+      "实现 addTodo、completeTodo、removeTodo、listTodos 纯函数",
+      "在 src/core/todo-core.test.ts 中用 node:test 覆盖正常路径与错误路径"
+    ]
+  },
+  "files": [
+    "src/core/**"
+  ],
+  "status": "todo",
+  "position": {
+    "x": 640,
+    "y": 0
+  }
+}

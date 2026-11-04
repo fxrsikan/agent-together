@@ -59,7 +59,7 @@ export function ContextInspector({
         {measure?.sections.map((s) => (
           <li key={s.title}>
             <span className="section-title">{s.title}</span>
-            <span className="bar" style={{ width: `${(s.tokens / largest) * 100}%` }} />
+            <span className="token-bar" style={{ width: `${(s.tokens / largest) * 100}%` }} />
             <span className="muted">{s.tokens}</span>
           </li>
         ))}

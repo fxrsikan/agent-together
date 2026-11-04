@@ -1,0 +1,27 @@
+{
+  "id": "todo-store",
+  "kind": "module",
+  "title": "待办持久化",
+  "intent": {
+    "goal": "把待办读写到当前工作目录下的 todos.json。",
+    "acceptance": [
+      "loadTodos 在文件不存在时返回空列表；JSON 非法或结构不符时抛出可识别的错误",
+      "saveTodos 写入后再读取，内容完全一致",
+      "数据路径默认为 process.cwd() 下的 todos.json，且可注入路径以便测试",
+      "写入采用先写临时文件再 rename 的方式，避免写到一半时文件损坏"
+    ],
+    "tasks": [
+      "实现 loadTodos 与 saveTodos，路径可注入",
+      "对读入数据做结构校验，复用 todo-core 的 Todo 类型",
+      "在 src/store/store.test.ts 中使用 os.tmpdir() 的临时目录进行读写测试"
+    ]
+  },
+  "files": [
+    "src/store/**"
+  ],
+  "status": "todo",
+  "position": {
+    "x": 320,
+    "y": 0
+  }
+}

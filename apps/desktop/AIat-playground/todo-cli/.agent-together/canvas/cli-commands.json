@@ -1,0 +1,30 @@
+{
+  "id": "cli-commands",
+  "kind": "feature",
+  "title": "终端待办命令",
+  "intent": {
+    "goal": "用户可以在终端运行 add、done、rm、ls 命令管理待办。",
+    "acceptance": [
+      "todo add 买牛奶 会在 todos.json 中追加一条待办并输出新 id；todo ls 列出待办并区分已完成与未完成",
+      "todo done <id> 与 todo rm <id> 对已存在的 id 生效并输出确认；id 不存在时输出错误信息并以非零退出码结束",
+      "参数错误时打印用法说明并以非零退出码结束；集成测试通过子进程在临时目录中跑通 add、ls、done、rm 全流程",
+      "数据文件始终位于执行命令时的当前工作目录"
+    ],
+    "tasks": [
+      "实现 src/cli/main.ts：调用 arg-parser 解析参数，分派到 todo-store 与 todo-core，统一输出和退出码",
+      "实现 ls 的输出格式与 help 文本",
+      "编写 package.json（scripts 包含 test 与 start，不含 dependencies）和 tsconfig.json",
+      "在 src/cli/cli.test.ts 中用 child_process 对四个子命令做集成测试"
+    ]
+  },
+  "files": [
+    "src/cli/**",
+    "package.json",
+    "tsconfig.json"
+  ],
+  "status": "todo",
+  "position": {
+    "x": 0,
+    "y": 0
+  }
+}

@@ -5,11 +5,19 @@ import path from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
 import { cleanEnv } from "./terminal.js";
 
-/** A small text-in, text-out model used for L2 judgments. */
+/** Per call: L2 judgments are short and quick; a canvas plan is long. */
+export interface CompleteOptions {
+  /** Default 60 s. */
+  timeoutMs?: number;
+  /** Default 2048. */
+  maxTokens?: number;
+}
+
+/** A small text-in, text-out model used for L2 judgments and canvas plans. */
 export interface Llm {
   /** Shown to the user, e.g. "claude-cli (haiku)". */
   readonly name: string;
-  complete(prompt: string): Promise<string>;
+  complete(prompt: string, options?: CompleteOptions): Promise<string>;
 }
 
 export interface LlmConfig {
@@ -42,15 +50,15 @@ class AnthropicLlm implements Llm {
     this.name = `anthropic (${model})`;
   }
 
-  async complete(prompt: string): Promise<string> {
+  async complete(prompt: string, options: CompleteOptions = {}): Promise<string> {
     const response = await this.client.messages.create(
       {
         model: this.model,
-        max_tokens: 2048,
+        max_tokens: options.maxTokens ?? 2048,
         output_config: { effort: "low" },
         messages: [{ role: "user", content: prompt }],
       },
-      { timeout: TIMEOUT_MS },
+      { timeout: options.timeoutMs ?? TIMEOUT_MS },
     );
     if (response.stop_reason === "refusal") throw new Error("the model declined this judgment");
     return response.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("");
@@ -68,7 +76,8 @@ class ClaudeCliLlm implements Llm {
     this.name = `claude-cli (${model})`;
   }
 
-  complete(prompt: string): Promise<string> {
+  complete(prompt: string, options: CompleteOptions = {}): Promise<string> {
+    const timeoutMs = options.timeoutMs ?? TIMEOUT_MS;
     return new Promise((resolve, reject) => {
       const child = spawn("claude", ["-p", "--model", this.model], {
         cwd: os.tmpdir(),
@@ -78,13 +87,21 @@ class ClaudeCliLlm implements Llm {
       });
       let out = "";
       let err = "";
-      const timer = setTimeout(() => child.kill(), TIMEOUT_MS);
+      let timedOut = false;
+      const timer = setTimeout(() => {
+        timedOut = true;
+        // With shell: true on Windows, killing the shell would leave claude running: end the whole tree.
+        if (process.platform === "win32" && child.pid) spawn("taskkill", ["/pid", String(child.pid), "/t", "/f"], { stdio: "ignore" });
+        else child.kill();
+      }, timeoutMs);
       child.stdout.on("data", (d) => (out += d));
       child.stderr.on("data", (d) => (err += d));
       child.on("error", reject);
       child.on("close", (code) => {
         clearTimeout(timer);
-        code === 0 ? resolve(out.trim()) : reject(new Error(`claude -p exited ${code}: ${err.trim().slice(0, 200)}`));
+        if (code === 0) resolve(out.trim());
+        else if (timedOut) reject(new Error(`claude -p 超过 ${Math.round(timeoutMs / 1000)} 秒没有回答`));
+        else reject(new Error(`claude -p exited ${code}: ${err.trim().slice(0, 200)}`));
       });
       child.stdin.end(prompt);
     });
@@ -102,13 +119,13 @@ class OpenAiCompatibleLlm implements Llm {
     this.name = `openai-compatible (${model})`;
   }
 
-  async complete(prompt: string): Promise<string> {
+  async complete(prompt: string, options: CompleteOptions = {}): Promise<string> {
     const key = process.env.AGENT_TOGETHER_LLM_API_KEY;
     const res = await fetch(`${this.baseUrl.replace(/\/$/, "")}/chat/completions`, {
       method: "POST",
       headers: { "content-type": "application/json", ...(key ? { authorization: `Bearer ${key}` } : {}) },
       body: JSON.stringify({ model: this.model, messages: [{ role: "user", content: prompt }] }),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal: AbortSignal.timeout(options.timeoutMs ?? TIMEOUT_MS),
     });
     if (!res.ok) throw new Error(`${this.baseUrl} answered ${res.status}`);
     const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };

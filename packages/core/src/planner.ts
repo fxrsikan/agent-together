@@ -79,7 +79,7 @@ export function canvasFromDraft(draft: { nodes?: DraftNode[]; edges?: Partial<Ca
 /** 规划官: one paragraph about the product → a canvas of nodes and dependencies, for a person to review. */
 export async function planCanvas(llm: Llm, description: string): Promise<CanvasPlan> {
   const draft = parseJsonObject<{ stack?: string; testCommand?: string; nodes?: DraftNode[]; edges?: Partial<CanvasEdge>[] }>(
-    await llm.complete(planPrompt(description)),
+    await llm.complete(planPrompt(description), { timeoutMs: 180_000, maxTokens: 8000 }),
   );
   if (!draft) throw new Error("模型的回复不是 JSON，请重试");
   return { canvas: canvasFromDraft(draft), stack: draft.stack?.trim() ?? "", testCommand: draft.testCommand?.trim() ?? "" };

@@ -2,7 +2,7 @@
 import path from "node:path";
 import { claudeCodeRunner } from "@loom/adapter-claude-code";
 import { codexRunner } from "@loom/adapter-codex";
-import { LoomStore, MemoryStore, Race, type RaceReport } from "@loom/core";
+import { loadRaceConfig, LoomStore, MemoryStore, Race, type RaceReport } from "@loom/core";
 import type { AgentRunner } from "@loom/schema";
 
 const usage = `Usage:
@@ -56,7 +56,10 @@ if (args[0] === "adopt") {
     console.error(usage);
     process.exit(1);
   }
-  const runners: AgentRunner[] = agents.map((a) => (a === "codex" ? codexRunner(codexModel) : claudeCodeRunner(claudeModel)));
+  const models = loadRaceConfig(root).models ?? {};
+  const runners: AgentRunner[] = agents.map((a) =>
+    a === "codex" ? codexRunner(codexModel ?? models.codex) : claudeCodeRunner(claudeModel ?? models["claude-code"]),
+  );
   const report = await new Race(root).run(nodeId, task, runners, new MemoryStore(root).forNode(nodeId), (m) => console.log(`… ${m}`));
   print(report);
 }

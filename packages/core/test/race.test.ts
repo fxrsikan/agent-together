@@ -67,6 +67,7 @@ describe("Race", () => {
     expect(fs.existsSync(careful.worktree)).toBe(false);
     expect(git(top, "for-each-ref", "refs/loom/races")).toBe("");
     expect(race.load(report.id).adopted).toBe("careful");
+    expect(race.list().map((r) => r.id)).toEqual([report.id]);
   }, 60_000); // several git worktrees: slow on Windows
 });
 

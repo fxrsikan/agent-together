@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { app, BrowserWindow, dialog, ipcMain } from "electron";
-import { claudeCodeCompiler, installHooks } from "@loom/adapter-claude-code";
-import { agentSkillsCompiler, installCodexHooks } from "@loom/adapter-codex";
+import { claudeCodeCompiler, claudeCodeRunner, installHooks } from "@loom/adapter-claude-code";
+import { agentSkillsCompiler, codexRunner, installCodexHooks } from "@loom/adapter-codex";
 import { cursorRulesCompiler } from "@loom/adapter-cursor";
 import {
   buildNodeContext,
@@ -13,7 +13,9 @@ import {
   Daemon,
   dispatchPrompt,
   loadLlmConfig,
+  loadRaceConfig,
   openTerminal,
+  Race,
 } from "@loom/core";
 import type { Memory } from "@loom/schema";
 
@@ -115,6 +117,43 @@ async function main() {
     daemon.reload();
     return true;
   });
+
+  // Races: both agents in their own worktrees; the report is kept, the human adopts one or discards all.
+  const race = hasGit ? new Race(root) : null;
+  let racing: string | null = null; // node id while a race runs; one at a time
+  ipcMain.handle("loom:races", () => ({ running: racing, reports: race?.list() ?? [] }));
+  ipcMain.handle("loom:race", async (_e, nodeId: string, task: string) => {
+    if (!race) throw new Error("项目不在 git 仓库中，无法赛马");
+    if (racing) throw new Error(`已有一场赛马在进行（${racing}）`);
+    racing = nodeId;
+    const models = loadRaceConfig(root).models ?? {};
+    try {
+      return await race.run(
+        nodeId,
+        task,
+        [claudeCodeRunner(models["claude-code"]), codexRunner(models.codex)],
+        daemon.memory.forNode(nodeId),
+        (message) => win.webContents.send("loom:raceProgress", message),
+      );
+    } finally {
+      racing = null;
+    }
+  });
+  ipcMain.handle("loom:adoptRace", async (_e, id: string, contestantId: string) => {
+    const { response } = await dialog.showMessageBox(win, {
+      type: "question",
+      buttons: ["采用", "取消"],
+      defaultId: 0,
+      cancelId: 1,
+      message: `把 ${contestantId} 的改动应用到项目？`,
+      detail: "应用前会自动存一个检查点，之后可以回滚。其他参赛者的 worktree 会被清理。",
+    });
+    if (response !== 0) return false;
+    race!.adopt(id, contestantId);
+    daemon.reload();
+    return true;
+  });
+  ipcMain.handle("loom:discardRace", (_e, id: string) => race!.discard(id));
 
   if (process.env.ELECTRON_RENDERER_URL) await win.loadURL(process.env.ELECTRON_RENDERER_URL);
   else await win.loadFile(path.join(__dirname, "../renderer/index.html"));

@@ -1,4 +1,5 @@
 {
   "testCommand": "node --test src/auth/validate.test.ts",
-  "timeoutMs": 600000
+  "timeoutMs": 600000,
+  "models": { "claude-code": "haiku" }
 }

@@ -1,9 +1,9 @@
 import { contextBridge, ipcRenderer } from "electron";
-import type { Checkpoint, CompileReport, Judgment } from "@loom/core";
+import type { Checkpoint, CompileReport, Judgment, RaceReport } from "@loom/core";
 import type { Canvas, LoomEvent, Memory, Verdict } from "@loom/schema";
 
 export type EventRecord = { event: LoomEvent; verdict: Verdict };
-export type { Judgment };
+export type { Judgment, RaceReport };
 
 const api = {
   info: (): Promise<{ root: string; port: number; hasGit: boolean; l2: string | null; activeNodeId: string | null }> =>
@@ -32,6 +32,15 @@ const api = {
     const listener = (_e: unknown, drafts: Memory[]) => cb(drafts);
     ipcRenderer.on("loom:memoryDrafts", listener);
     return () => void ipcRenderer.off("loom:memoryDrafts", listener);
+  },
+  races: (): Promise<{ running: string | null; reports: RaceReport[] }> => ipcRenderer.invoke("loom:races"),
+  race: (nodeId: string, task: string): Promise<RaceReport> => ipcRenderer.invoke("loom:race", nodeId, task),
+  adoptRace: (id: string, contestantId: string): Promise<boolean> => ipcRenderer.invoke("loom:adoptRace", id, contestantId),
+  discardRace: (id: string): Promise<void> => ipcRenderer.invoke("loom:discardRace", id),
+  onRaceProgress(cb: (message: string) => void) {
+    const listener = (_e: unknown, message: string) => cb(message);
+    ipcRenderer.on("loom:raceProgress", listener);
+    return () => void ipcRenderer.off("loom:raceProgress", listener);
   },
   canvas: (): Promise<Canvas> => ipcRenderer.invoke("loom:canvas"),
   setActive: (nodeId: string | null): Promise<void> => ipcRenderer.invoke("loom:setActive", nodeId),

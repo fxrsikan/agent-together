@@ -5,6 +5,7 @@ import type { CompileReport } from "@loom/core";
 import type { EventRecord, Judgment } from "../../preload";
 import { CheckpointsPanel } from "./CheckpointsPanel";
 import { MemoryPanel } from "./MemoryPanel";
+import { RacePanel } from "./RacePanel";
 import { NodeCard, type NodeCardType } from "./NodeCard";
 
 const nodeTypes = { card: NodeCard };
@@ -195,6 +196,7 @@ export function App() {
                 )}
                 <button onClick={() => exportCapability(selected.id)}>导出为能力单元</button>
               </div>
+              {info?.hasGit && <RacePanel nodeId={selected.id} task={task} version={version} onChange={changed} />}
               <MemoryPanel nodeId={selected.id} version={version} onChange={changed} />
             </section>
           ) : (

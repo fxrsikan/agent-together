@@ -17,6 +17,13 @@ export interface RaceConfig {
   testCommand?: string;
   /** Per agent, default 15 minutes. */
   timeoutMs?: number;
+  /** Model per agent id, e.g. { "claude-code": "haiku" }; used when the caller names none. */
+  models?: Record<string, string>;
+}
+
+export function loadRaceConfig(root: string): RaceConfig {
+  const file = path.join(root, ".loom", "race.json");
+  return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : {};
 }
 
 export interface ScorePart {
@@ -46,6 +53,8 @@ export interface RaceReport {
   finishedAt: string;
   contestants: ContestantResult[];
   adopted?: string;
+  /** Worktrees removed without adopting anyone. */
+  discarded?: boolean;
 }
 
 const SKIP = (rel: string) => rel.startsWith(".loom/") || rel.split("/").includes("node_modules");
@@ -102,6 +111,17 @@ export class Race {
     return JSON.parse(fs.readFileSync(this.reportFile(id), "utf8"));
   }
 
+  /** Saved reports, newest first. */
+  list(): RaceReport[] {
+    const dir = path.join(this.store.dir, "races");
+    if (!fs.existsSync(dir)) return [];
+    return fs
+      .readdirSync(dir)
+      .filter((f) => f.endsWith(".json"))
+      .map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), "utf8")) as RaceReport)
+      .sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+  }
+
   private save(report: RaceReport) {
     fs.mkdirSync(path.dirname(this.reportFile(report.id)), { recursive: true });
     fs.writeFileSync(this.reportFile(report.id), JSON.stringify(report, null, 2));
@@ -124,9 +144,7 @@ export class Race {
     memories: Memory[] = [],
     onProgress: (message: string) => void = () => {},
   ): Promise<RaceReport> {
-    const config: RaceConfig = fs.existsSync(path.join(this.store.dir, "race.json"))
-      ? JSON.parse(fs.readFileSync(path.join(this.store.dir, "race.json"), "utf8"))
-      : {};
+    const config = loadRaceConfig(this.root);
     const canvas = this.store.loadCanvas();
     const startedAt = new Date().toISOString();
     const id = `${startedAt.replace(/[-:.]/g, "").replace("T", "-").slice(0, 15)}-${nodeId}`.slice(0, 80);
@@ -230,7 +248,9 @@ export class Race {
 
   /** Removes the race's worktrees and refs; the report stays. */
   discard(id: string): void {
-    this.cleanup(this.load(id));
+    const report = this.load(id);
+    this.save({ ...report, discarded: true });
+    this.cleanup(report);
   }
 
   private cleanup(report: RaceReport) {

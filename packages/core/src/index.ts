@@ -22,4 +22,4 @@ export {
 } from "./capabilities.js";
 export { formatFrontmatter, parseFrontmatter } from "./frontmatter.js";
 export { execCli, type ExecResult } from "./exec.js";
-export { Race, scoreContestant, type ContestantResult, type RaceConfig, type RaceReport, type ScorePart } from "./race.js";
+export { loadRaceConfig, Race, scoreContestant, type ContestantResult, type RaceConfig, type RaceReport, type ScorePart } from "./race.js";

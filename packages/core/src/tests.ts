@@ -128,3 +128,28 @@ export function runProjectTests(root: string, nodeId: string | null, timeoutMs =
     }),
   );
 }
+
+/**
+ * Lets headless agents run the project's tests in a throwaway copy (a race
+ * worktree, a bench run). Non-interactive runs refuse anything that needs
+ * approval, so without this an agent can only check its work by reading it.
+ * Claude Code: `.claude/settings.local.json` permissions. Cursor: `.cursor/cli.json`,
+ * whose shell permissions match the program name only, so it allows node and npm.
+ */
+export function allowTestCommands(dir: string): void {
+  const command = testCommandFor(dir);
+  const merge = (file: string, key: "allow", add: string[]) => {
+    const full = path.join(dir, file);
+    const json = fs.existsSync(full) ? JSON.parse(fs.readFileSync(full, "utf8")) : {};
+    json.permissions ??= {};
+    json.permissions[key] = [...new Set([...(json.permissions[key] ?? []), ...add])];
+    json.permissions.deny ??= [];
+    fs.mkdirSync(path.dirname(full), { recursive: true });
+    fs.writeFileSync(full, JSON.stringify(json, null, 2) + "\n");
+  };
+  const claude = ["Bash(node --test:*)", "Bash(npm test:*)", "Bash(npm run test:*)"];
+  if (command) claude.push(`Bash(${command}:*)`);
+  merge(".claude/settings.local.json", "allow", claude);
+  const program = command?.split(/\s+/)[0];
+  merge(".cursor/cli.json", "allow", [...new Set(["Shell(node)", "Shell(npm)", ...(program ? [`Shell(${program})`] : [])])]);
+}

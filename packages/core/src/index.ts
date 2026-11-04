@@ -25,7 +25,7 @@ export {
 export { formatFrontmatter, parseFrontmatter } from "./frontmatter.js";
 export { execCli, type ExecResult } from "./exec.js";
 export { streamJsonResult, streamJsonText } from "./stream.js";
-export { failingTestFiles, runProjectTests, testCommandFor, testCounts, testHistory, type TestHistory, type TestRun } from "./tests.js";
+export { allowTestCommands, failingTestFiles, runProjectTests, testCommandFor, testCounts, testHistory, type TestHistory, type TestRun } from "./tests.js";
 export { loadRaceConfig, Race, scoreContestant, type ContestantResult, type RaceContestant, type RaceConfig, type RaceReport, type ScorePart } from "./race.js";
 export * from "./evolution.js";
 export * from "./audit.js";

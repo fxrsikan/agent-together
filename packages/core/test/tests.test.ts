@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { failingTestFiles, runProjectTests, streamJsonResult, streamJsonText, testCommandFor, testCounts, testHistory, writeProjectInfo } from "@agent-together/core";
+import { allowTestCommands, failingTestFiles, runProjectTests, streamJsonResult, streamJsonText, testCommandFor, testCounts, testHistory, writeProjectInfo } from "@agent-together/core";
 
 const project = () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "agent-together-tests-"));
@@ -76,5 +76,26 @@ describe("failingTestFiles", () => {
     const nodeTest = "✖ add (1ms)\ntest at src\\cli.test.ts:69:3\n  at TestContext.<anonymous> (file:///D:/AI/proj/src/cli.test.ts:75:12)\ntest at D:\\AI\\proj\\src\\store\\s.test.ts:3:1\n";
     expect(failingTestFiles(nodeTest, root)).toEqual(["src/cli.test.ts", "src/store/s.test.ts"]);
     expect(failingTestFiles(" FAIL  src/a.test.ts > adds\nFAIL src/b.test.js\n", root)).toEqual(["src/a.test.ts", "src/b.test.js"]);
+  });
+});
+
+describe("allowTestCommands", () => {
+  it("lets Claude Code and Cursor run the tests, keeping existing settings", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "at-allow-"));
+    try {
+      fs.mkdirSync(path.join(root, ".agent-together"));
+      writeProjectInfo(root, { testCommand: "node --test" });
+      fs.mkdirSync(path.join(root, ".claude"));
+      fs.writeFileSync(path.join(root, ".claude", "settings.local.json"), JSON.stringify({ hooks: { Stop: [] }, permissions: { allow: ["Read"] } }));
+      allowTestCommands(root);
+      allowTestCommands(root); // idempotent
+      const claude = JSON.parse(fs.readFileSync(path.join(root, ".claude", "settings.local.json"), "utf8"));
+      expect(claude.hooks).toEqual({ Stop: [] });
+      expect(claude.permissions.allow).toEqual(["Read", "Bash(node --test:*)", "Bash(npm test:*)", "Bash(npm run test:*)"]);
+      const cursor = JSON.parse(fs.readFileSync(path.join(root, ".cursor", "cli.json"), "utf8"));
+      expect(cursor.permissions.allow).toEqual(["Shell(node)", "Shell(npm)"]);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 });

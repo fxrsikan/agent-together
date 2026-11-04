@@ -14,6 +14,7 @@ import { claudeCodeRunner, installHooks } from "@agent-together/adapter-claude-c
 import { codexRunner } from "@agent-together/adapter-codex";
 import { cursorRunner, installCursorHooks } from "@agent-together/adapter-cursor";
 import {
+  allowTestCommands,
   buildNodeContext,
   builtinRules,
   Daemon,
@@ -107,23 +108,6 @@ function runnerFor(agent: string, model?: string): AgentRunner {
 const IGNORED = (rel: string) => rel.startsWith(".agent-together/") || rel.startsWith(".claude/") || rel.startsWith(".cursor/") || rel.split("/").includes("node_modules");
 
 /**
- * Runs are non-interactive, so a command that needs approval is simply refused.
- * Let the agent run the project's tests itself, or it can only check its work
- * by reading it.
- */
-function allowTestCommand(dir: string) {
-  const command = testCommandFor(dir);
-  const allow = ["Bash(node --test:*)", "Bash(npm test:*)", "Bash(npm run test:*)"];
-  if (command) allow.push(`Bash(${command}:*)`);
-  const file = path.join(dir, ".claude", "settings.local.json");
-  const settings = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : {};
-  settings.permissions ??= {};
-  settings.permissions.allow = [...new Set([...(settings.permissions.allow ?? []), ...allow])];
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, JSON.stringify(settings, null, 2) + "\n");
-}
-
-/**
  * clean: tests pass without touching other nodes. crossed: changed another
  * node's files. escalated: it stayed inside its node and every test still
  * failing belongs to another node, so the rest is left to a person (a correct
@@ -151,7 +135,7 @@ async function runOne(fixture: string, t: BenchTask, condition: Condition, repea
   const hook = path.join(path.dirname(fileURLToPath(import.meta.url)), "agent-together-hook.js");
   installHooks(dir, `node "${hook}"`);
   if (agent === "cursor") installCursorHooks(dir, `node "${hook}" --platform cursor`);
-  allowTestCommand(dir);
+  allowTestCommands(dir);
   const store = new ProjectStore(dir);
   const canvas = store.loadCanvas();
   if (!canvas.nodes.some((n) => n.id === t.node)) throw new Error(`task ${t.id}: no node ${t.node}`);

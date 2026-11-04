@@ -8,7 +8,7 @@ import { capabilityRules, CapabilityStore } from "./capabilities.js";
 import { Checkpoints } from "./checkpoints.js";
 import { buildNodeContext } from "./context.js";
 import { readProjectInfo } from "./project.js";
-import { failingTestFiles, testCommandFor } from "./tests.js";
+import { allowTestCommands, failingTestFiles, testCommandFor } from "./tests.js";
 import { ownerOf } from "./owners.js";
 import { Observer } from "./observer.js";
 import { builtinRules } from "./rules/index.js";
@@ -75,7 +75,9 @@ export interface RaceReport {
   discarded?: boolean;
 }
 
-const SKIP = (rel: string) => rel.startsWith(".agent-together/") || rel.split("/").includes("node_modules");
+/** Bookkeeping, not the contestant's work: Agent Together's files and the agent settings each worktree gets. */
+const SKIP = (rel: string) =>
+  [".agent-together/", ".claude/", ".cursor/"].some((p) => rel.startsWith(p)) || rel.split("/").includes("node_modules");
 
 function git(cwd: string, args: string[], input?: string): string {
   return execFileSync("git", args, { cwd, encoding: "utf8", input, stdio: ["pipe", "pipe", "pipe"], maxBuffer: 64 * 1024 * 1024 }).trim();
@@ -185,6 +187,8 @@ export class Race {
         const project = path.join(worktree, this.rel);
         fs.mkdirSync(path.join(project, ".agent-together", "context"), { recursive: true });
         fs.writeFileSync(path.join(project, ".agent-together", "context", `${nodeId}.md`), context + (extra ? `\n\n## 这次尝试的做法\n${extra}` : ""));
+        // A worktree only has tracked files, so the project's local agent settings are missing; let the agent run the tests.
+        allowTestCommands(project);
         const deps = path.join(this.root, "node_modules");
         if (fs.existsSync(deps) && !fs.existsSync(path.join(project, "node_modules"))) {
           fs.symlinkSync(deps, path.join(project, "node_modules"), "junction");
@@ -270,7 +274,8 @@ export class Race {
     if (!winner) throw new Error(`no contestant ${contestantId} in race ${id}`);
     new Checkpoints(this.root).create(`采用赛马 ${contestantId} 之前`, report.nodeId);
     const scope = this.rel || ".";
-    const exclude = [`:(exclude)${this.rel ? `${this.rel}/` : ""}.agent-together`, ":(exclude)**/node_modules"];
+    const prefix = this.rel ? `${this.rel}/` : "";
+    const exclude = [".agent-together", ".claude", ".cursor"].map((d) => `:(exclude)${prefix}${d}`).concat(":(exclude)**/node_modules");
     const patch = execFileSync("git", ["diff", "--binary", report.base, winner.commit, "--", scope, ...exclude], {
       cwd: this.top,
       encoding: "utf8",

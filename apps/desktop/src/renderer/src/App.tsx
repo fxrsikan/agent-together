@@ -107,7 +107,7 @@ export function App() {
   const selected = canvas?.nodes.find((n) => n.id === selectedId) ?? null;
 
   const install = async () =>
-    setNotice(`已写入 ${(await window.loom.installHooks()).join("、")}。Codex 需要在项目里运行 codex 并用 /hooks 信任后才生效。`);
+    setNotice(`已写入 ${(await window.loom.installHooks()).join("、")}。Codex 需要在项目里运行 codex 并用 /hooks 信任后才生效；Cursor 需要信任该工作区。`);
 
   const describeReport = (r: CompileReport) =>
     r.errors.length

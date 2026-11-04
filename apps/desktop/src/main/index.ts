@@ -3,7 +3,7 @@ import path from "node:path";
 import { app, BrowserWindow, dialog, ipcMain } from "electron";
 import { claudeCodeCompiler, claudeCodeRunner, installHooks } from "@loom/adapter-claude-code";
 import { agentSkillsCompiler, codexRunner, installCodexHooks } from "@loom/adapter-codex";
-import { cursorRulesCompiler } from "@loom/adapter-cursor";
+import { cursorRulesCompiler, installCursorHooks } from "@loom/adapter-cursor";
 import {
   buildNodeContext,
   capabilityFromNode,
@@ -63,7 +63,11 @@ async function main() {
   ipcMain.handle("loom:installHooks", () => {
     // Dev layout: the hook program is built in the sibling workspace package.
     const hook = path.resolve(app.getAppPath(), "../../packages/hook/dist/loom-hook.js");
-    return [installHooks(root, `node "${hook}"`), installCodexHooks(root, `node "${hook}" --platform codex`)];
+    return [
+      installHooks(root, `node "${hook}"`),
+      installCodexHooks(root, `node "${hook}" --platform codex`),
+      installCursorHooks(root, `node "${hook}" --platform cursor`),
+    ];
   });
   // Dispatch: checkpoint first, make the node active, write its neighbourhood context, open the agent on it.
   // Context inspector: what the agent would get, with sizes; memories can be left out per dispatch.

@@ -1,7 +1,7 @@
 {
   "name": "@loom/adapter-cursor",
   "version": "0.0.1",
-  "description": "Cursor adapter: capability units compiled to .cursor/rules/*.mdc (hooks come in v0.3)",
+  "description": "Cursor adapter: hook payloads (incl. Windows PowerShell repair) to Loom events, verdicts to hook output, hook installer, rules compiler",
   "license": "Apache-2.0",
   "type": "module",
   "main": "dist/index.js",

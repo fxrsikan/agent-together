@@ -7,4 +7,5 @@ out/
 **/.loom/context/
 **/.claude/settings.local.json
 **/.codex/hooks.json
+**/.cursor/hooks.json
 **/.loom/races/

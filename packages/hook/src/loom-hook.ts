@@ -4,12 +4,23 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { installHooks, toHookOutput, toLoomEvent, type HookPayload } from "@loom/adapter-claude-code";
 import { exitCodeFromTranscript, installCodexHooks, toCodexOutput, toLoomEvents, type CodexHookPayload } from "@loom/adapter-codex";
+import {
+  cursorCwd,
+  installCursorHooks,
+  parseHookInput,
+  toCursorEvents,
+  toCursorOutput,
+  type CursorHookPayload,
+} from "@loom/adapter-cursor";
 import { LoomStore } from "@loom/core";
 import { strongest, type LoomEvent, type Verdict } from "@loom/schema";
 
-type Platform = "claude-code" | "codex";
+type Platform = "claude-code" | "codex" | "cursor";
 
 interface Adapter {
+  parse?(raw: string): any;
+  /** Where to look for .loom; default payload.cwd. */
+  cwd?(payload: any): string;
   toEvents(payload: any, readFile: (p: string) => string | undefined): LoomEvent[];
   toOutput(hookEventName: string, verdict: Verdict): string | null;
 }
@@ -22,6 +33,13 @@ const adapters: Record<Platform, Adapter> = {
   codex: {
     toEvents: (p: CodexHookPayload) => toLoomEvents(p, new Date(), codexExitCode),
     toOutput: toCodexOutput,
+  },
+  // Cursor blocks a preToolUse whose reply does not parse, so toOutput always answers it, even with no findings.
+  cursor: {
+    parse: parseHookInput,
+    cwd: (p: CursorHookPayload) => cursorCwd(p),
+    toEvents: (p: CursorHookPayload, readFile) => toCursorEvents(p, readFile),
+    toOutput: toCursorOutput,
   },
 };
 
@@ -47,9 +65,12 @@ if (args[0] === "install") {
   const file =
     platform === "codex"
       ? installCodexHooks(root, `node "${self}" --platform codex`)
-      : installHooks(root, `node "${self}"`);
+      : platform === "cursor"
+        ? installCursorHooks(root, `node "${self}" --platform cursor`)
+        : installHooks(root, `node "${self}"`);
   console.log(`Loom hooks for ${platform} written to ${file}`);
   if (platform === "codex") console.log("Codex runs them only after you trust them: open codex in the project and use /hooks.");
+  if (platform === "cursor") console.log("Cursor runs project hooks only in a trusted workspace.");
   process.exit(0);
 }
 
@@ -63,11 +84,15 @@ async function main() {
   const adapter = adapters[platform];
   if (!adapter) return;
   const raw = fs.readFileSync(0, "utf8");
-  if (process.env.LOOM_HOOK_LOG) fs.appendFileSync(process.env.LOOM_HOOK_LOG, `${JSON.stringify({ platform, raw: JSON.parse(raw) })}\n`);
-  const payload = JSON.parse(raw);
-  const store = LoomStore.find(payload.cwd);
+  const payload = adapter.parse ? adapter.parse(raw) : JSON.parse(raw);
+  if (process.env.LOOM_HOOK_LOG) fs.appendFileSync(process.env.LOOM_HOOK_LOG, `${JSON.stringify({ platform, raw: payload })}\n`);
+  allow = () => {
+    const output = adapter.toOutput(payload.hook_event_name, { level: "off", findings: [] });
+    if (output) process.stdout.write(output);
+  };
+  const store = LoomStore.find(adapter.cwd ? adapter.cwd(payload) : payload.cwd);
   const runtime = store?.readRuntime();
-  if (!runtime) return;
+  if (!runtime) return allow();
 
   const readFile = (p: string) => (fs.existsSync(p) ? fs.readFileSync(p, "utf8") : undefined);
   const findings: Verdict["findings"] = [];
@@ -84,4 +109,13 @@ async function main() {
   if (output) process.stdout.write(output);
 }
 
-main().catch(() => {}).finally(() => process.exit(0));
+/**
+ * The reply when Loom cannot judge: nothing, except where the platform needs an
+ * explicit allow. Before the payload is known, Cursor gets a bare allow (it
+ * ignores fields an event does not use).
+ */
+let allow = platform === "cursor" ? () => void process.stdout.write('{"permission":"allow"}') : () => {};
+
+main()
+  .catch(() => allow())
+  .finally(() => process.exit(0));

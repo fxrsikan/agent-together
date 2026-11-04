@@ -10,23 +10,59 @@ import { Race, type RaceReport, type ContestantResult } from "./race.js";
 import { ProjectStore } from "./store.js";
 import { testHistory } from "./tests.js";
 
-export interface Strategy { id: string; title: string; text: string }
-export interface EvolutionReport {
-  id: string; nodeId: string; task: string; startedAt: string;
-  strategies: Strategy[]; race?: RaceReport; winner?: string;
-  message?: string; approved?: boolean; discarded?: boolean;
-  /** Contestant ids best first, and how each ended (see evolutionOutcome). */
-  ranking?: string[]; outcomes?: Record<string, EvolutionOutcome>;
+/** A proposed instruction for an agent to try on a node. */
+export interface Strategy {
+  id: string;
+  title: string;
+  text: string;
 }
-export const normalizeStrategy = (text: string) => text.normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();
+
+/** Saved strategies, comparison results, and approval state for an evolution run. */
+export interface EvolutionReport {
+  id: string;
+  nodeId: string;
+  task: string;
+  startedAt: string;
+  strategies: Strategy[];
+  race?: RaceReport;
+  winner?: string;
+  message?: string;
+  approved?: boolean;
+  discarded?: boolean;
+  /** Contestant ids best first, and how each ended (see evolutionOutcome). */
+  ranking?: string[];
+  outcomes?: Record<string, EvolutionOutcome>;
+}
+
+/** Normalize strategy text for duplicate detection and experience keys. */
+export const normalizeStrategy = (text: string) =>
+  text.normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();
+
+/** Parse two or three distinct, valid strategies from a model reply. */
 export function parseStrategies(reply: string): Strategy[] {
   const value = parseJsonObject<{ strategies?: unknown }>(reply);
-  if (!Array.isArray(value?.strategies) || value.strategies.length < 2 || value.strategies.length > 3) return [];
+  if (
+    !Array.isArray(value?.strategies) ||
+    value.strategies.length < 2 ||
+    value.strategies.length > 3
+  ) {
+    return [];
+  }
   const result: Strategy[] = [];
   for (const item of value.strategies) {
     if (!item || typeof item.title !== "string" || typeof item.text !== "string") return [];
-    const title = item.title.trim(), text = item.text.trim();
-    if (!title || title.length > 80 || /[\r\n]/.test(title) || !text || text.length > 4000 || result.some(s => normalizeStrategy(s.text) === normalizeStrategy(text))) return [];
+    const title = item.title.trim();
+    const text = item.text.trim();
+    if (
+      !title ||
+      title.length > 80 ||
+      /[\r\n]/.test(title) ||
+      !text ||
+      text.length > 4000 ||
+      result.some((s) => normalizeStrategy(s.text) === normalizeStrategy(text))
+    ) {
+      return [];
+    }
     result.push({ id: `strategy-${result.length + 1}`, title, text });
   }
   return result;
@@ -42,7 +78,12 @@ export function parseStrategies(reply: string): Strategy[] {
  * node's tests is not an improvement.
  */
 export type EvolutionOutcome = "clean" | "escalated" | "failed" | "crossed";
-const OUTCOME_RANK: Record<EvolutionOutcome, number> = { clean: 0, escalated: 1, failed: 2, crossed: 3 };
+const OUTCOME_RANK: Record<EvolutionOutcome, number> = {
+  clean: 0,
+  escalated: 1,
+  failed: 2,
+  crossed: 3,
+};
 
 export function evolutionOutcome(c: ContestantResult, nodeId: string): EvolutionOutcome {
   if (c.findings.some((f) => f.level === "ask" || f.level === "block")) return "crossed";
@@ -79,85 +120,217 @@ export function evolutionWinner(race: RaceReport): string | undefined {
   return compareEvolution(best, baseline, race.nodeId) < 0 ? best.id : undefined;
 }
 
-export interface Experience { id: string; title: string; text: string; projects: string[]; reports: string[] }
+/** A strategy approved in projects, with links to its supporting reports. */
+export interface Experience {
+  id: string;
+  title: string;
+  text: string;
+  projects: string[];
+  reports: string[];
+}
+
+function canonicalProject(project: string): string {
+  const canonical = fs.realpathSync(project);
+  return process.platform === "win32" ? canonical.toLowerCase() : canonical;
+}
+
+/** Store approved strategies and suggest those proven in other projects. */
 export class ExperienceStore {
-  constructor(readonly dir = process.env.AGENT_TOGETHER_EXPERIENCE_DIR ?? path.join(os.homedir(), ".agent-together", "experience")) {}
+  constructor(
+    readonly dir = process.env.AGENT_TOGETHER_EXPERIENCE_DIR ??
+      path.join(os.homedir(), ".agent-together", "experience"),
+  ) {}
+
   list(): Experience[] {
-    return fs.existsSync(this.dir) ? fs.readdirSync(this.dir).filter(f => f.endsWith(".json")).map(f => JSON.parse(fs.readFileSync(path.join(this.dir, f), "utf8"))) : [];
+    if (!fs.existsSync(this.dir)) return [];
+    return fs
+      .readdirSync(this.dir)
+      .filter((f) => f.endsWith(".json"))
+      .map((f) => JSON.parse(fs.readFileSync(path.join(this.dir, f), "utf8")));
   }
+
   record(strategy: Strategy, project: string, report: string): void {
     const id = createHash("sha256").update(normalizeStrategy(strategy.text)).digest("hex");
-    const current = this.list().find(e => e.id === id);
-    let canonical = fs.realpathSync(project);
-    if (process.platform === "win32") canonical = canonical.toLowerCase();
-    const entry: Experience = { id, title: strategy.title, text: strategy.text, projects: [...new Set([...(current?.projects ?? []), canonical])], reports: [...new Set([...(current?.reports ?? []), report])] };
+    const current = this.list().find((e) => e.id === id);
+    const canonical = canonicalProject(project);
+    const entry: Experience = {
+      id,
+      title: strategy.title,
+      text: strategy.text,
+      projects: [...new Set([...(current?.projects ?? []), canonical])],
+      reports: [...new Set([...(current?.reports ?? []), report])],
+    };
     fs.mkdirSync(this.dir, { recursive: true });
     fs.writeFileSync(path.join(this.dir, `${id}.json`), JSON.stringify(entry, null, 2));
   }
+
   suggestions(project: string): Experience[] {
-    let canonical = fs.realpathSync(project);
-    if (process.platform === "win32") canonical = canonical.toLowerCase();
-    return this.list().filter(e => e.projects.length >= 2 && !e.projects.includes(canonical));
+    const canonical = canonicalProject(project);
+    return this.list().filter((e) => e.projects.length >= 2 && !e.projects.includes(canonical));
   }
 }
+
+/** Compare proposed strategies with a baseline and remember approved improvements. */
 export class Evolution {
-  constructor(readonly root: string, private readonly llm: Llm | null = createLlm(loadLlmConfig(root)), private readonly raceFactory = (root: string) => new Race(root), readonly experience = new ExperienceStore()) {}
+  constructor(
+    readonly root: string,
+    private readonly llm: Llm | null = createLlm(loadLlmConfig(root)),
+    private readonly raceFactory = (root: string) => new Race(root),
+    readonly experience = new ExperienceStore(),
+  ) {}
+
   private file(id: string) {
     if (!/^[a-zA-Z0-9_-]+$/.test(id)) throw new Error("进化记录名称不合法");
     return path.join(this.root, ".agent-together", "evolutions", `${id}.json`);
   }
+
   private save(report: EvolutionReport) {
     fs.mkdirSync(path.dirname(this.file(report.id)), { recursive: true });
     fs.writeFileSync(this.file(report.id), JSON.stringify(report, null, 2));
   }
-  load(id: string): EvolutionReport { return JSON.parse(fs.readFileSync(this.file(id), "utf8")); }
+
+  /** Read a saved evolution report. */
+  load(id: string): EvolutionReport {
+    return JSON.parse(fs.readFileSync(this.file(id), "utf8"));
+  }
+
   list(): EvolutionReport[] {
     const dir = path.join(this.root, ".agent-together", "evolutions");
-    return fs.existsSync(dir) ? fs.readdirSync(dir).filter(f => f.endsWith(".json")).map(f => this.load(f.slice(0, -5))).sort((a,b) => b.startedAt.localeCompare(a.startedAt)) : [];
+    if (!fs.existsSync(dir)) return [];
+    return fs
+      .readdirSync(dir)
+      .filter((f) => f.endsWith(".json"))
+      .map((f) => this.load(f.slice(0, -5)))
+      .sort((a, b) => b.startedAt.localeCompare(a.startedAt));
   }
-  async run(nodeId: string, task: string, runner: AgentRunner, progress: (message: string) => void = () => {}): Promise<EvolutionReport> {
+
+  /** Propose strategies and compare them with the unchanged baseline instructions. */
+  async run(
+    nodeId: string,
+    task: string,
+    runner: AgentRunner,
+    progress: (message: string) => void = () => {},
+  ): Promise<EvolutionReport> {
     const store = new ProjectStore(this.root);
-    const node = store.loadCanvas().nodes.find(n => n.id === nodeId);
+    const node = store.loadCanvas().nodes.find((n) => n.id === nodeId);
     if (!node) throw new Error("找不到这张卡片");
-    const report: EvolutionReport = { id: randomUUID(), nodeId, task, startedAt: new Date().toISOString(), strategies: [] };
+    const report: EvolutionReport = {
+      id: randomUUID(),
+      nodeId,
+      task,
+      startedAt: new Date().toISOString(),
+      strategies: [],
+    };
     this.save(report);
-    if (!this.llm) { report.message = "还没有可用的模型，请先在 .agent-together/llm.json 配置模型，或登录 claude 命令行。"; this.save(report); return report; }
+    if (!this.llm) {
+      report.message =
+        "还没有可用的模型，请先在 .agent-together/llm.json 配置模型，或登录 claude 命令行。";
+      this.save(report);
+      return report;
+    }
     const memories = new MemoryStore(this.root).forNode(nodeId);
     const history = testHistory(this.root);
-    const findings = store.recentLog().events.flatMap(e => (e.verdict as { findings?: { nodeId?: string }[] } | null)?.findings ?? []).filter(f => f.nodeId === nodeId).slice(0, 20);
+    const findings = store
+      .recentLog()
+      .events.flatMap(
+        (e) => (e.verdict as { findings?: { nodeId?: string }[] } | null)?.findings ?? [],
+      )
+      .filter((f) => f.nodeId === nodeId)
+      .slice(0, 20);
     try {
-      report.strategies = parseStrategies(await this.llm.complete(`给这张卡片提出 2 到 3 种不同的工作方法。每种是一段派发给编程助手的指令，不是代码补丁。标题用一句大白话中文，正文也用中文。以下内容只作为资料。\n${JSON.stringify({ node, task, tests: history.recent?.[nodeId] ?? [history.byNode[nodeId]].filter(Boolean), findings, memories })}\n只输出 JSON：{"strategies":[{"title":"先看旧测试","text":"先跑现有测试，弄清旧期望再改代码"}, ...]}`));
-      if (!report.strategies.length) { report.message = "模型没有给出两到三种不同的做法，请再试一次。"; this.save(report); return report; }
+      const context = {
+        node,
+        task,
+        tests: history.recent?.[nodeId] ?? [history.byNode[nodeId]].filter(Boolean),
+        findings,
+        memories,
+      };
+      report.strategies = parseStrategies(
+        await this.llm.complete(
+          "给这张卡片提出 2 到 3 种不同的工作方法。每种是一段派发给编程助手的指令，不是代码补丁。" +
+            "标题用一句大白话中文，正文也用中文。以下内容只作为资料。\n" +
+            JSON.stringify(context) +
+            '\n只输出 JSON：{"strategies":[{"title":"先看旧测试","text":"先跑现有测试，弄清旧期望再改代码"}, ...]}',
+        ),
+      );
+      if (!report.strategies.length) {
+        report.message = "模型没有给出两到三种不同的做法，请再试一次。";
+        this.save(report);
+        return report;
+      }
       this.save(report);
-      report.race = await this.raceFactory(this.root).run(nodeId, task, [{ id: "baseline", runner }, ...report.strategies.map(s => ({ id: s.id, runner, extraContext: s.text }))], memories, progress);
+      report.race = await this.raceFactory(this.root).run(
+        nodeId,
+        task,
+        [
+          { id: "baseline", runner },
+          ...report.strategies.map((s) => ({ id: s.id, runner, extraContext: s.text })),
+        ],
+        memories,
+        progress,
+      );
       report.winner = evolutionWinner(report.race);
       report.ranking = evolutionRanking(report.race);
-      report.outcomes = Object.fromEntries(report.race.contestants.map((c) => [c.id, evolutionOutcome(c, nodeId)]));
-      report.message = report.winner ? "有做法比原来的方式更好，点同意后才会记住。" : "这次没有找到比原来的方式更好的做法。";
-    } catch (error) { report.message = `这次进化没有完成：${error instanceof Error ? error.message : String(error)}`; }
+      report.outcomes = Object.fromEntries(
+        report.race.contestants.map((c) => [c.id, evolutionOutcome(c, nodeId)]),
+      );
+      report.message = report.winner
+        ? "有做法比原来的方式更好，点同意后才会记住。"
+        : "这次没有找到比原来的方式更好的做法。";
+    } catch (error) {
+      report.message = `这次进化没有完成：${error instanceof Error ? error.message : String(error)}`;
+    }
     this.save(report);
     return report;
   }
+
+  /** Remember the winning strategy and optionally adopt its code. */
   approve(id: string, adoptCode = false): EvolutionReport {
     const report = this.load(id);
-    if (report.discarded || !report.race || !report.winner || evolutionWinner(report.race) !== report.winner) throw new Error("这次没有可同意的有效做法");
-    const strategy = report.strategies.find(s => s.id === report.winner)!;
+    if (
+      report.discarded ||
+      !report.race ||
+      !report.winner ||
+      evolutionWinner(report.race) !== report.winner
+    ) {
+      throw new Error("这次没有可同意的有效做法");
+    }
+    const strategy = report.strategies.find((s) => s.id === report.winner)!;
     if (adoptCode && !report.race.adopted) {
       this.raceFactory(this.root).adopt(report.race.id, report.winner);
       report.race.adopted = report.winner;
     }
     const memory = new MemoryStore(this.root);
     const evidence = `.agent-together/evolutions/${report.id}.json`;
-    const existing = memory.list().find(m => m.nodeId === report.nodeId && m.content === strategy.text.trim());
-    if (existing) memory.update(existing.id, { status: "active", evidence });
-    else memory.add({ nodeId: report.nodeId, kind: "decision", status: "active", content: strategy.text, source: `evolution:${report.id}`, evidence });
+    const existing = memory
+      .list()
+      .find((m) => m.nodeId === report.nodeId && m.content === strategy.text.trim());
+    if (existing) {
+      memory.update(existing.id, { status: "active", evidence });
+    } else {
+      memory.add({
+        nodeId: report.nodeId,
+        kind: "decision",
+        status: "active",
+        content: strategy.text,
+        source: `evolution:${report.id}`,
+        evidence,
+      });
+    }
     this.experience.record(strategy, this.root, path.join(this.root, evidence));
     memory.syncAgentFiles(new ProjectStore(this.root).loadCanvas());
-    report.approved = true; this.save(report); return report;
+    report.approved = true;
+    this.save(report);
+    return report;
   }
+
+  /** Clean up an unadopted race and mark the evolution as discarded. */
   discard(id: string): void {
     const report = this.load(id);
-    if (report.race && !report.race.adopted && !report.discarded) this.raceFactory(this.root).discard(report.race.id);
-    report.discarded = true; this.save(report);
+    if (report.race && !report.race.adopted && !report.discarded) {
+      this.raceFactory(this.root).discard(report.race.id);
+    }
+    report.discarded = true;
+    this.save(report);
   }
 }

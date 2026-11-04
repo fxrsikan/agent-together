@@ -365,32 +365,62 @@ async function main() {
 
   ipcMain.handle("agent-together:evolutions", () => {
     const s = need();
-    return { reports: new Evolution(s.root, s.llm).list(), running: s.racing, agents: raceAgents(s.root), candidate: testHistory(s.root).consecutiveFailures ?? {}, suggestions: new ExperienceStore().suggestions(s.root) };
+    return {
+      reports: new Evolution(s.root, s.llm).list(),
+      running: s.racing,
+      agents: raceAgents(s.root),
+      candidate: testHistory(s.root).consecutiveFailures ?? {},
+      suggestions: new ExperienceStore().suggestions(s.root),
+    };
   });
   ipcMain.handle("agent-together:evolve", async (_e, nodeId: string, task: string, agent: string) => {
     const s = need();
     if (s.racing) throw new Error("已有任务在比较，请等它结束");
     if (!runners[agent]) throw new Error("请选择一个可用的助手");
     s.racing = nodeId;
-    try { return await new Evolution(s.root, s.llm).run(nodeId, task, runners[agent](loadRaceConfig(s.root).models?.[agent]), message => win.webContents.send("agent-together:raceProgress", message)); }
-    finally { s.racing = null; }
+    try {
+      return await new Evolution(s.root, s.llm).run(
+        nodeId,
+        task,
+        runners[agent](loadRaceConfig(s.root).models?.[agent]),
+        (message) => win.webContents.send("agent-together:raceProgress", message),
+      );
+    } finally {
+      s.racing = null;
+    }
   });
   ipcMain.handle("agent-together:approveEvolution", (_e, id: string, adopt: boolean) => {
     const s = need();
     if (s.racing) throw new Error("请等当前比较结束");
     const report = new Evolution(s.root, s.llm).approve(id, adopt);
-    s.canvasChanged(); return report;
+    s.canvasChanged();
+    return report;
   });
-  ipcMain.handle("agent-together:discardEvolution", (_e, id: string) => new Evolution(need().root, need().llm).discard(id));
+  ipcMain.handle("agent-together:discardEvolution", (_e, id: string) =>
+    new Evolution(need().root, need().llm).discard(id),
+  );
   ipcMain.handle("agent-together:approveExperience", (_e, id: string, nodeId: string) => {
     const s = need();
-    if (!s.daemon.canvas.nodes.some(n => n.id === nodeId)) throw new Error("找不到这条记录");
-    const entry = new ExperienceStore().suggestions(s.root).find(e => e.id === id);
+    if (!s.daemon.canvas.nodes.some((n) => n.id === nodeId)) throw new Error("找不到这条记录");
+    const entry = new ExperienceStore().suggestions(s.root).find((e) => e.id === id);
     if (!entry) throw new Error("找不到这条记录");
-    const existing = s.daemon.memory.list().find(m => m.nodeId === nodeId && m.content === entry.text.trim());
-    if (existing) s.daemon.memory.update(existing.id, { status: "active", evidence: entry.reports.join("\n") });
-    else s.daemon.memory.add({ nodeId, kind: "decision", status: "active", content: entry.text, source: "experience:" + id, evidence: entry.reports.join("\n") });
-    s.daemon.memory.syncAgentFiles(s.daemon.canvas); s.canvasChanged();
+    const existing = s.daemon.memory
+      .list()
+      .find((m) => m.nodeId === nodeId && m.content === entry.text.trim());
+    if (existing) {
+      s.daemon.memory.update(existing.id, { status: "active", evidence: entry.reports.join("\n") });
+    } else {
+      s.daemon.memory.add({
+        nodeId,
+        kind: "decision",
+        status: "active",
+        content: entry.text,
+        source: "experience:" + id,
+        evidence: entry.reports.join("\n"),
+      });
+    }
+    s.daemon.memory.syncAgentFiles(s.daemon.canvas);
+    s.canvasChanged();
   });
 
   // Races: every agent in its own worktree; the report is kept, the human adopts one or discards all.

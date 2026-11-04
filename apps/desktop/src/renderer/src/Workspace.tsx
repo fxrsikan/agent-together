@@ -15,7 +15,7 @@ import {
 import { strongest, type AgentEvent, type Canvas, type Level } from "@agent-together/schema";
 import type { CompileReport } from "@agent-together/core";
 import type { Agent, EventRecord, Judgment, SessionInfo, TestHistory } from "../../preload";
-import { AgentRun, TestBadge, type RunView } from "./AgentRun";
+import { AgentRun, TestBadge, type RunView, auditSummary } from "./AgentRun";
 import { CheckpointsPanel } from "./CheckpointsPanel";
 import { ContextInspector } from "./ContextInspector";
 import { MemoryPanel } from "./MemoryPanel";
@@ -270,8 +270,9 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
     attempt(async () => {
       setTesting(true);
       try {
-        const { tests, checkpoint } = await window.agentTogether.runTests(selectedId);
-        changed(tests ? `${tests.passed ? "测试通过" : "测试失败"}（${tests.command}）${checkpoint ? "，已存检查点" : ""}` : "项目没有测试命令：在项目设置里填写");
+        const { tests, checkpoint, audit } = await window.agentTogether.runTests(selectedId);
+        const found = auditSummary(audit);
+        changed((tests ? `${tests.passed ? "测试通过" : "测试失败"}（${tests.command}）${checkpoint ? "，已存检查点" : ""}` : "项目没有测试命令：在项目设置里填写") + (found ? `。${found}` : ""));
       } finally {
         setTesting(false);
       }

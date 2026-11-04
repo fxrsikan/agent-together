@@ -3,7 +3,8 @@ import type { BrowserWindow } from "electron";
 import { installHooks } from "@agent-together/adapter-claude-code";
 import { installCodexHooks } from "@agent-together/adapter-codex";
 import { installCursorHooks } from "@agent-together/adapter-cursor";
-import { Checkpoints, createLlm, Daemon, loadLlmConfig, Race, readProjectInfo, type Llm } from "@agent-together/core";
+import { auditChanges, Checkpoints, createLlm, Daemon, loadLlmConfig, Race, readProjectInfo, writtenPaths, type AuditResult, type Llm } from "@agent-together/core";
+import type { AgentEvent } from "@agent-together/schema";
 
 /** Everything that belongs to one open project; closing it stops its daemon. */
 export class Session {
@@ -17,6 +18,8 @@ export class Session {
   racing: string | null = null;
   /** The agent running in the app, if any; one at a time. */
   running: { nodeId: string; agent: string; stop: AbortController } | null = null;
+  /** Per node: the checkpoint taken before its last dispatch and the events the observer saw since. */
+  private watches = new Map<string, { base: string; events: AgentEvent[] }>();
 
   private constructor(
     readonly root: string,
@@ -30,6 +33,9 @@ export class Session {
     this.race = this.hasGit ? new Race(root) : null;
     const send = (channel: string) => (payload: unknown) => win.webContents.send(`agent-together:${channel}`, payload);
     this.daemon.on("event", send("event"));
+    this.daemon.on("event", ({ event }: { event: AgentEvent }) => {
+      for (const w of this.watches.values()) w.events.push(event);
+    });
     this.daemon.on("active", send("active"));
     this.daemon.on("memory", send("memoryDrafts"));
     this.daemon.on("judgment", send("judgment"));
@@ -64,6 +70,24 @@ export class Session {
       installCodexHooks(this.root, `node "${hookProgram}" --platform codex`),
       ...installCursorHooks(this.root, `node "${hookProgram}" --platform cursor`),
     ].map((f) => path.relative(this.root, f) || f);
+  }
+
+  /** Saves the pre-dispatch checkpoint and starts remembering what the observer sees for this node. */
+  startDispatch(nodeId: string, agent: string) {
+    if (!this.hasGit) return;
+    const checkpoint = this.checkpoints.create(`派发前（${agent}）`, nodeId);
+    this.watches.set(nodeId, { base: checkpoint.commit, events: [] });
+  }
+
+  /** Every change since the node's last dispatch, put through the observer; null without git or a dispatch. */
+  audit(nodeId: string | null): AuditResult | null {
+    const w = nodeId ? this.watches.get(nodeId) : undefined;
+    if (!w || !nodeId) return null;
+    try {
+      return auditChanges(this.root, w.base, nodeId, writtenPaths(this.root, w.events), this.daemon.canvas);
+    } catch {
+      return null;
+    }
   }
 
   /** The canvas changed on disk: the observer judges against the new one, the window redraws. */

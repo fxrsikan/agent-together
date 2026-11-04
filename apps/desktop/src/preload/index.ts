@@ -1,11 +1,12 @@
 import type { EvolutionReport, Experience } from "@agent-together/core";
 import { contextBridge, ipcRenderer } from "electron";
-import type { CanvasPlan, Checkpoint, CompileReport, Judgment, ProjectInfo, RaceReport, TestHistory, TestRun } from "@agent-together/core";
+import type { AuditResult, CanvasPlan, Checkpoint, CompileReport, Judgment, ProjectInfo, RaceReport, TestHistory, TestRun } from "@agent-together/core";
 import type { AgentEvent, Canvas, CanvasEdge, CanvasNode, Memory, RunResult, Verdict } from "@agent-together/schema";
 
 export type EventRecord = { event: AgentEvent; verdict: Verdict };
 export type { Judgment, RaceReport, RunResult, TestHistory, TestRun };
-export type AgentRunOutcome = { run: RunResult; tests: TestRun | null; checkpoint: Checkpoint | null };
+export type { AuditResult };
+export type AgentRunOutcome = { run: RunResult; tests: TestRun | null; checkpoint: Checkpoint | null; audit: AuditResult | null };
 export type Agent = "claude-code" | "codex" | "cursor" | "grok-build";
 export type SessionInfo = { root: string; name: string; port: number; hasGit: boolean; l2: string | null; activeNodeId: string | null };
 
@@ -49,7 +50,7 @@ const api = {
   stopAgent: () => invoke<void>("stopAgent"),
   onAgentText: (cb: (e: { nodeId: string; text: string }) => void) => on("agentText", cb),
   onAgentStatus: (cb: (e: { nodeId: string; agent: Agent; state: "running" | "testing" | "idle" }) => void) => on("agentStatus", cb),
-  runTests: (nodeId: string | null) => invoke<{ tests: TestRun | null; checkpoint: Checkpoint | null }>("runTests", nodeId),
+  runTests: (nodeId: string | null) => invoke<{ tests: TestRun | null; checkpoint: Checkpoint | null; audit: AuditResult | null }>("runTests", nodeId),
   testHistory: () => invoke<TestHistory>("testHistory"),
   testCommand: () => invoke<string | null>("testCommand"),
   onTests: (cb: (run: TestRun | null) => void) => on("tests", cb),

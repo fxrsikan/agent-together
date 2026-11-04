@@ -28,7 +28,7 @@ AI 写代码很快，但做着做着容易跑偏：让它改购物车，它顺�
 
 - 新建或打开项目，AI 生成画布，在画布上增删改卡片和连线
 - 在应用里派发给 Claude Code、Codex、Cursor，实时看 AI 的输出（Grok Build 也支持，但还没在应用里完整跑通）
-- 观察者：拦下越界修改、违反依赖、篡改测试、原地打转
+- 观察者：拦下越界修改、违反依赖、篡改测试、原地打转；跑完后再查一遍所有改动，用命令行绕过去的也能发现
 - 每次做完自动跑测试，失败交给负责的卡片修复，通过自动存检查点
 - 记忆：AI 犯过的错整理成经验，你批准后，以后每次派发都会带上
 - 同一张卡片让几个 AI 比赛，按测试结果和越界情况打分，选最好的那个
@@ -84,6 +84,7 @@ npm run dev
 | 观察者 L0 规则 | 越界写入、设计守护（import 必须沿画布连线）、篡改测试、重复失败、重复读取。级别在 `rules.json` 里按规则设：`off` / `log` / `warn` / `ask` / `block` |
 | L2 语义判断 | 每轮结束后在后台运行：把记忆草稿提炼成一句经验，对照节点目标判断这一轮是否跑偏 |
 | 应用内运行 | Claude Code、Cursor 用 `--output-format stream-json`，Codex 用 JSONL，输出实时显示；结束后跑项目测试，并从测试输出找出失败文件属于哪个节点 |
+| 事后检查 | hook 只能看到 AI 用改文件工具做的修改。每次跑完、跑测试之前，把派发前检查点以来的所有改动再过一遍观察者规则，用命令行或脚本改的也算；观察者当场没看到的会标出来 |
 | 检查点与回滚 | 派发前和测试通过时自动保存，存为 `refs/agent-together/checkpoints/*`，不碰分支和暂存区，回滚本身可撤销 |
 | 记忆 | 拦截生成草稿，批准后进入派发上下文，并同步到 `CLAUDE.md` 的 Agent Together 区块 |
 | 能力单元 | `.agent-together/capabilities/<id>.md` 写一次，编译到各平台：skill → `.claude/skills/`、`.agents/skills/`、`.cursor/rules/*.mdc`；agent 角色 → `.claude/agents/`；observer 由 Agent Together 对所有 agent 执行 |

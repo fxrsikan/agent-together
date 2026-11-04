@@ -201,7 +201,7 @@ async function main() {
   // `context`, when given, is the inspector's (possibly edited) text and is handed out as is.
   ipcMain.handle("agent-together:dispatch", (_e, nodeId: string, task: string, agent: Agent, context?: string) => {
     const s = need();
-    if (s.hasGit) s.checkpoints.create(`派发前（${agent}）`, nodeId);
+    s.startDispatch(nodeId, agent);
     const file = s.daemon.store.writeContext(nodeId, context ?? contextFor(s, nodeId, task));
     s.daemon.setActiveNode(nodeId);
     const node = s.daemon.canvas.nodes.find((n) => n.id === nodeId);
@@ -218,11 +218,13 @@ async function main() {
    * save a checkpoint, so a green state is always one click away.
    */
   const testAndCheckpoint = async (s: Session, nodeId: string | null) => {
+    // Before the tests: check every change since dispatch, including ones the hooks never saw.
+    const audit = s.audit(nodeId);
     const tests = await runProjectTests(s.root, nodeId);
     win.webContents.send("agent-together:tests", tests);
     const title = s.daemon.canvas.nodes.find((n) => n.id === nodeId)?.title ?? "项目";
     const checkpoint = tests?.passed && s.hasGit ? s.checkpoints.create(`测试通过：${title}`, nodeId) : null;
-    return { tests, checkpoint };
+    return { tests, checkpoint, audit };
   };
   ipcMain.handle("agent-together:runTests", (_e, nodeId: string | null) => testAndCheckpoint(need(), nodeId));
   ipcMain.handle("agent-together:testHistory", () => testHistory(need().root));
@@ -233,7 +235,7 @@ async function main() {
   ipcMain.handle("agent-together:runAgent", async (_e, nodeId: string, task: string, agent: Agent, context?: string) => {
     const s = need();
     if (s.running) throw new Error(`已有 agent 在运行（${s.running.nodeId}）`);
-    if (s.hasGit) s.checkpoints.create(`派发前（${agent}）`, nodeId);
+    s.startDispatch(nodeId, agent);
     const file = s.daemon.store.writeContext(nodeId, context ?? contextFor(s, nodeId, task));
     s.daemon.setActiveNode(nodeId);
     const node = s.daemon.canvas.nodes.find((n) => n.id === nodeId);
@@ -250,9 +252,9 @@ async function main() {
         onText: (text) => send("agentText", { nodeId, text }),
       });
       send("agentStatus", { nodeId, agent, state: "testing" });
-      const { tests, checkpoint } = run.summary === "已停止" ? { tests: null, checkpoint: null } : await testAndCheckpoint(s, nodeId);
+      const { tests, checkpoint, audit } = run.summary === "已停止" ? { tests: null, checkpoint: null, audit: s.audit(nodeId) } : await testAndCheckpoint(s, nodeId);
       s.canvasChanged();
-      return { run, tests, checkpoint };
+      return { run, tests, checkpoint, audit };
     } finally {
       s.running = null;
       send("agentStatus", { nodeId, agent, state: "idle" });

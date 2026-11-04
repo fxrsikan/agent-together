@@ -21,6 +21,36 @@ export function TestBadge({ run }: { run: TestRun | null | undefined }) {
   );
 }
 
+/** One line for a notice: what the after-run check found, or "" when nothing. */
+export function auditSummary(audit: AgentRunOutcome["audit"] | undefined): string {
+  if (!audit?.findings.length) return "";
+  const missed = audit.findings.filter((f) => !f.seenLive).length;
+  return `事后检查发现 ${audit.findings.length} 个问题${missed ? `，其中 ${missed} 个是观察者当场没看到的（多半是用命令行改的）` : ""}`;
+}
+
+/**
+ * Every change since dispatch, checked again after the run, however it was made.
+ * A finding the observer never saw live means a write slipped past the hooks.
+ */
+export function AuditNotice({ audit }: { audit: AgentRunOutcome["audit"] | undefined }) {
+  if (!audit?.findings.length) return null;
+  const strong = audit.findings.some((f) => f.level === "ask" || f.level === "block");
+  return (
+    <div className={`finding ${strong ? "finding-block" : "finding-warn"}`}>
+      <strong>{auditSummary(audit)}</strong>
+      <ul>
+        {audit.findings.map((f, i) => (
+          <li key={i}>
+            {f.path}：{f.message}
+            {f.seenLive ? "" : "（当场没拦到）"}
+          </li>
+        ))}
+      </ul>
+      {strong && <p className="small">先看一下这些改动再标记完成；不想要可以在"检查点"里回到派发前。</p>}
+    </div>
+  );
+}
+
 /**
  * An agent working in the app: what it says as it goes, then its summary and the
  * project's test result, with the next step (mark the node done, or hand the
@@ -46,7 +76,7 @@ export function AgentRun({
     box.current?.scrollTo({ top: box.current.scrollHeight });
   }, [view.lines.length]);
 
-  const { run, tests, checkpoint } = view.outcome ?? {};
+  const { run, tests, checkpoint, audit } = view.outcome ?? {};
   const failureTask = tests && !tests.passed ? `项目测试没有通过（${tests.command}），请修复。测试输出的最后部分：\n\n${tests.output.slice(-1500)}` : "";
   // A change here can break a test another node owns; that node is the one to fix it.
   const owners = (tests?.failingNodes ?? []).filter((id) => id !== view.nodeId && titles[id]);
@@ -76,6 +106,7 @@ export function AgentRun({
       )}
       {view.state === "done" && view.outcome && (
         <>
+          <AuditNotice audit={audit} />
           {tests ? (
             <div className="row">
               <TestBadge run={tests} />

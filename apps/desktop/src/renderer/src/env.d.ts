@@ -1,7 +1,7 @@
-import type { LoomApi } from "../../preload";
+import type { AgentTogetherApi } from "../../preload";
 
 declare global {
   interface Window {
-    loom: LoomApi;
+    agentTogether: AgentTogetherApi;
   }
 }

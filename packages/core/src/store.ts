@@ -1,9 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
-import { Canvas, type CanvasEdge, type Level, type LoomEvent } from "@loom/schema";
+import { Canvas, type CanvasEdge, type Level, type AgentEvent } from "@agent-together/schema";
 
 /**
- * Everything Loom knows lives in files under <project>/.loom so it can be
+ * Everything Agent Together knows lives in files under <project>/.agent-together so it can be
  * diffed, reviewed and shared through git:
  *   canvas/_edges.json   edges between nodes
  *   canvas/<id>.json     one file per node
@@ -12,17 +12,17 @@ import { Canvas, type CanvasEdge, type Level, type LoomEvent } from "@loom/schem
  *   context/<id>.md      context handed to the last agent dispatched on a node (git-ignored)
  *   runtime.json         daemon port (git-ignored)
  */
-export class LoomStore {
+export class ProjectStore {
   readonly dir: string;
 
   constructor(readonly root: string) {
-    this.dir = path.join(root, ".loom");
+    this.dir = path.join(root, ".agent-together");
   }
 
-  static find(start: string): LoomStore | null {
+  static find(start: string): ProjectStore | null {
     let dir = path.resolve(start);
     for (;;) {
-      if (fs.existsSync(path.join(dir, ".loom"))) return new LoomStore(dir);
+      if (fs.existsSync(path.join(dir, ".agent-together"))) return new ProjectStore(dir);
       const parent = path.dirname(dir);
       if (parent === dir) return null;
       dir = parent;
@@ -54,7 +54,7 @@ export class LoomStore {
     return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : {};
   }
 
-  appendEvent(record: { event: LoomEvent; verdict?: unknown }): void {
+  appendEvent(record: { event: AgentEvent; verdict?: unknown }): void {
     const eventsDir = path.join(this.dir, "events");
     fs.mkdirSync(eventsDir, { recursive: true });
     const day = record.event.at.slice(0, 10);
@@ -81,7 +81,7 @@ export class LoomStore {
     const contextDir = path.join(this.dir, "context");
     fs.mkdirSync(contextDir, { recursive: true });
     fs.writeFileSync(path.join(contextDir, `${nodeId}.md`), markdown);
-    return `.loom/context/${nodeId}.md`;
+    return `.agent-together/context/${nodeId}.md`;
   }
 
   writeRuntime(runtime: { port: number; pid: number }): void {

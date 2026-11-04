@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Background, Controls, MarkerType, ReactFlow, type Edge } from "@xyflow/react";
-import { strongest, type Canvas, type Level, type LoomEvent } from "@loom/schema";
-import type { CompileReport } from "@loom/core";
+import { strongest, type Canvas, type Level, type AgentEvent } from "@agent-together/schema";
+import type { CompileReport } from "@agent-together/core";
 import type { EventRecord, Judgment } from "../../preload";
 import { CheckpointsPanel } from "./CheckpointsPanel";
 import { ContextInspector } from "./ContextInspector";
@@ -12,7 +12,7 @@ import { NodeCard, type NodeCardType } from "./NodeCard";
 const nodeTypes = { card: NodeCard };
 const FEED_LIMIT = 100;
 
-function describe(event: LoomEvent): string {
+function describe(event: AgentEvent): string {
   if (event.kind === "turn.end") return "一轮结束";
   const a = event.action;
   const what = a.type === "write" ? `写 ${a.path}` : a.type === "read" ? `读 ${a.path}` : a.type === "shell" ? `$ ${a.command}` : a.tool;
@@ -37,22 +37,22 @@ export function App() {
   const context = inspecting ? contextText : undefined;
 
   useEffect(() => {
-    window.loom.info().then((i) => {
+    window.agentTogether.info().then((i) => {
       setInfo(i);
       setActiveId(i.activeNodeId);
     });
-    const offEvent = window.loom.onEvent((r) => {
+    const offEvent = window.agentTogether.onEvent((r) => {
       setFeed((f) => [r, ...f].slice(0, FEED_LIMIT));
       // An agent turn may have changed files or checkpoints: refresh what depends on them.
       if (r.event.kind === "turn.end") setVersion((v) => v + 1);
     });
-    const offActive = window.loom.onActive(setActiveId);
-    const offDrafts = window.loom.onMemoryDrafts((drafts) => {
+    const offActive = window.agentTogether.onActive(setActiveId);
+    const offDrafts = window.agentTogether.onMemoryDrafts((drafts) => {
       setNotice(`有 ${drafts.length} 条记忆草稿待审批，点开对应节点查看`);
       setVersion((v) => v + 1);
     });
-    const offJudgment = window.loom.onJudgment((j) => setJudgments((js) => [j, ...js].slice(0, FEED_LIMIT)));
-    const offL2Error = window.loom.onL2Error((e) => setNotice(`L2 判断没能运行：${e}`));
+    const offJudgment = window.agentTogether.onJudgment((j) => setJudgments((js) => [j, ...js].slice(0, FEED_LIMIT)));
+    const offL2Error = window.agentTogether.onL2Error((e) => setNotice(`L2 判断没能运行：${e}`));
     return () => {
       offEvent();
       offActive();
@@ -63,7 +63,7 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    window.loom.canvas().then(setCanvas);
+    window.agentTogether.canvas().then(setCanvas);
   }, [version]);
 
   const changed = (message: string) => {
@@ -107,27 +107,27 @@ export function App() {
   const selected = canvas?.nodes.find((n) => n.id === selectedId) ?? null;
 
   const install = async () =>
-    setNotice(`已写入 ${(await window.loom.installHooks()).join("、")}。Codex 需要在项目里运行 codex 并用 /hooks 信任后才生效；Cursor 需要信任该工作区。`);
+    setNotice(`已写入 ${(await window.agentTogether.installHooks()).join("、")}。Codex 需要在项目里运行 codex 并用 /hooks 信任后才生效；Cursor 需要信任该工作区。`);
 
   const describeReport = (r: CompileReport) =>
     r.errors.length
       ? `${r.id} 未编译：${r.errors.join("；")}`
       : r.kind === "observer"
-        ? `${r.id} → 由 Loom 观察者对所有 agent 执行`
+        ? `${r.id} → 由 Agent Together 观察者对所有 agent 执行`
         : `${r.id} → ${Object.values(r.written).flat().join("、")}` +
         (r.warnings.length ? `（提醒：${r.warnings.join("；")}）` : "");
 
   const exportCapability = async (nodeId: string) =>
-    setNotice(`已保存为能力单元并编译：${describeReport(await window.loom.exportCapability(nodeId))}`);
+    setNotice(`已保存为能力单元并编译：${describeReport(await window.agentTogether.exportCapability(nodeId))}`);
 
   const compileAll = async () => {
-    const reports = await window.loom.compileCapabilities();
-    setNotice(reports.length ? reports.map(describeReport).join(" · ") : "还没有能力单元（.loom/capabilities/ 为空）");
+    const reports = await window.agentTogether.compileCapabilities();
+    setNotice(reports.length ? reports.map(describeReport).join(" · ") : "还没有能力单元（.agent-together/capabilities/ 为空）");
   };
 
   const dispatch = async (nodeId: string) => {
     try {
-      const file = await window.loom.dispatch(nodeId, task, agent, context);
+      const file = await window.agentTogether.dispatch(nodeId, task, agent, context);
       changed(`已存检查点并在新窗口启动 ${agent === "codex" ? "Codex" : "Claude Code"}，上下文：${file}`);
       setTask("");
     } catch (err) {
@@ -138,7 +138,7 @@ export function App() {
   return (
     <div className="app">
       <header className="bar">
-        <strong>Loom</strong>
+        <strong>Agent Together</strong>
         <span className="muted">{info ? `${info.root} · 守护进程 127.0.0.1:${info.port}` : "启动中…"}</span>
         <span className="spacer" />
         <span className="muted">L2：{info ? info.l2 ?? "关闭" : "…"}</span>
@@ -195,9 +195,9 @@ export function App() {
                   派发
                 </button>
                 {selected.id === activeId ? (
-                  <button onClick={() => window.loom.setActive(null)}>取消当前节点</button>
+                  <button onClick={() => window.agentTogether.setActive(null)}>取消当前节点</button>
                 ) : (
-                  <button onClick={() => window.loom.setActive(selected.id)}>设为当前节点</button>
+                  <button onClick={() => window.agentTogether.setActive(selected.id)}>设为当前节点</button>
                 )}
                 <button onClick={() => exportCapability(selected.id)}>导出为能力单元</button>
                 <button onClick={() => setInspecting((v) => !v)}>{inspecting ? "收起上下文" : "检查上下文"}</button>

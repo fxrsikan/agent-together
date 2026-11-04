@@ -1,23 +1,23 @@
 {
-  "name": "@loom/hook",
+  "name": "@agent-together/hook",
   "version": "0.0.1",
-  "description": "loom-hook: the tiny program agent hooks call; asks the local Loom daemon for a verdict",
+  "description": "agent-together-hook: the tiny program agent hooks call; asks the local Agent Together daemon for a verdict",
   "license": "Apache-2.0",
   "type": "module",
-  "main": "dist/loom-hook.js",
+  "main": "dist/agent-together-hook.js",
   "bin": {
-    "loom-hook": "dist/loom-hook.js",
-    "loom-compile": "dist/loom-compile.js",
-    "loom-race": "dist/loom-race.js"
+    "agent-together-hook": "dist/agent-together-hook.js",
+    "agent-together-compile": "dist/agent-together-compile.js",
+    "agent-together-race": "dist/agent-together-race.js"
   },
   "scripts": {
     "build": "tsc -b"
   },
   "dependencies": {
-    "@loom/adapter-claude-code": "0.0.1",
-    "@loom/adapter-codex": "0.0.1",
-    "@loom/core": "0.0.1",
-    "@loom/schema": "0.0.1",
-    "@loom/adapter-cursor": "0.0.1"
+    "@agent-together/adapter-claude-code": "0.0.1",
+    "@agent-together/adapter-codex": "0.0.1",
+    "@agent-together/core": "0.0.1",
+    "@agent-together/schema": "0.0.1",
+    "@agent-together/adapter-cursor": "0.0.1"
   }
 }

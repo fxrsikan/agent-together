@@ -1,10 +1,10 @@
-import { generatedNote, type Capability, type CapabilityCompiler, type CompiledFile } from "@loom/schema";
+import { generatedNote, type Capability, type CapabilityCompiler, type CompiledFile } from "@agent-together/schema";
 
 const yaml = (s: string) => JSON.stringify(s); // a JSON string is a valid YAML double-quoted scalar
 
 /**
  * Claude Code: skills → .claude/skills/<id>/SKILL.md, agent roles →
- * .claude/agents/<id>.md (subagents). Observers run in Loom, not here.
+ * .claude/agents/<id>.md (subagents). Observers run in Agent Together, not here.
  */
 export const claudeCodeCompiler: CapabilityCompiler = {
   target: "claude-code",

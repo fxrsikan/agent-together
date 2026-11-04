@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { RaceReport } from "../../preload";
 
-const AGENT_NAMES: Record<string, string> = { "claude-code": "Claude Code", codex: "Codex" };
+const AGENT_NAMES: Record<string, string> = { "claude-code": "Claude Code", codex: "Codex", cursor: "Cursor" };
 
 function seconds(ms: number) {
   return `${Math.round(ms / 1000)}s`;
@@ -27,25 +27,27 @@ export function RacePanel({
 }) {
   const [reports, setReports] = useState<RaceReport[]>([]);
   const [running, setRunning] = useState<string | null>(null);
+  const [agents, setAgents] = useState<string[]>([]);
   const [progress, setProgress] = useState<string[]>([]);
 
   const refresh = () =>
-    window.loom.races().then((r) => {
+    window.agentTogether.races().then((r) => {
       setReports(r.reports);
       setRunning(r.running);
+      setAgents(r.agents);
     });
 
   useEffect(() => {
     refresh();
   }, [version]);
 
-  useEffect(() => window.loom.onRaceProgress((m) => setProgress((p) => [...p, m])), []);
+  useEffect(() => window.agentTogether.onRaceProgress((m) => setProgress((p) => [...p, m])), []);
 
   const start = async () => {
     setProgress([]);
     setRunning(nodeId);
     try {
-      const report = await window.loom.race(nodeId, task, context);
+      const report = await window.agentTogether.race(nodeId, task, context);
       const best = [...report.contestants].sort((a, b) => b.score.total - a.score.total)[0];
       onChange(`赛马结束，${AGENT_NAMES[best.id] ?? best.id} 得分最高（${best.score.total}），确认后点"采用"`);
     } catch (err) {
@@ -55,12 +57,12 @@ export function RacePanel({
   };
 
   const adopt = async (report: RaceReport, contestantId: string) => {
-    if (await window.loom.adoptRace(report.id, contestantId))
+    if (await window.agentTogether.adoptRace(report.id, contestantId))
       onChange(`已采用 ${AGENT_NAMES[contestantId] ?? contestantId} 的改动，采用前的状态存成了检查点`);
   };
 
   const discard = async (report: RaceReport) => {
-    await window.loom.discardRace(report.id);
+    await window.agentTogether.discardRace(report.id);
     onChange("已放弃这场赛马，worktree 已清理");
   };
 
@@ -73,19 +75,19 @@ export function RacePanel({
       <div className="row">
         <h4>赛马</h4>
         <button onClick={start} disabled={running !== null || !!open} title={open ? "先采用或放弃上一场" : undefined}>
-          {running === nodeId ? "进行中…" : "Claude Code vs Codex"}
+          {running === nodeId ? "进行中…" : agents.map((a) => AGENT_NAMES[a] ?? a).join(" vs ")}
         </button>
       </div>
       {running === nodeId && (
         <ol className="feed">
-          <li className="muted">两个 agent 在各自的 worktree 里跑同一个任务，可能要几分钟。</li>
+          <li className="muted">每个 agent 在各自的 worktree 里跑同一个任务，可能要几分钟。</li>
           {progress.map((m, i) => (
             <li key={i}>{m}</li>
           ))}
         </ol>
       )}
       {running && running !== nodeId && <p className="muted">节点 {running} 正在赛马。</p>}
-      {!latest && running !== nodeId && <p className="muted">用上面的任务描述，同一起点让两个 agent 各做一遍，按测试和观察者打分。</p>}
+      {!latest && running !== nodeId && <p className="muted">用上面的任务描述，同一起点让每个参赛 agent 各做一遍，按测试和观察者打分。</p>}
       {latest && (
         <>
           <p className="muted">

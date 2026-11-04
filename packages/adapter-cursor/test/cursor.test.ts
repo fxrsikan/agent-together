@@ -1,8 +1,9 @@
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { cursorCwd, installCursorHooks, parseHookInput, toCursorEvents, toCursorOutput } from "@loom/adapter-cursor";
+import { cursorCwd, installCursorHooks, parseHookInput, toCursorEvents, toCursorOutput } from "@agent-together/adapter-cursor";
 
 /** A real preToolUse payload from Cursor 3.19 on Windows, as PowerShell delivered it (BOM, GBK-mangled). */
 const mangled = fs.readFileSync(path.join(__dirname, "fixtures/pretooluse-write-powershell.txt"), "utf8");
@@ -50,6 +51,14 @@ describe("toCursorEvents", () => {
     expect(toCursorEvents({ ...base, hook_event_name: "stop" })[0].kind).toBe("turn.end");
     expect(cursorCwd({ ...base, hook_event_name: "stop" })).toBe("d:/proj");
   });
+
+  it("looks for the project from the touched file first: the CLI's workspace root is the git root", () => {
+    const file = path.resolve("/repo/app/src/auth/a.ts");
+    const cli = { conversation_id: "c", hook_event_name: "preToolUse", workspace_roots: [path.resolve("/repo")], tool_name: "Read", tool_input: { file_path: file } };
+    expect(cursorCwd(cli)).toBe(path.dirname(file));
+    const folder = os.tmpdir();
+    expect(cursorCwd({ ...cli, tool_name: "Grep", tool_input: { file_path: folder } })).toBe(folder);
+  });
 });
 
 describe("toCursorOutput", () => {
@@ -72,15 +81,26 @@ describe("toCursorOutput", () => {
 });
 
 describe("installCursorHooks", () => {
-  it("writes .cursor/hooks.json, replacing earlier Loom entries and keeping others", () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "loom-cursor-"));
+  it("writes .cursor/hooks.json, replacing earlier Agent Together entries and keeping others", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "agent-together-cursor-"));
     fs.mkdirSync(path.join(dir, ".cursor"));
     fs.writeFileSync(path.join(dir, ".cursor/hooks.json"), JSON.stringify({ version: 1, hooks: { stop: [{ command: "other" }] } }));
-    installCursorHooks(dir, "node loom-hook.js --platform cursor");
-    installCursorHooks(dir, "node loom-hook.js --platform cursor");
+    installCursorHooks(dir, "node agent-together-hook.js --platform cursor");
+    installCursorHooks(dir, "node agent-together-hook.js --platform cursor");
     const config = JSON.parse(fs.readFileSync(path.join(dir, ".cursor/hooks.json"), "utf8"));
     expect(config.version).toBe(1);
-    expect(config.hooks.stop).toEqual([{ command: "other" }, { command: "node loom-hook.js --platform cursor" }]);
+    expect(config.hooks.stop).toEqual([{ command: "other" }, { command: "node agent-together-hook.js --platform cursor" }]);
     expect(config.hooks.preToolUse).toHaveLength(1);
+  });
+
+  it("also writes to the git root, where cursor-agent looks", () => {
+    const top = fs.mkdtempSync(path.join(os.tmpdir(), "agent-together-cursor-git-"));
+    execFileSync("git", ["init", "-q"], { cwd: top });
+    const app = path.join(top, "app");
+    fs.mkdirSync(app);
+    const files = installCursorHooks(app, "node agent-together-hook.js --platform cursor");
+    expect(files).toHaveLength(2);
+    expect(fs.existsSync(path.join(top, ".cursor/hooks.json"))).toBe(true);
+    expect(fs.existsSync(path.join(app, ".cursor/hooks.json"))).toBe(true);
   });
 });

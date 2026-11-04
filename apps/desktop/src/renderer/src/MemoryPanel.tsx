@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Memory } from "@loom/schema";
+import type { Memory } from "@agent-together/schema";
 
 const KIND_LABEL: Record<Memory["kind"], string> = { decision: "决策", constraint: "约束", pitfall: "踩过的坑", preference: "偏好" };
 
@@ -21,7 +21,7 @@ export function MemoryPanel({
   const [kind, setKind] = useState<Memory["kind"]>("decision");
 
   useEffect(() => {
-    window.loom.memories().then(setAll);
+    window.agentTogether.memories().then(setAll);
   }, [version, nodeId]);
 
   const mine = all.filter((m) => m.nodeId === nodeId);
@@ -29,13 +29,13 @@ export function MemoryPanel({
   const active = mine.filter((m) => m.status === "active");
 
   const setStatus = async (m: Memory, status: Memory["status"], verb: string) => {
-    await window.loom.setMemoryStatus(m.id, status);
+    await window.agentTogether.setMemoryStatus(m.id, status);
     onChange(`${verb}记忆，CLAUDE.md 已同步`);
   };
 
   const add = async () => {
     if (!text.trim()) return;
-    await window.loom.addMemory(nodeId, kind, text);
+    await window.agentTogether.addMemory(nodeId, kind, text);
     setText("");
     onChange("已添加记忆，CLAUDE.md 已同步");
   };

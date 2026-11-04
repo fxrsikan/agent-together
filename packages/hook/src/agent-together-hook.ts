@@ -2,8 +2,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { installHooks, toHookOutput, toLoomEvent, type HookPayload } from "@loom/adapter-claude-code";
-import { exitCodeFromTranscript, installCodexHooks, toCodexOutput, toLoomEvents, type CodexHookPayload } from "@loom/adapter-codex";
+import { installHooks, toHookOutput, toAgentEvent, type HookPayload } from "@agent-together/adapter-claude-code";
+import { exitCodeFromTranscript, installCodexHooks, toCodexOutput, toAgentEvents, type CodexHookPayload } from "@agent-together/adapter-codex";
 import {
   cursorCwd,
   installCursorHooks,
@@ -11,27 +11,27 @@ import {
   toCursorEvents,
   toCursorOutput,
   type CursorHookPayload,
-} from "@loom/adapter-cursor";
-import { LoomStore } from "@loom/core";
-import { strongest, type LoomEvent, type Verdict } from "@loom/schema";
+} from "@agent-together/adapter-cursor";
+import { ProjectStore } from "@agent-together/core";
+import { strongest, type AgentEvent, type Verdict } from "@agent-together/schema";
 
 type Platform = "claude-code" | "codex" | "cursor";
 
 interface Adapter {
   parse?(raw: string): any;
-  /** Where to look for .loom; default payload.cwd. */
+  /** Where to look for .agent-together; default payload.cwd. */
   cwd?(payload: any): string;
-  toEvents(payload: any, readFile: (p: string) => string | undefined): LoomEvent[];
+  toEvents(payload: any, readFile: (p: string) => string | undefined): AgentEvent[];
   toOutput(hookEventName: string, verdict: Verdict): string | null;
 }
 
 const adapters: Record<Platform, Adapter> = {
   "claude-code": {
-    toEvents: (p: HookPayload, readFile) => [toLoomEvent(p, readFile)].filter((e): e is LoomEvent => e !== null),
+    toEvents: (p: HookPayload, readFile) => [toAgentEvent(p, readFile)].filter((e): e is AgentEvent => e !== null),
     toOutput: toHookOutput,
   },
   codex: {
-    toEvents: (p: CodexHookPayload) => toLoomEvents(p, new Date(), codexExitCode),
+    toEvents: (p: CodexHookPayload) => toAgentEvents(p, new Date(), codexExitCode),
     toOutput: toCodexOutput,
   },
   // Cursor blocks a preToolUse whose reply does not parse, so toOutput always answers it, even with no findings.
@@ -59,38 +59,38 @@ const flag = args.indexOf("--platform");
 const platform = (flag >= 0 ? args[flag + 1] : "claude-code") as Platform;
 const self = fileURLToPath(import.meta.url);
 
-// `loom-hook install [projectDir] [--platform codex]` registers this program with that agent.
+// `agent-together-hook install [projectDir] [--platform codex]` registers this program with that agent.
 if (args[0] === "install") {
   const root = path.resolve(args[1] && !args[1].startsWith("--") ? args[1] : ".");
   const file =
     platform === "codex"
       ? installCodexHooks(root, `node "${self}" --platform codex`)
       : platform === "cursor"
-        ? installCursorHooks(root, `node "${self}" --platform cursor`)
+        ? installCursorHooks(root, `node "${self}" --platform cursor`).join(" and ")
         : installHooks(root, `node "${self}"`);
-  console.log(`Loom hooks for ${platform} written to ${file}`);
+  console.log(`Agent Together hooks for ${platform} written to ${file}`);
   if (platform === "codex") console.log("Codex runs them only after you trust them: open codex in the project and use /hooks.");
   if (platform === "cursor") console.log("Cursor runs project hooks only in a trusted workspace.");
   process.exit(0);
 }
 
 /**
- * Called by the agent for every hooked event. Fails open: if there is no .loom
+ * Called by the agent for every hooked event. Fails open: if there is no .agent-together
  * project, no running daemon, or anything goes wrong, it prints nothing and
- * exits 0 so the agent is never stuck because Loom is down.
- * LOOM_HOOK_LOG=<file> appends each raw payload, for building and checking adapters.
+ * exits 0 so the agent is never stuck because Agent Together is down.
+ * AGENT_TOGETHER_HOOK_LOG=<file> appends each raw payload, for building and checking adapters.
  */
 async function main() {
   const adapter = adapters[platform];
   if (!adapter) return;
   const raw = fs.readFileSync(0, "utf8");
   const payload = adapter.parse ? adapter.parse(raw) : JSON.parse(raw);
-  if (process.env.LOOM_HOOK_LOG) fs.appendFileSync(process.env.LOOM_HOOK_LOG, `${JSON.stringify({ platform, raw: payload })}\n`);
+  if (process.env.AGENT_TOGETHER_HOOK_LOG) fs.appendFileSync(process.env.AGENT_TOGETHER_HOOK_LOG, `${JSON.stringify({ platform, raw: payload })}\n`);
   allow = () => {
     const output = adapter.toOutput(payload.hook_event_name, { level: "off", findings: [] });
     if (output) process.stdout.write(output);
   };
-  const store = LoomStore.find(adapter.cwd ? adapter.cwd(payload) : payload.cwd);
+  const store = ProjectStore.find(adapter.cwd ? adapter.cwd(payload) : payload.cwd);
   const runtime = store?.readRuntime();
   if (!runtime) return allow();
 
@@ -110,7 +110,7 @@ async function main() {
 }
 
 /**
- * The reply when Loom cannot judge: nothing, except where the platform needs an
+ * The reply when Agent Together cannot judge: nothing, except where the platform needs an
  * explicit allow. Before the payload is known, Cursor gets a bare allow (it
  * ignores fields an event does not use).
  */

@@ -1,5 +1,5 @@
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
-import type { CanvasNode, Level } from "@loom/schema";
+import type { CanvasNode, Level } from "@agent-together/schema";
 
 export type NodeCardData = { node: CanvasNode; active: boolean; signal: Level };
 export type NodeCardType = Node<NodeCardData, "card">;

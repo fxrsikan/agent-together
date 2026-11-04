@@ -2,10 +2,10 @@ node_modules/
 dist/
 out/
 *.tsbuildinfo
-**/.loom/runtime.json
-**/.loom/events/
-**/.loom/context/
+**/.agent-together/runtime.json
+**/.agent-together/events/
+**/.agent-together/context/
 **/.claude/settings.local.json
 **/.codex/hooks.json
 **/.cursor/hooks.json
-**/.loom/races/
+**/.agent-together/races/

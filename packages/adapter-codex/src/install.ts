@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 const EVENTS = ["PreToolUse", "PostToolUse", "Stop"] as const;
-const MARKER = "loom-hook";
+const MARKER = "agent-together-hook";
 
 interface HookGroup {
   matcher?: string;
@@ -11,8 +11,8 @@ interface HookGroup {
 }
 
 /**
- * Codex loads project hooks from the repository root's .codex/ only, so a Loom
- * project in a subfolder still installs there; loom-hook finds the right .loom
+ * Codex loads project hooks from the repository root's .codex/ only, so a Agent Together
+ * project in a subfolder still installs there; agent-together-hook finds the right .agent-together
  * from each event's cwd. Outside git, the project folder itself is used.
  */
 export function codexHooksRoot(projectRoot: string): string {
@@ -28,9 +28,9 @@ export function codexHooksRoot(projectRoot: string): string {
 }
 
 /**
- * Registers loom-hook in <repo root>/.codex/hooks.json. Codex runs project
+ * Registers agent-together-hook in <repo root>/.codex/hooks.json. Codex runs project
  * hooks only after the user trusts them (/hooks in the Codex CLI), and again
- * after they change. Re-running replaces earlier Loom entries and keeps the rest.
+ * after they change. Re-running replaces earlier Agent Together entries and keeps the rest.
  */
 export function installCodexHooks(projectRoot: string, hookCommand: string): string {
   if (!hookCommand.includes(MARKER)) throw new Error(`hook command must contain "${MARKER}"`);

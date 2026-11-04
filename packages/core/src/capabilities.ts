@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import picomatch from "picomatch";
-import { Capability, type Canvas, type CapabilityCompiler, type Memory } from "@loom/schema";
+import { Capability, type Canvas, type CapabilityCompiler, type Memory } from "@agent-together/schema";
 import { buildNodeGuide } from "./context.js";
 import { formatFrontmatter, parseFrontmatter } from "./frontmatter.js";
 import { relativeToRoot } from "./paths.js";
@@ -9,12 +9,12 @@ import type { Rule } from "./rules/types.js";
 
 const FIELDS = ["id", "kind", "description", "version", "nodeId", "scope", "tools", "model", "forbid", "level"] as const;
 
-/** Capabilities as Markdown files in .loom/capabilities/<id>.md, shared through git. */
+/** Capabilities as Markdown files in .agent-together/capabilities/<id>.md, shared through git. */
 export class CapabilityStore {
   readonly dir: string;
 
   constructor(readonly root: string) {
-    this.dir = path.join(root, ".loom", "capabilities");
+    this.dir = path.join(root, ".agent-together", "capabilities");
   }
 
   list(): Capability[] {
@@ -42,13 +42,13 @@ export class CapabilityStore {
 
 /**
  * Node gene → capability: a finished node becomes a skill holding its goal,
- * file scope, neighbours, approved memories and Loom's rules. Its version goes
+ * file scope, neighbours, approved memories and Agent Together's rules. Its version goes
  * up each time the node is exported again with different content.
  */
 export function capabilityFromNode(canvas: Canvas, nodeId: string, memories: Memory[], previous?: Capability): Capability {
   const node = canvas.nodes.find((n) => n.id === nodeId);
   if (!node) throw new Error(`unknown node: ${nodeId}`);
-  const id = `loom-${node.id}`.slice(0, 64);
+  const id = `agent-together-${node.id}`.slice(0, 64);
   const scope = node.files.join(", ") || "its files";
   const body = buildNodeGuide(canvas, nodeId, memories);
   const description = `Work on "${node.title}"${node.intent.goal ? `: ${node.intent.goal}` : ""}. Use when changing ${scope}.`.slice(0, 1024);
@@ -109,7 +109,7 @@ export function compileCapabilities(root: string, capabilities: Capability[], co
   return capabilities.map((c) => {
     const { errors, warnings } = checkCapability(c);
     const report: CompileReport = { id: c.id, kind: c.kind, errors, warnings, written: {}, skipped: [] };
-    // Observers are enforced by Loom itself on every platform; there is nothing to write.
+    // Observers are enforced by Agent Together itself on every platform; there is nothing to write.
     if (errors.length || c.kind === "observer") return report;
     for (const compiler of compilers) {
       const files = compiler.compile(c);

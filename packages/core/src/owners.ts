@@ -1,5 +1,5 @@
 import picomatch from "picomatch";
-import type { Canvas, CanvasNode } from "@loom/schema";
+import type { Canvas, CanvasNode } from "@agent-together/schema";
 
 /** The first node whose file globs match a project-relative path. */
 export function ownerOf(canvas: Canvas, rel: string): CanvasNode | null {

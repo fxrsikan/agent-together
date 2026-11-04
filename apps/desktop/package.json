@@ -1,7 +1,7 @@
 {
-  "name": "@loom/desktop",
+  "name": "@agent-together/desktop",
   "version": "0.0.1",
-  "description": "Loom desktop app: the canvas",
+  "description": "Agent Together desktop app: the canvas",
   "license": "Apache-2.0",
   "private": true,
   "main": "out/main/index.js",
@@ -11,11 +11,11 @@
     "start": "electron-vite preview"
   },
   "dependencies": {
-    "@loom/adapter-claude-code": "0.0.1",
-    "@loom/core": "0.0.1",
-    "@loom/schema": "0.0.1",
-    "@loom/adapter-codex": "0.0.1",
-    "@loom/adapter-cursor": "0.0.1"
+    "@agent-together/adapter-claude-code": "0.0.1",
+    "@agent-together/core": "0.0.1",
+    "@agent-together/schema": "0.0.1",
+    "@agent-together/adapter-codex": "0.0.1",
+    "@agent-together/adapter-cursor": "0.0.1"
   },
   "devDependencies": {
     "@types/react": "^19.3.0",

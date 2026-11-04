@@ -1,7 +1,7 @@
 {
-  "name": "@loom/adapter-claude-code",
+  "name": "@agent-together/adapter-claude-code",
   "version": "0.0.1",
-  "description": "Claude Code adapter: hook payloads to Loom events, verdicts to hook output, hook installer",
+  "description": "Claude Code adapter: hook payloads to Agent Together events, verdicts to hook output, hook installer",
   "license": "Apache-2.0",
   "type": "module",
   "main": "dist/index.js",
@@ -10,7 +10,7 @@
     "build": "tsc -b"
   },
   "dependencies": {
-    "@loom/schema": "0.0.1",
-    "@loom/core": "0.0.1"
+    "@agent-together/schema": "0.0.1",
+    "@agent-together/core": "0.0.1"
   }
 }

@@ -2,8 +2,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { Canvas } from "@loom/schema";
-import { buildNodeContext, draftsFromFindings, MemoryStore } from "@loom/core";
+import { Canvas } from "@agent-together/schema";
+import { buildNodeContext, draftsFromFindings, MemoryStore } from "@agent-together/core";
 
 const canvas = Canvas.parse({
   version: 1,
@@ -14,7 +14,7 @@ const canvas = Canvas.parse({
   edges: [],
 });
 
-const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), "loom-mem-"));
+const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), "agent-together-mem-"));
 const base = { nodeId: "login-form", kind: "pitfall" as const, status: "draft" as const, source: "user" };
 
 describe("MemoryStore", () => {
@@ -37,7 +37,7 @@ describe("MemoryStore", () => {
     expect(store.forNode("login-form").map((m) => m.content).sort()).toEqual(["a", "global"]);
   });
 
-  it("keeps a Loom-managed block in CLAUDE.md (and AGENTS.md) and leaves the rest alone", () => {
+  it("keeps a Agent Together-managed block in CLAUDE.md (and AGENTS.md) and leaves the rest alone", () => {
     const root = tmp();
     fs.writeFileSync(path.join(root, "CLAUDE.md"), "# My project\n\nOwn notes.\n");
     const store = new MemoryStore(root);
@@ -46,7 +46,7 @@ describe("MemoryStore", () => {
     store.syncAgentFiles(canvas);
     const md = fs.readFileSync(path.join(root, "CLAUDE.md"), "utf8");
     expect(md.startsWith("# My project\n\nOwn notes.\n")).toBe(true);
-    expect(md.match(/loom:memory:start/g)).toHaveLength(1);
+    expect(md.match(/agent-together:memory:start/g)).toHaveLength(1);
     expect(md).toContain("### 登录表单");
     expect(md).toContain("（踩过的坑）不要直连数据库");
     expect(fs.readFileSync(path.join(root, "AGENTS.md"), "utf8")).toContain("（踩过的坑）不要直连数据库");

@@ -11,18 +11,18 @@ export interface Checkpoint {
   nodeId: string | null;
 }
 
-const REF_PREFIX = "refs/loom/checkpoints/";
-// Checkpoint commits are Loom's own bookkeeping, so they never need the user's git identity.
+const REF_PREFIX = "refs/agent-together/checkpoints/";
+// Checkpoint commits are Agent Together's own bookkeeping, so they never need the user's git identity.
 const IDENTITY = {
-  GIT_AUTHOR_NAME: "Loom",
-  GIT_AUTHOR_EMAIL: "loom@localhost",
-  GIT_COMMITTER_NAME: "Loom",
-  GIT_COMMITTER_EMAIL: "loom@localhost",
+  GIT_AUTHOR_NAME: "Agent Together",
+  GIT_AUTHOR_EMAIL: "agent-together@localhost",
+  GIT_COMMITTER_NAME: "Agent Together",
+  GIT_COMMITTER_EMAIL: "agent-together@localhost",
 };
 
 /**
  * Snapshots of a project's working tree kept as git commits under
- * refs/loom/checkpoints/*. They never touch the user's branch, index or stash.
+ * refs/agent-together/checkpoints/*. They never touch the user's branch, index or stash.
  * Everything is scoped to the project directory, which may be a subfolder of a
  * larger repository; ignored files (node_modules, build output) are left alone.
  */
@@ -48,7 +48,7 @@ export class Checkpoints {
 
   /** Tree of the project's current files (tracked and untracked, minus ignored), via a throwaway index. */
   private snapshotTree(): string {
-    const index = path.join(os.tmpdir(), `loom-index-${process.pid}-${Date.now()}`);
+    const index = path.join(os.tmpdir(), `agent-together-index-${process.pid}-${Date.now()}`);
     try {
       this.git(["add", "--all", "--", "."], { GIT_INDEX_FILE: index });
       return this.git(["write-tree"], { GIT_INDEX_FILE: index });

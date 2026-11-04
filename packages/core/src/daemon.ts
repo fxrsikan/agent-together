@@ -1,14 +1,14 @@
 import { EventEmitter } from "node:events";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
-import type { Canvas, Finding, LoomEvent, Memory, Verdict } from "@loom/schema";
+import type { Canvas, Finding, AgentEvent, Memory, Verdict } from "@agent-together/schema";
 import { CapabilityStore, capabilityRules } from "./capabilities.js";
 import { judgeTurn, refineMemory, turnWorthJudging } from "./judge.js";
 import { builtinRules } from "./rules/index.js";
 import type { Llm } from "./llm.js";
 import { draftsFromFindings, MemoryStore } from "./memory.js";
 import { Observer } from "./observer.js";
-import { LoomStore } from "./store.js";
+import { ProjectStore } from "./store.js";
 
 /** An L2 verdict on one agent turn. */
 export interface Judgment {
@@ -21,7 +21,7 @@ export interface Judgment {
 }
 
 export interface DaemonEvents {
-  event: [{ event: LoomEvent; verdict: Verdict }];
+  event: [{ event: AgentEvent; verdict: Verdict }];
   active: [string | null];
   /** Memory drafts written, or refined by L2, at the end of an agent turn. */
   memory: [Memory[]];
@@ -31,33 +31,33 @@ export interface DaemonEvents {
 }
 
 export interface DaemonOptions {
-  /** L2 model; without one, Loom runs on L0 rules only. */
+  /** L2 model; without one, Agent Together runs on L0 rules only. */
   llm?: Llm | null;
   maxL2CallsPerSession?: number;
 }
 
 /**
  * The local daemon. Hooks POST unified events to /event and get a verdict back.
- * It listens on 127.0.0.1 only and announces its port in .loom/runtime.json.
+ * It listens on 127.0.0.1 only and announces its port in .agent-together/runtime.json.
  * L2 work (refining memories, judging turns) runs after the hook has its answer,
  * so a slow model never slows the agent down.
  */
 export class Daemon extends EventEmitter<DaemonEvents> {
-  readonly store: LoomStore;
+  readonly store: ProjectStore;
   readonly observer: Observer;
   readonly memory: MemoryStore;
   readonly capabilities: CapabilityStore;
   readonly llm: Llm | null;
   private server: http.Server | null = null;
   /** Findings and events of each agent session since its last turn ended. */
-  private pending = new Map<string, { findings: Finding[]; events: LoomEvent[] }>();
+  private pending = new Map<string, { findings: Finding[]; events: AgentEvent[] }>();
   private l2Calls = new Map<string, number>();
   private background = new Set<Promise<void>>();
   private readonly maxL2Calls: number;
 
   constructor(root: string, options: DaemonOptions = {}) {
     super();
-    this.store = new LoomStore(root);
+    this.store = new ProjectStore(root);
     this.memory = new MemoryStore(root);
     this.capabilities = new CapabilityStore(root);
     this.observer = new Observer(root, this.store.loadCanvas(), this.store.loadRuleLevels(), this.rules());
@@ -85,7 +85,7 @@ export class Daemon extends EventEmitter<DaemonEvents> {
     this.emit("active", nodeId);
   }
 
-  handle(event: LoomEvent): Verdict {
+  handle(event: AgentEvent): Verdict {
     const verdict = this.observer.evaluate(event);
     this.store.appendEvent({ event, verdict });
     const turn = this.pending.get(event.sessionId) ?? { findings: [], events: [] };
@@ -123,7 +123,7 @@ export class Daemon extends EventEmitter<DaemonEvents> {
     return true;
   }
 
-  private async runL2(sessionId: string, drafts: Memory[], events: LoomEvent[]) {
+  private async runL2(sessionId: string, drafts: Memory[], events: AgentEvent[]) {
     const llm = this.llm!;
     const canvas = this.observer.canvasNow;
     const refined: Memory[] = [];
@@ -159,7 +159,7 @@ export class Daemon extends EventEmitter<DaemonEvents> {
       req.on("end", () => {
         try {
           const data = JSON.parse(body);
-          if (req.url === "/event") return reply(200, this.handle(data as LoomEvent));
+          if (req.url === "/event") return reply(200, this.handle(data as AgentEvent));
           if (req.url === "/active") {
             this.setActiveNode(data.nodeId ?? null);
             return reply(200, { activeNodeId: this.observer.activeNodeId });

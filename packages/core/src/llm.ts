@@ -16,7 +16,7 @@ export interface LlmConfig {
   /** "auto" picks anthropic when an API key is set, else the claude CLI if installed. */
   provider?: "auto" | "off" | "anthropic" | "claude-cli" | "openai-compatible";
   model?: string;
-  /** openai-compatible only, e.g. http://localhost:11434/v1 for Ollama. The key comes from LOOM_LLM_API_KEY. */
+  /** openai-compatible only, e.g. http://localhost:11434/v1 for Ollama. The key comes from AGENT_TOGETHER_LLM_API_KEY. */
   baseUrl?: string;
   /** L2 calls allowed per agent session; keeps judging from becoming a token sink. */
   maxCallsPerSession?: number;
@@ -25,11 +25,11 @@ export interface LlmConfig {
 const HAIKU = "claude-haiku-5-5";
 const TIMEOUT_MS = 60_000;
 
-/** Reads .loom/llm.json (no secrets in it); LOOM_LLM_PROVIDER overrides the provider. */
+/** Reads .agent-together/llm.json (no secrets in it); AGENT_TOGETHER_LLM_PROVIDER overrides the provider. */
 export function loadLlmConfig(root: string): LlmConfig {
-  const file = path.join(root, ".loom", "llm.json");
+  const file = path.join(root, ".agent-together", "llm.json");
   const config: LlmConfig = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : {};
-  const fromEnv = process.env.LOOM_LLM_PROVIDER as LlmConfig["provider"] | undefined;
+  const fromEnv = process.env.AGENT_TOGETHER_LLM_PROVIDER as LlmConfig["provider"] | undefined;
   return fromEnv ? { ...config, provider: fromEnv } : config;
 }
 
@@ -59,7 +59,7 @@ class AnthropicLlm implements Llm {
 
 /**
  * The user's logged-in Claude Code CLI in headless mode: no API key needed.
- * Runs in the temp folder so the call never lands inside a Loom project (and its hooks).
+ * Runs in the temp folder so the call never lands inside a Agent Together project (and its hooks).
  */
 class ClaudeCliLlm implements Llm {
   readonly name: string;
@@ -103,7 +103,7 @@ class OpenAiCompatibleLlm implements Llm {
   }
 
   async complete(prompt: string): Promise<string> {
-    const key = process.env.LOOM_LLM_API_KEY;
+    const key = process.env.AGENT_TOGETHER_LLM_API_KEY;
     const res = await fetch(`${this.baseUrl.replace(/\/$/, "")}/chat/completions`, {
       method: "POST",
       headers: { "content-type": "application/json", ...(key ? { authorization: `Bearer ${key}` } : {}) },
@@ -134,7 +134,7 @@ export function createLlm(config: LlmConfig): Llm | null {
     case "claude-cli":
       return new ClaudeCliLlm(config.model);
     case "openai-compatible":
-      if (!config.baseUrl || !config.model) throw new Error("openai-compatible needs baseUrl and model in .loom/llm.json");
+      if (!config.baseUrl || !config.model) throw new Error("openai-compatible needs baseUrl and model in .agent-together/llm.json");
       return new OpenAiCompatibleLlm(config.baseUrl, config.model);
     case "auto":
       if (process.env.ANTHROPIC_API_KEY) return new AnthropicLlm(config.model);

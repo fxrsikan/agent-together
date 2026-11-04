@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { Canvas, type LoomEvent } from "@loom/schema";
-import { Observer } from "@loom/core";
+import { Canvas, type AgentEvent } from "@agent-together/schema";
+import { Observer } from "@agent-together/core";
 
 const root = process.platform === "win32" ? "C:\\proj" : "/proj";
 
@@ -18,7 +18,7 @@ const canvas = Canvas.parse({
   ],
 });
 
-const write = (file: string, after: string, before?: string): LoomEvent => ({
+const write = (file: string, after: string, before?: string): AgentEvent => ({
   kind: "tool.before",
   platform: "claude-code",
   sessionId: "s1",
@@ -26,7 +26,7 @@ const write = (file: string, after: string, before?: string): LoomEvent => ({
   action: { type: "write", path: `${root}/${file}`, before, after },
 });
 
-const rules = (event: LoomEvent) =>
+const rules = (event: AgentEvent) =>
   new Observer(root, canvas, { "scope-fence": "off" }).evaluate(event).findings.map((f) => f.rule);
 
 describe("design-guard", () => {

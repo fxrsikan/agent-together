@@ -1,5 +1,5 @@
-import { cleanEnv, execCli } from "@loom/core";
-import type { AgentRunner, RunResult } from "@loom/schema";
+import { cleanEnv, execCli } from "@agent-together/core";
+import type { AgentRunner, RunResult } from "@agent-together/schema";
 
 /**
  * Claude Code headless: `claude -p --output-format json`, edits auto-accepted

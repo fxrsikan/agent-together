@@ -3,7 +3,7 @@ export { createLlm, loadLlmConfig, type Llm, type LlmConfig } from "./llm.js";
 export { judgeTurn, parseJsonObject, refineMemory, turnWorthJudging, type TurnJudgment } from "./judge.js";
 export { Observer } from "./observer.js";
 export { builtinRules, type Rule, type RuleContext } from "./rules/index.js";
-export { LoomStore } from "./store.js";
+export { ProjectStore } from "./store.js";
 export { relativeToRoot } from "./paths.js";
 export { mayDepend, ownerOf } from "./owners.js";
 export { buildNodeContext, buildNodeGuide, contextSections, estimateTokens } from "./context.js";

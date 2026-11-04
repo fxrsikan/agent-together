@@ -1,4 +1,4 @@
-import { generatedNote, type Capability, type CapabilityCompiler, type CompiledFile } from "@loom/schema";
+import { generatedNote, type Capability, type CapabilityCompiler, type CompiledFile } from "@agent-together/schema";
 
 /**
  * Cursor project rules: a skill becomes .cursor/rules/<id>.mdc. With a scope it

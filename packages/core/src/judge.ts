@@ -1,4 +1,4 @@
-import type { CanvasNode, LoomEvent } from "@loom/schema";
+import type { CanvasNode, AgentEvent } from "@agent-together/schema";
 import type { Llm } from "./llm.js";
 
 /** The first JSON object in a model reply (models sometimes wrap it in prose or fences). */
@@ -26,7 +26,7 @@ ${raw}
 把它改写成一条给以后的开发者（人或 AI）看的经验，要求：
 - 只用一句中文，不超过 60 个字；
 - 写清楚"不要做什么 / 应该怎么做"，保留关键的文件、模块名；
-- 不要提"观察器""Loom""规则"这些词。
+- 不要提"观察器""Agent Together""规则"这些词。
 
 只输出 JSON：{"memory": "..."}`;
   const answer = parseJsonObject<{ memory?: string }>(await llm.complete(prompt));
@@ -39,7 +39,7 @@ export interface TurnJudgment {
   reason: string;
 }
 
-function describe(event: LoomEvent): string | null {
+function describe(event: AgentEvent): string | null {
   if (event.kind === "turn.end") return null;
   const a = event.action;
   if (a.type === "write") return `写入 ${a.path}`;
@@ -48,7 +48,7 @@ function describe(event: LoomEvent): string | null {
 }
 
 /** True when a turn did something worth judging (wrote files or ran commands). */
-export function turnWorthJudging(events: LoomEvent[]): boolean {
+export function turnWorthJudging(events: AgentEvent[]): boolean {
   return events.some((e) => describe(e) !== null);
 }
 
@@ -56,7 +56,7 @@ export function turnWorthJudging(events: LoomEvent[]): boolean {
  * 定向官 (L2): did this agent turn serve the node's goal and the dispatched task?
  * Sees only the node's intent, the task text and a list of actions, never the code.
  */
-export async function judgeTurn(llm: Llm, node: CanvasNode, task: string | null, events: LoomEvent[]): Promise<TurnJudgment | null> {
+export async function judgeTurn(llm: Llm, node: CanvasNode, task: string | null, events: AgentEvent[]): Promise<TurnJudgment | null> {
   const actions = events.map(describe).filter(Boolean).slice(-40);
   const prompt = `你在检查一个 AI 编程助手的这一轮工作有没有偏离目标。
 

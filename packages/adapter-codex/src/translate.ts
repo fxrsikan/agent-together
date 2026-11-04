@@ -1,8 +1,8 @@
 import path from "node:path";
-import type { LoomEvent, ToolAction, Verdict } from "@loom/schema";
+import type { AgentEvent, ToolAction, Verdict } from "@agent-together/schema";
 import { parsePatch } from "./patch.js";
 
-/** The subset of Codex's hook stdin payload Loom reads. */
+/** The subset of Codex's hook stdin payload Agent Together reads. */
 export interface CodexHookPayload {
   session_id: string;
   cwd: string;
@@ -64,15 +64,15 @@ function toActions(payload: CodexHookPayload): ToolAction[] {
 }
 
 /**
- * Codex hook payload → unified Loom events (several for a multi-file patch).
+ * Codex hook payload → unified Agent Together events (several for a multi-file patch).
  * Codex's Bash tool_response is only the command's output, so `exitCode` lets
  * the caller look the exit code up elsewhere (the transcript) when needed.
  */
-export function toLoomEvents(
+export function toAgentEvents(
   payload: CodexHookPayload,
   now = new Date(),
   exitCode: (payload: CodexHookPayload) => number | null = () => null,
-): LoomEvent[] {
+): AgentEvent[] {
   const base = { platform: "codex" as const, sessionId: payload.session_id, at: now.toISOString() };
   switch (payload.hook_event_name) {
     case "PreToolUse":
@@ -93,7 +93,7 @@ export function toLoomEvents(
 const reasonOf = (verdict: Verdict) =>
   verdict.findings
     .filter((f) => f.level !== "log" && f.level !== "off")
-    .map((f) => `[Loom ${f.rule}] ${f.message}`)
+    .map((f) => `[Agent Together ${f.rule}] ${f.message}`)
     .join("\n");
 
 /**
@@ -106,7 +106,7 @@ export function toCodexOutput(hookEventName: string, verdict: Verdict): string |
   const reason = reasonOf(verdict);
   if (!reason || hookEventName === "Stop") return null;
   if (hookEventName === "PreToolUse" && (verdict.level === "block" || verdict.level === "ask")) {
-    const prefix = verdict.level === "ask" ? "Loom needs the user's decision before this runs. Ask the user, do not work around it.\n" : "";
+    const prefix = verdict.level === "ask" ? "Agent Together needs the user's decision before this runs. Ask the user, do not work around it.\n" : "";
     return JSON.stringify({
       hookSpecificOutput: { hookEventName, permissionDecision: "deny", permissionDecisionReason: prefix + reason },
     });

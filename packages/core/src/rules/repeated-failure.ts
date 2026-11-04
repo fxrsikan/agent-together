@@ -1,9 +1,9 @@
-import type { LoomEvent } from "@loom/schema";
+import type { AgentEvent } from "@agent-together/schema";
 import type { Rule } from "./types.js";
 
 const LIMIT = 3;
 
-const failedCommand = (e: LoomEvent) =>
+const failedCommand = (e: AgentEvent) =>
   e.kind === "tool.after" && !e.ok && e.action.type === "shell" ? e.action.command.trim() : null;
 
 /** 纠偏官: the same command keeps failing — stop and rethink instead of retrying. */

@@ -14,7 +14,7 @@ export function cleanEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
  * Opens a new terminal window running `commandLine` in `cwd`, so the user can
  * watch and answer the agent. Windows only in v0.1.
  */
-export function openTerminal(cwd: string, commandLine: string, title = "Loom"): void {
+export function openTerminal(cwd: string, commandLine: string, title = "Agent Together"): void {
   if (process.platform !== "win32") {
     throw new Error(`暂只支持在 Windows 上打开终端窗口；请在项目目录手动运行：${commandLine}`);
   }

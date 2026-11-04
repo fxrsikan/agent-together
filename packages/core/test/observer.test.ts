@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { Canvas, type LoomEvent } from "@loom/schema";
-import { Observer } from "@loom/core";
+import { Canvas, type AgentEvent } from "@agent-together/schema";
+import { Observer } from "@agent-together/core";
 
 const root = process.platform === "win32" ? "C:\\proj" : "/proj";
 const at = "2026-11-04T00:00:00.000Z";
@@ -14,7 +14,7 @@ const canvas = Canvas.parse({
   edges: [{ from: "login-form", to: "db" }],
 });
 
-const write = (path: string, after: string, before?: string): LoomEvent => ({
+const write = (path: string, after: string, before?: string): AgentEvent => ({
   kind: "tool.before",
   platform: "claude-code",
   sessionId: "s1",
@@ -22,7 +22,7 @@ const write = (path: string, after: string, before?: string): LoomEvent => ({
   action: { type: "write", path, before, after },
 });
 
-const failed = (command: string): LoomEvent => ({
+const failed = (command: string): AgentEvent => ({
   kind: "tool.after",
   platform: "claude-code",
   sessionId: "s1",

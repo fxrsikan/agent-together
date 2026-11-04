@@ -2,8 +2,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import type { LoomEvent } from "@loom/schema";
-import { Daemon, parseJsonObject, type Judgment, type Llm } from "@loom/core";
+import type { AgentEvent } from "@agent-together/schema";
+import { Daemon, parseJsonObject, type Judgment, type Llm } from "@agent-together/core";
 
 /** A canned model: answers memory prompts and turn prompts with fixed JSON, and records what it was asked. */
 function fakeLlm(turn: { onTrack: boolean; reason: string }): Llm & { prompts: string[] } {
@@ -21,8 +21,8 @@ function fakeLlm(turn: { onTrack: boolean; reason: string }): Llm & { prompts: s
 }
 
 function project(): string {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "loom-l2-"));
-  const canvas = path.join(root, ".loom", "canvas");
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "agent-together-l2-"));
+  const canvas = path.join(root, ".agent-together", "canvas");
   fs.mkdirSync(canvas, { recursive: true });
   fs.writeFileSync(
     path.join(canvas, "login-form.json"),
@@ -36,7 +36,7 @@ const at = "2026-11-04T00:00:00.000Z";
 const base = { platform: "claude-code" as const, sessionId: "s1", at };
 
 function runTurn(daemon: Daemon, root: string, writePath: string) {
-  const events: LoomEvent[] = [
+  const events: AgentEvent[] = [
     { kind: "tool.before", ...base, action: { type: "write", path: path.join(root, writePath), after: "x" } },
     { kind: "turn.end", ...base },
   ];

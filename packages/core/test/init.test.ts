@@ -2,10 +2,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { generateCanvas, initProject, LoomStore } from "@loom/core";
+import { generateCanvas, initProject, ProjectStore } from "@agent-together/core";
 
 function project(files: Record<string, string>): string {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "loom-init-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "agent-together-init-"));
   for (const [rel, content] of Object.entries(files)) {
     fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
     fs.writeFileSync(path.join(dir, rel), content);
@@ -79,7 +79,7 @@ describe("initProject", () => {
   it("writes a canvas the store can load, and refuses to overwrite it", () => {
     const root = project(files);
     initProject(root);
-    expect(new LoomStore(root).loadCanvas().nodes).toHaveLength(4);
+    expect(new ProjectStore(root).loadCanvas().nodes).toHaveLength(4);
     expect(() => initProject(root)).toThrow("--force");
     expect(() => initProject(root, { force: true })).not.toThrow();
   });

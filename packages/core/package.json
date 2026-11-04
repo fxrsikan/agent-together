@@ -1,21 +1,21 @@
 {
-  "name": "@loom/core",
+  "name": "@agent-together/core",
   "version": "0.0.1",
-  "description": "Loom daemon: .loom store, observer engine, local hook server",
+  "description": "Agent Together daemon: .agent-together store, observer engine, local hook server",
   "license": "Apache-2.0",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "loom-daemon": "dist/cli.js",
-    "loom-init": "dist/init-cli.js"
+    "agent-together-daemon": "dist/cli.js",
+    "agent-together-init": "dist/init-cli.js"
   },
   "scripts": {
     "build": "tsc -b"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.4.0",
-    "@loom/schema": "0.0.1",
+    "@agent-together/schema": "0.0.1",
     "picomatch": "^4.0.2"
   },
   "devDependencies": {

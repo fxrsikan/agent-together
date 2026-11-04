@@ -3,26 +3,26 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import type { AgentRunner } from "@loom/schema";
-import { Race, scoreContestant } from "@loom/core";
+import type { AgentRunner } from "@agent-together/schema";
+import { Race, scoreContestant } from "@agent-together/core";
 
 const git = (cwd: string, ...args: string[]) =>
   execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
 
-/** A repo whose Loom project lives in app/: login-form owns src/auth, database owns src/db. */
+/** A repo whose Agent Together project lives in app/: login-form owns src/auth, database owns src/db. */
 function repo() {
-  const top = fs.mkdtempSync(path.join(os.tmpdir(), "loom-race-repo-"));
+  const top = fs.mkdtempSync(path.join(os.tmpdir(), "agent-together-race-repo-"));
   git(top, "init", "-q");
   const app = path.join(top, "app");
   const write = (rel: string, text: string) => {
     fs.mkdirSync(path.dirname(path.join(app, rel)), { recursive: true });
     fs.writeFileSync(path.join(app, rel), text);
   };
-  write(".loom/canvas/login-form.json", JSON.stringify({ id: "login-form", kind: "feature", title: "Login", files: ["src/auth/**"] }));
-  write(".loom/canvas/database.json", JSON.stringify({ id: "database", kind: "module", title: "DB", files: ["src/db/**"] }));
-  write(".loom/canvas/_edges.json", "[]");
+  write(".agent-together/canvas/login-form.json", JSON.stringify({ id: "login-form", kind: "feature", title: "Login", files: ["src/auth/**"] }));
+  write(".agent-together/canvas/database.json", JSON.stringify({ id: "database", kind: "module", title: "DB", files: ["src/db/**"] }));
+  write(".agent-together/canvas/_edges.json", "[]");
   // The "tests": pass when src/auth/rule.txt says digit.
-  write(".loom/race.json", JSON.stringify({ testCommand: `node -e "process.exit(require('fs').readFileSync('src/auth/rule.txt','utf8').includes('digit')?0:1)"` }));
+  write(".agent-together/race.json", JSON.stringify({ testCommand: `node -e "process.exit(require('fs').readFileSync('src/auth/rule.txt','utf8').includes('digit')?0:1)"` }));
   write("src/auth/rule.txt", "length\n");
   return { top, app };
 }
@@ -31,8 +31,8 @@ function repo() {
 const agent = (id: string, files: Record<string, string>): AgentRunner => ({
   id,
   async run(cwd, prompt) {
-    expect(prompt).toContain(".loom/context/login-form.md");
-    expect(fs.readFileSync(path.join(cwd, ".loom/context/login-form.md"), "utf8")).toContain("add a digit rule");
+    expect(prompt).toContain(".agent-together/context/login-form.md");
+    expect(fs.readFileSync(path.join(cwd, ".agent-together/context/login-form.md"), "utf8")).toContain("add a digit rule");
     for (const [rel, text] of Object.entries(files)) {
       fs.mkdirSync(path.dirname(path.join(cwd, rel)), { recursive: true });
       fs.writeFileSync(path.join(cwd, rel), text);
@@ -65,7 +65,7 @@ describe("Race", () => {
     expect(fs.readFileSync(path.join(app, "src/auth/rule.txt"), "utf8").replace(/\r\n/g, "\n")).toBe("length\ndigit\n");
     expect(fs.existsSync(path.join(app, "src/db/users.ts"))).toBe(false);
     expect(fs.existsSync(careful.worktree)).toBe(false);
-    expect(git(top, "for-each-ref", "refs/loom/races")).toBe("");
+    expect(git(top, "for-each-ref", "refs/agent-together/races")).toBe("");
     expect(race.load(report.id).adopted).toBe("careful");
     expect(race.list().map((r) => r.id)).toEqual([report.id]);
   }, 60_000); // several git worktrees: slow on Windows

@@ -1,11 +1,11 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { Canvas, type CanvasEdge, type CanvasNode } from "@loom/schema";
+import { Canvas, type CanvasEdge, type CanvasNode } from "@agent-together/schema";
 import { importCandidates, importSpecifiers, SOURCE_FILE } from "./imports.js";
 import { ownerOf } from "./owners.js";
 
-const SKIP_DIRS = new Set(["node_modules", ".git", ".loom", ".claude", "dist", "out", "build", "coverage"]);
+const SKIP_DIRS = new Set(["node_modules", ".git", ".agent-together", ".claude", "dist", "out", "build", "coverage"]);
 const MAX_SOURCE_BYTES = 512 * 1024;
 
 /** Project files as posix paths: git's view (tracked + untracked, minus ignored) when available. */
@@ -151,9 +151,9 @@ function layout(nodes: CanvasNode[], edges: CanvasEdge[]) {
   }
 }
 
-/** Writes .loom/canvas/* and default rules for a project. Refuses to overwrite unless forced. */
+/** Writes .agent-together/canvas/* and default rules for a project. Refuses to overwrite unless forced. */
 export function initProject(root: string, { force = false } = {}): Canvas {
-  const canvasDir = path.join(root, ".loom", "canvas");
+  const canvasDir = path.join(root, ".agent-together", "canvas");
   if (fs.existsSync(canvasDir) && !force) {
     throw new Error(`${canvasDir} already exists; pass --force to regenerate it`);
   }
@@ -164,7 +164,7 @@ export function initProject(root: string, { force = false } = {}): Canvas {
     fs.writeFileSync(path.join(canvasDir, `${node.id}.json`), JSON.stringify(node, null, 2) + "\n");
   }
   fs.writeFileSync(path.join(canvasDir, "_edges.json"), JSON.stringify(canvas.edges, null, 2) + "\n");
-  const rules = path.join(root, ".loom", "rules.json");
+  const rules = path.join(root, ".agent-together", "rules.json");
   if (!fs.existsSync(rules)) {
     const defaults = { "scope-fence": "ask", "design-guard": "ask", "test-tampering": "ask", "repeated-failure": "warn", "repeated-read": "warn" };
     fs.writeFileSync(rules, JSON.stringify(defaults, null, 2) + "\n");

@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 const EVENTS = ["PreToolUse", "PostToolUse", "PostToolUseFailure", "Stop"] as const;
-const MARKER = "loom-hook";
+const MARKER = "agent-together-hook";
 
 interface HookGroup {
   matcher?: string;
@@ -10,9 +10,9 @@ interface HookGroup {
 }
 
 /**
- * Registers loom-hook for every event in <project>/.claude/settings.local.json.
+ * Registers agent-together-hook for every event in <project>/.claude/settings.local.json.
  * The command holds an absolute path, so it goes in the personal (git-ignored)
- * settings file, not the shared one. Re-running replaces earlier Loom entries
+ * settings file, not the shared one. Re-running replaces earlier Agent Together entries
  * and leaves everything else untouched.
  */
 export function installHooks(projectRoot: string, hookCommand: string): string {

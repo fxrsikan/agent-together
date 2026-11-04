@@ -3,14 +3,14 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { Checkpoints } from "@loom/core";
+import { Checkpoints } from "@agent-together/core";
 
 const git = (cwd: string, ...args: string[]) =>
   execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
 
-/** A repo whose Loom project lives in app/, next to an unrelated sibling folder. */
+/** A repo whose Agent Together project lives in app/, next to an unrelated sibling folder. */
 function repo() {
-  const top = fs.mkdtempSync(path.join(os.tmpdir(), "loom-cp-"));
+  const top = fs.mkdtempSync(path.join(os.tmpdir(), "agent-together-cp-"));
   git(top, "init", "-q");
   const app = path.join(top, "app");
   fs.mkdirSync(path.join(app, "src"), { recursive: true });
@@ -21,7 +21,8 @@ function repo() {
   return { top, app, read: (p: string) => fs.readFileSync(path.join(top, p), "utf8") };
 }
 
-describe("Checkpoints", () => {
+// Each test runs many git commands: slow on a busy Windows machine.
+describe("Checkpoints", { timeout: 30_000 }, () => {
   it("rolls back edits and new files inside the project only", () => {
     const { top, app, read } = repo();
     const cp = new Checkpoints(app);

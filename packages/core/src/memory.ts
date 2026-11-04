@@ -1,12 +1,12 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { Memory, type Canvas, type Finding } from "@loom/schema";
+import { Memory, type Canvas, type Finding } from "@agent-together/schema";
 import { formatFrontmatter, parseFrontmatter } from "./frontmatter.js";
 
 const FIELDS = ["id", "nodeId", "kind", "status", "source", "createdAt", "evidence"] as const;
-const BLOCK_START = "<!-- loom:memory:start -->";
-const BLOCK_END = "<!-- loom:memory:end -->";
+const BLOCK_START = "<!-- agent-together:memory:start -->";
+const BLOCK_END = "<!-- agent-together:memory:end -->";
 
 const KIND_LABEL: Record<Memory["kind"], string> = { decision: "决策", constraint: "约束", pitfall: "踩过的坑", preference: "偏好" };
 
@@ -18,14 +18,14 @@ function parse(text: string): Memory {
 }
 
 /**
- * Memories as reviewable Markdown files: .loom/memory/<id>.md with a small
+ * Memories as reviewable Markdown files: .agent-together/memory/<id>.md with a small
  * frontmatter. Shared through git like the canvas.
  */
 export class MemoryStore {
   readonly dir: string;
 
   constructor(readonly root: string) {
-    this.dir = path.join(root, ".loom", "memory");
+    this.dir = path.join(root, ".agent-together", "memory");
   }
 
   list(): Memory[] {
@@ -62,9 +62,9 @@ export class MemoryStore {
   }
 
   /**
-   * Mirrors active memories into a Loom-managed block of the project's agent
+   * Mirrors active memories into a Agent Together-managed block of the project's agent
    * instruction files — CLAUDE.md (Claude Code) and AGENTS.md (Codex, Cursor,
-   * Grok Build) — so agents started without Loom still see them. Text outside
+   * Grok Build) — so agents started without Agent Together still see them. Text outside
    * the block is kept. Returns the files written.
    */
   syncAgentFiles(canvas: Canvas): string[] {
@@ -75,7 +75,7 @@ export class MemoryStore {
     const body = [...groups]
       .map(([t, ms]) => `### ${t}\n\n${ms.map((m) => `- （${KIND_LABEL[m.kind]}）${m.content}`).join("\n")}`)
       .join("\n\n");
-    const block = `${BLOCK_START}\n## Loom 记忆（由 Loom 维护，请在 Loom 中修改）\n\n${body || "（暂无）"}\n${BLOCK_END}`;
+    const block = `${BLOCK_START}\n## Agent Together 记忆（由 Agent Together 维护，请在 Agent Together 中修改）\n\n${body || "（暂无）"}\n${BLOCK_END}`;
 
     return ["CLAUDE.md", "AGENTS.md"].map((name) => {
       const file = path.join(this.root, name);

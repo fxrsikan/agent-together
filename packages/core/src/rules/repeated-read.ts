@@ -1,9 +1,9 @@
-import type { LoomEvent } from "@loom/schema";
+import type { AgentEvent } from "@agent-together/schema";
 import type { Rule } from "./types.js";
 
 const LIMIT = 4;
 
-const readPath = (e: LoomEvent) => (e.kind === "tool.before" && e.action.type === "read" ? e.action.path : null);
+const readPath = (e: AgentEvent) => (e.kind === "tool.before" && e.action.type === "read" ? e.action.path : null);
 
 /** Token waste: the same file read again and again in one session. */
 export const repeatedRead: Rule = {

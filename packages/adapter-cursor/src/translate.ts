@@ -1,7 +1,9 @@
-import type { LoomEvent, ToolAction, Verdict } from "@loom/schema";
+import fs from "node:fs";
+import path from "node:path";
+import type { AgentEvent, ToolAction, Verdict } from "@agent-together/schema";
 import { asciiJson } from "./encoding.js";
 
-/** The subset of Cursor's hook stdin payload Loom reads (verified against Cursor 3.19 on Windows). */
+/** The subset of Cursor's hook stdin payload Agent Together reads (verified against Cursor 3.19 on Windows). */
 export interface CursorHookPayload {
   conversation_id: string;
   hook_event_name: string;
@@ -15,11 +17,26 @@ export interface CursorHookPayload {
   error_message?: string;
 }
 
-/** "/d:/AI/project" → "d:/AI/project"; posix roots stay as they are. */
+const isDirectory = (p: string) => {
+  try {
+    return fs.statSync(p).isDirectory();
+  } catch {
+    return false;
+  }
+};
+
+/** The editor sends "/d:/AI/project", the CLI "D:\AI\project"; both become a usable path. */
 const fromCursorPath = (p: string) => (/^\/[a-zA-Z]:/.test(p) ? p.slice(1) : p);
 
-/** The folder to look for .loom from: the tool's cwd, else the first workspace root. */
+/**
+ * The folder to look for .agent-together from: the file the tool touches, else the tool's
+ * cwd, else the first workspace root. The CLI's workspace root is the git
+ * repository root, which may sit above the Agent Together project.
+ */
 export function cursorCwd(payload: CursorHookPayload): string {
+  const file = payload.tool_input?.file_path;
+  // Grep and Glob pass a folder as file_path.
+  if (typeof file === "string" && path.isAbsolute(file)) return isDirectory(file) ? file : path.dirname(file);
   const root = payload.workspace_roots?.[0];
   return payload.tool_input?.cwd ?? payload.cwd ?? (root ? fromCursorPath(root) : process.cwd());
 }
@@ -51,14 +68,14 @@ function shellResult(output: string | undefined): { ok: boolean; error?: string 
 }
 
 /**
- * Cursor hook payload → unified Loom events. `readFile` supplies a file's
+ * Cursor hook payload → unified Agent Together events. `readFile` supplies a file's
  * current content, the "before" of a write.
  */
 export function toCursorEvents(
   payload: CursorHookPayload,
   readFile: (p: string) => string | undefined = () => undefined,
   now = new Date(),
-): LoomEvent[] {
+): AgentEvent[] {
   const base = { platform: "cursor" as const, sessionId: payload.conversation_id, at: now.toISOString() };
   switch (payload.hook_event_name) {
     case "preToolUse":
@@ -79,7 +96,7 @@ export function toCursorEvents(
 const reasonOf = (verdict: Verdict) =>
   verdict.findings
     .filter((f) => f.level !== "log" && f.level !== "off")
-    .map((f) => `[Loom ${f.rule}] ${f.message}`)
+    .map((f) => `[Agent Together ${f.rule}] ${f.message}`)
     .join("\n");
 
 /**
@@ -92,7 +109,7 @@ export function toCursorOutput(hookEventName: string, verdict: Verdict): string 
   const reason = reasonOf(verdict);
   if (hookEventName === "preToolUse") {
     if (verdict.level === "block" || verdict.level === "ask") {
-      const prefix = verdict.level === "ask" ? "Loom needs the user's decision before this runs. Ask the user, do not work around it.\n" : "";
+      const prefix = verdict.level === "ask" ? "Agent Together needs the user's decision before this runs. Ask the user, do not work around it.\n" : "";
       return asciiJson({ permission: "deny", user_message: reason, agent_message: prefix + reason });
     }
     return asciiJson(reason ? { permission: "allow", agent_message: reason } : { permission: "allow" });

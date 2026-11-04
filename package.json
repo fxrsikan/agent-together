@@ -1,7 +1,7 @@
 {
-  "name": "loom",
+  "name": "agent-together",
   "private": true,
-  "description": "Canvas control plane for AI coding agents (working name: Loom)",
+  "description": "Canvas control plane for AI coding agents (working name: Agent Together)",
   "license": "Apache-2.0",
   "type": "module",
   "workspaces": [
@@ -9,9 +9,9 @@
     "apps/*"
   ],
   "scripts": {
-    "build": "npm run build -w @loom/schema -w @loom/core -w @loom/adapter-claude-code -w @loom/adapter-codex -w @loom/adapter-cursor -w @loom/hook",
-    "build:desktop": "npm run build -w @loom/desktop",
-    "dev": "npm run dev -w @loom/desktop",
+    "build": "npm run build -w @agent-together/schema -w @agent-together/core -w @agent-together/adapter-claude-code -w @agent-together/adapter-codex -w @agent-together/adapter-cursor -w @agent-together/hook",
+    "build:desktop": "npm run build -w @agent-together/desktop",
+    "dev": "npm run dev -w @agent-together/desktop",
     "test": "vitest run",
     "typecheck": "tsc -b"
   },

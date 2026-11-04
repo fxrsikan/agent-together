@@ -1,4 +1,4 @@
-import { generatedNote, type Capability, type CapabilityCompiler, type CompiledFile } from "@loom/schema";
+import { generatedNote, type Capability, type CapabilityCompiler, type CompiledFile } from "@agent-together/schema";
 
 /**
  * The open Agent Skills layout, .agents/skills/<id>/SKILL.md, which Codex reads

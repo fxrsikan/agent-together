@@ -1,4 +1,4 @@
-import type { Canvas, CanvasNode, Memory } from "@loom/schema";
+import type { Canvas, CanvasNode, Memory } from "@agent-together/schema";
 
 const list = (items: string[]) => (items.length ? items.map((i) => `- ${i}`).join("\n") : "- （无）");
 const files = (n: CanvasNode) => n.files.map((f) => `\`${f}\``).join("、") || "（未绑定）";
@@ -7,7 +7,7 @@ const KIND_LABEL: Record<Memory["kind"], string> = { decision: "决策", constra
 /**
  * Everything an agent should know to work on one node, without a specific task:
  * the node, the interface of its direct neighbours, its approved memories and the
- * rules Loom enforces. Never the whole repository. Used for dispatch and skill export.
+ * rules Agent Together enforces. Never the whole repository. Used for dispatch and skill export.
  */
 export function buildNodeGuide(canvas: Canvas, nodeId: string, memories: Memory[] = []): string {
   const node = canvas.nodes.find((n) => n.id === nodeId);
@@ -43,7 +43,7 @@ ${list(usedBy.map((n) => `${n.title}：文件 ${files(n)}`))}
 
 ${list(memories.map((m) => `（${KIND_LABEL[m.kind]}）${m.content}`))}
 
-## Loom 会检查的规则
+## Agent Together 会检查的规则
 
 - 只修改本节点的文件；越界写入会被拦截，需要向用户说明理由。
 - 只能通过上面列出的依赖关系引用其他节点的代码。

@@ -2,27 +2,29 @@ import { exec as execShell, execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import type { AgentRunner, Finding, LoomEvent, Memory, RunResult } from "@loom/schema";
+import type { AgentRunner, Finding, AgentEvent, Memory, RunResult } from "@agent-together/schema";
 import { capabilityRules, CapabilityStore } from "./capabilities.js";
 import { Checkpoints } from "./checkpoints.js";
 import { buildNodeContext } from "./context.js";
 import { Observer } from "./observer.js";
 import { builtinRules } from "./rules/index.js";
-import { LoomStore } from "./store.js";
+import { ProjectStore } from "./store.js";
 import { dispatchPrompt } from "./terminal.js";
 
-/** .loom/race.json */
+/** .agent-together/race.json */
 export interface RaceConfig {
   /** Run in each contestant's copy of the project after it finishes, e.g. "npm test". */
   testCommand?: string;
   /** Per agent, default 15 minutes. */
   timeoutMs?: number;
+  /** Who races, by agent id; default ["claude-code", "codex"]. */
+  agents?: string[];
   /** Model per agent id, e.g. { "claude-code": "haiku" }; used when the caller names none. */
   models?: Record<string, string>;
 }
 
 export function loadRaceConfig(root: string): RaceConfig {
-  const file = path.join(root, ".loom", "race.json");
+  const file = path.join(root, ".agent-together", "race.json");
   return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : {};
 }
 
@@ -33,7 +35,7 @@ export interface ScorePart {
 
 export interface ContestantResult {
   id: string;
-  /** Snapshot of the contestant's project after its run (kept under refs/loom/races/). */
+  /** Snapshot of the contestant's project after its run (kept under refs/agent-together/races/). */
   commit: string;
   worktree: string;
   run: RunResult;
@@ -57,7 +59,7 @@ export interface RaceReport {
   discarded?: boolean;
 }
 
-const SKIP = (rel: string) => rel.startsWith(".loom/") || rel.split("/").includes("node_modules");
+const SKIP = (rel: string) => rel.startsWith(".agent-together/") || rel.split("/").includes("node_modules");
 
 function git(cwd: string, args: string[], input?: string): string {
   return execFileSync("git", args, { cwd, encoding: "utf8", input, stdio: ["pipe", "pipe", "pipe"], maxBuffer: 64 * 1024 * 1024 }).trim();
@@ -92,13 +94,13 @@ export function scoreContestant(c: Pick<ContestantResult, "run" | "files" | "fin
 }
 
 export class Race {
-  private readonly store: LoomStore;
+  private readonly store: ProjectStore;
   private readonly top: string;
   /** The project folder relative to the repository root ("" when they are the same). */
   private readonly rel: string;
 
   constructor(readonly root: string) {
-    this.store = new LoomStore(root);
+    this.store = new ProjectStore(root);
     this.top = git(root, ["rev-parse", "--show-toplevel"]);
     this.rel = path.relative(this.top, root).split(path.sep).join("/");
   }
@@ -151,26 +153,26 @@ export class Race {
     const startedAt = new Date().toISOString();
     const id = `${startedAt.replace(/[-:.]/g, "").replace("T", "-").slice(0, 15)}-${nodeId}`.slice(0, 80);
     const base = new Checkpoints(this.root).snapshot(`赛马起点 ${id}`);
-    git(this.top, ["update-ref", `refs/loom/races/${id}/base`, base]);
+    git(this.top, ["update-ref", `refs/agent-together/races/${id}/base`, base]);
     const context = contextOverride ?? buildNodeContext(canvas, nodeId, task, memories);
 
     const contestants = await Promise.all(
       runners.map(async (runner): Promise<ContestantResult> => {
-        const worktree = path.join(os.tmpdir(), `loom-race-${id}`, runner.id);
+        const worktree = path.join(os.tmpdir(), `agent-together-race-${id}`, runner.id);
         git(this.top, ["worktree", "add", "--detach", worktree, base]);
         const project = path.join(worktree, this.rel);
-        fs.mkdirSync(path.join(project, ".loom", "context"), { recursive: true });
-        fs.writeFileSync(path.join(project, ".loom", "context", `${nodeId}.md`), context);
+        fs.mkdirSync(path.join(project, ".agent-together", "context"), { recursive: true });
+        fs.writeFileSync(path.join(project, ".agent-together", "context", `${nodeId}.md`), context);
         const deps = path.join(this.root, "node_modules");
         if (fs.existsSync(deps) && !fs.existsSync(path.join(project, "node_modules"))) {
           fs.symlinkSync(deps, path.join(project, "node_modules"), "junction");
         }
         onProgress(`${runner.id} 开始`);
-        const run = await runner.run(project, dispatchPrompt(`.loom/context/${nodeId}.md`), config.timeoutMs ?? 15 * 60_000);
+        const run = await runner.run(project, dispatchPrompt(`.agent-together/context/${nodeId}.md`), config.timeoutMs ?? 15 * 60_000);
         onProgress(`${runner.id} 结束（${Math.round(run.durationMs / 1000)}s）`);
 
         const commit = new Checkpoints(project).snapshot(`赛马 ${id} ${runner.id}`);
-        git(this.top, ["update-ref", `refs/loom/races/${id}/${runner.id}`, commit]);
+        git(this.top, ["update-ref", `refs/agent-together/races/${id}/${runner.id}`, commit]);
         const files = git(this.top, ["diff-tree", "-r", "--numstat", base, commit])
           .split("\n")
           .filter(Boolean)
@@ -215,7 +217,7 @@ export class Race {
       }
       const full = path.join(project, rel);
       const after = fs.existsSync(full) ? fs.readFileSync(full, "utf8") : "";
-      const event: LoomEvent = {
+      const event: AgentEvent = {
         kind: "tool.before",
         platform: sessionId === "codex" ? "codex" : "claude-code",
         sessionId,
@@ -237,7 +239,7 @@ export class Race {
     if (!winner) throw new Error(`no contestant ${contestantId} in race ${id}`);
     new Checkpoints(this.root).create(`采用赛马 ${contestantId} 之前`, report.nodeId);
     const scope = this.rel || ".";
-    const exclude = [`:(exclude)${this.rel ? `${this.rel}/` : ""}.loom`, ":(exclude)**/node_modules"];
+    const exclude = [`:(exclude)${this.rel ? `${this.rel}/` : ""}.agent-together`, ":(exclude)**/node_modules"];
     const patch = execFileSync("git", ["diff", "--binary", report.base, winner.commit, "--", scope, ...exclude], {
       cwd: this.top,
       encoding: "utf8",
@@ -263,11 +265,11 @@ export class Race {
         fs.rmSync(c.worktree, { recursive: true, force: true });
       }
       try {
-        git(this.top, ["update-ref", "-d", `refs/loom/races/${report.id}/${c.id}`]);
+        git(this.top, ["update-ref", "-d", `refs/agent-together/races/${report.id}/${c.id}`]);
       } catch {}
     }
     try {
-      git(this.top, ["update-ref", "-d", `refs/loom/races/${report.id}/base`]);
+      git(this.top, ["update-ref", "-d", `refs/agent-together/races/${report.id}/base`]);
     } catch {}
     git(this.top, ["worktree", "prune"]);
   }

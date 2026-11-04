@@ -6,11 +6,11 @@ const src = (p: string) => fileURLToPath(new URL(`./packages/${p}/src/index.ts`,
 export default defineConfig({
   resolve: {
     alias: {
-      "@loom/schema": src("schema"),
-      "@loom/core": src("core"),
-      "@loom/adapter-claude-code": src("adapter-claude-code"),
-      "@loom/adapter-codex": src("adapter-codex"),
-      "@loom/adapter-cursor": src("adapter-cursor"),
+      "@agent-together/schema": src("schema"),
+      "@agent-together/core": src("core"),
+      "@agent-together/adapter-claude-code": src("adapter-claude-code"),
+      "@agent-together/adapter-codex": src("adapter-codex"),
+      "@agent-together/adapter-cursor": src("adapter-cursor"),
     },
   },
   test: {

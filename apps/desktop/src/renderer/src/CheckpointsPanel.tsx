@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Checkpoint } from "@loom/core";
+import type { Checkpoint } from "@agent-together/core";
 
 const SHOWN = 8;
 
@@ -8,16 +8,16 @@ export function CheckpointsPanel({ version, onChange }: { version: number; onCha
   const [list, setList] = useState<Checkpoint[]>([]);
 
   useEffect(() => {
-    window.loom.checkpoints().then(setList);
+    window.agentTogether.checkpoints().then(setList);
   }, [version]);
 
   const save = async () => {
-    const cp = await window.loom.checkpoint("手动保存");
+    const cp = await window.agentTogether.checkpoint("手动保存");
     onChange(`已保存检查点 ${cp.id}`);
   };
 
   const rollback = async (cp: Checkpoint) => {
-    if (await window.loom.rollback(cp.id)) onChange(`已回滚到"${cp.label}"（${cp.at.slice(11, 19)}），回滚前的状态也存成了检查点`);
+    if (await window.agentTogether.rollback(cp.id)) onChange(`已回滚到"${cp.label}"（${cp.at.slice(11, 19)}），回滚前的状态也存成了检查点`);
   };
 
   return (

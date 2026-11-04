@@ -1,6 +1,6 @@
 /**
- * The small frontmatter dialect Loom writes for its own Markdown files
- * (.loom/memory, .loom/capabilities): one `key: value` per line, where a value
+ * The small frontmatter dialect Agent Together writes for its own Markdown files
+ * (.agent-together/memory, .agent-together/capabilities): one `key: value` per line, where a value
  * is null, a JSON string/array/object (anything that starts with " [ or {),
  * or a bare word. Not YAML; just enough to stay readable and diff-friendly.
  */

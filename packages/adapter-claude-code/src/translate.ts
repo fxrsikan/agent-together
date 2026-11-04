@@ -1,6 +1,6 @@
-import type { LoomEvent, ToolAction, Verdict } from "@loom/schema";
+import type { AgentEvent, ToolAction, Verdict } from "@agent-together/schema";
 
-/** The subset of Claude Code's hook stdin payload Loom reads. */
+/** The subset of Claude Code's hook stdin payload Agent Together reads. */
 export interface HookPayload {
   session_id: string;
   cwd: string;
@@ -37,14 +37,14 @@ function toAction(tool: string, input: Record<string, any>, readFile: (p: string
 }
 
 /**
- * Claude Code hook payload → unified Loom event. `readFile` supplies the current
+ * Claude Code hook payload → unified Agent Together event. `readFile` supplies the current
  * content of a file a Write is about to replace, so rules can compare before/after.
  */
-export function toLoomEvent(
+export function toAgentEvent(
   payload: HookPayload,
   readFile: (p: string) => string | undefined = () => undefined,
   now = new Date(),
-): LoomEvent | null {
+): AgentEvent | null {
   const base = { platform: "claude-code" as const, sessionId: payload.session_id, at: now.toISOString() };
   const action = () => toAction(payload.tool_name ?? "", payload.tool_input ?? {}, readFile);
   switch (payload.hook_event_name) {
@@ -64,7 +64,7 @@ export function toLoomEvent(
 const reasonOf = (verdict: Verdict) =>
   verdict.findings
     .filter((f) => f.level !== "log" && f.level !== "off")
-    .map((f) => `[Loom ${f.rule}] ${f.message}`)
+    .map((f) => `[Agent Together ${f.rule}] ${f.message}`)
     .join("\n");
 
 /**

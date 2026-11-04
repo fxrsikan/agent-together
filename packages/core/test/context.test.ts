@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { Canvas } from "@loom/schema";
-import { buildNodeContext, contextSections, estimateTokens } from "@loom/core";
+import { Canvas } from "@agent-together/schema";
+import { buildNodeContext, contextSections, estimateTokens } from "@agent-together/core";
 
 const canvas = Canvas.parse({
   version: 1,
@@ -58,7 +58,7 @@ describe("estimateTokens / contextSections", () => {
       "可以依赖的节点",
       "依赖本节点的节点",
       "已审批的记忆",
-      "Loom 会检查的规则",
+      "Agent Together 会检查的规则",
     ]);
     expect(sections.every((s) => s.tokens > 0)).toBe(true);
   });

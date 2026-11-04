@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Memory } from "@loom/schema";
+import type { Memory } from "@agent-together/schema";
 
 const KIND_LABEL: Record<Memory["kind"], string> = { decision: "决策", constraint: "约束", pitfall: "踩过的坑", preference: "偏好" };
 
@@ -33,7 +33,7 @@ export function ContextInspector({
   }, [nodeId]);
 
   useEffect(() => {
-    window.loom.previewContext(nodeId, task, without).then((p) => {
+    window.agentTogether.previewContext(nodeId, task, without).then((p) => {
       setGenerated(p.markdown);
       setMemories(p.memories);
     });
@@ -43,7 +43,7 @@ export function ContextInspector({
 
   useEffect(() => {
     onContext(text);
-    window.loom.measureContext(text).then(setMeasure);
+    window.agentTogether.measureContext(text).then(setMeasure);
   }, [text]);
 
   const toggle = (id: string) => setWithout((w) => (w.includes(id) ? w.filter((x) => x !== id) : [...w, id]));

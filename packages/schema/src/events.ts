@@ -10,7 +10,7 @@ export type ToolAction =
   | { type: "shell"; command: string }
   | { type: "other"; tool: string };
 
-export type LoomEvent =
+export type AgentEvent =
   | {
       kind: "tool.before";
       platform: AgentPlatform;

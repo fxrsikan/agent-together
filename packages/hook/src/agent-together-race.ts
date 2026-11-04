@@ -1,26 +1,30 @@
 #!/usr/bin/env node
 import path from "node:path";
-import { claudeCodeRunner } from "@loom/adapter-claude-code";
-import { codexRunner } from "@loom/adapter-codex";
-import { loadRaceConfig, LoomStore, MemoryStore, Race, type RaceReport } from "@loom/core";
-import type { AgentRunner } from "@loom/schema";
+import { claudeCodeRunner } from "@agent-together/adapter-claude-code";
+import { codexRunner } from "@agent-together/adapter-codex";
+import { cursorRunner } from "@agent-together/adapter-cursor";
+import { loadRaceConfig, ProjectStore, MemoryStore, Race, type RaceReport } from "@agent-together/core";
+import type { AgentRunner } from "@agent-together/schema";
 
 const usage = `Usage:
-  loom-race <projectDir> <nodeId> "<task>" [--agents claude-code,codex] [--claude-model haiku] [--codex-model <m>]
-  loom-race adopt <projectDir> <raceId> <contestant>
-  loom-race discard <projectDir> <raceId>`;
+  agent-together-race <projectDir> <nodeId> "<task>" [--agents claude-code,codex,cursor] [--claude-model haiku] [--codex-model <m>] [--cursor-model <m>]
+  agent-together-race adopt <projectDir> <raceId> <contestant>
+  agent-together-race discard <projectDir> <raceId>`;
 
 const args = process.argv.slice(2);
 const option = (name: string) => {
   const i = args.indexOf(name);
   return i >= 0 ? args.splice(i, 2)[1] : undefined;
 };
-const agents = (option("--agents") ?? "claude-code,codex").split(",");
-const claudeModel = option("--claude-model");
-const codexModel = option("--codex-model");
+const agentsOption = option("--agents");
+const modelOptions: Record<string, string | undefined> = {
+  "claude-code": option("--claude-model"),
+  codex: option("--codex-model"),
+  cursor: option("--cursor-model"),
+};
 
 function project(dir: string | undefined): string {
-  const store = dir && LoomStore.find(path.resolve(dir));
+  const store = dir && ProjectStore.find(path.resolve(dir));
   if (!store) {
     console.error(usage);
     process.exit(1);
@@ -40,7 +44,7 @@ function print(report: RaceReport) {
     for (const f of c.findings) console.log(`    [${f.level}] ${f.rule}: ${f.message}`);
     console.log(`    says: ${c.run.summary.replace(/\s+/g, " ").slice(0, 200)}`);
   }
-  console.log(`\nAdopt one:  loom-race adopt <projectDir> ${report.id} <contestant>`);
+  console.log(`\nAdopt one:  agent-together-race adopt <projectDir> ${report.id} <contestant>`);
 }
 
 if (args[0] === "adopt") {
@@ -56,10 +60,15 @@ if (args[0] === "adopt") {
     console.error(usage);
     process.exit(1);
   }
-  const models = loadRaceConfig(root).models ?? {};
-  const runners: AgentRunner[] = agents.map((a) =>
-    a === "codex" ? codexRunner(codexModel ?? models.codex) : claudeCodeRunner(claudeModel ?? models["claude-code"]),
-  );
+  const config = loadRaceConfig(root);
+  const agents = agentsOption?.split(",") ?? config.agents ?? ["claude-code", "codex"];
+  const factories: Record<string, (model?: string) => AgentRunner> = { "claude-code": claudeCodeRunner, codex: codexRunner, cursor: cursorRunner };
+  const unknown = agents.filter((a) => !factories[a]);
+  if (unknown.length) {
+    console.error(`Unknown agent(s): ${unknown.join(", ")}. Known: ${Object.keys(factories).join(", ")}`);
+    process.exit(1);
+  }
+  const runners = agents.map((a) => factories[a](modelOptions[a] ?? config.models?.[a]));
   const report = await new Race(root).run(nodeId, task, runners, new MemoryStore(root).forNode(nodeId), (m) => console.log(`… ${m}`));
   print(report);
 }

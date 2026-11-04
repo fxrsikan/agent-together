@@ -1,5 +1,5 @@
-import { execCli } from "@loom/core";
-import type { AgentRunner, RunResult } from "@loom/schema";
+import { execCli } from "@agent-together/core";
+import type { AgentRunner, RunResult } from "@agent-together/schema";
 
 /**
  * Codex headless: `codex exec --json` with a workspace-write sandbox. Reads the

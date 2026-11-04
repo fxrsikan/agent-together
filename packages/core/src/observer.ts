@@ -1,11 +1,11 @@
-import { strongest, type Canvas, type Finding, type Level, type LoomEvent, type Verdict } from "@loom/schema";
+import { strongest, type Canvas, type Finding, type Level, type AgentEvent, type Verdict } from "@agent-together/schema";
 import { builtinRules, type Rule } from "./rules/index.js";
 
 const HISTORY_LIMIT = 500;
 
 /** Runs every rule on every event and keeps a short per-session history. */
 export class Observer {
-  private sessions = new Map<string, LoomEvent[]>();
+  private sessions = new Map<string, AgentEvent[]>();
 
   constructor(
     private readonly root: string,
@@ -31,7 +31,7 @@ export class Observer {
     this.levels = levels;
   }
 
-  evaluate(event: LoomEvent): Verdict {
+  evaluate(event: AgentEvent): Verdict {
     const history = this.sessions.get(event.sessionId) ?? [];
     const ctx = {
       root: this.root,

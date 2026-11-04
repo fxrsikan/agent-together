@@ -1,11 +1,16 @@
 {
-  "name": "@loom/adapter-cursor",
+  "name": "@agent-together/adapter-cursor",
   "version": "0.0.1",
-  "description": "Cursor adapter: hook payloads (incl. Windows PowerShell repair) to Loom events, verdicts to hook output, hook installer, rules compiler",
+  "description": "Cursor adapter: hook payloads (incl. Windows PowerShell repair) to Agent Together events, verdicts to hook output, hook installer, rules compiler, race runner",
   "license": "Apache-2.0",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "scripts": { "build": "tsc -b" },
-  "dependencies": { "@loom/schema": "0.0.1" }
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@agent-together/schema": "0.0.1",
+    "@agent-together/core": "0.0.1"
+  }
 }

@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { exitCodeFromTranscript, installCodexHooks, parsePatch, toCodexOutput, toLoomEvents } from "@loom/adapter-codex";
+import { exitCodeFromTranscript, installCodexHooks, parsePatch, toCodexOutput, toAgentEvents } from "@agent-together/adapter-codex";
 
 const patch = [
   "*** Begin Patch",
@@ -36,9 +36,9 @@ describe("parsePatch", () => {
 
 const base = { session_id: "s1", cwd: path.resolve("/proj") };
 
-describe("toLoomEvents", () => {
+describe("toAgentEvents", () => {
   it("turns one apply_patch into one write per file (and the rename target), with absolute paths", () => {
-    const events = toLoomEvents({ ...base, hook_event_name: "PreToolUse", tool_name: "apply_patch", tool_input: { command: patch } });
+    const events = toAgentEvents({ ...base, hook_event_name: "PreToolUse", tool_name: "apply_patch", tool_input: { command: patch } });
     expect(events.map((e) => (e.kind === "tool.before" && e.action.type === "write" ? e.action.path : null))).toEqual(
       ["src/a.ts", "src/b.ts", "src/old.ts", "src/c.ts", "src/d.ts"].map((p) => path.resolve("/proj", p)),
     );
@@ -46,7 +46,7 @@ describe("toLoomEvents", () => {
   });
 
   it("reads a shell failure from the tool response", () => {
-    const [event] = toLoomEvents({
+    const [event] = toAgentEvents({
       ...base,
       hook_event_name: "PostToolUse",
       tool_name: "Bash",
@@ -63,15 +63,15 @@ describe("toLoomEvents", () => {
     ].join("\n");
     const lookup = (p: { tool_use_id?: string }) => exitCodeFromTranscript(transcript, p.tool_use_id!);
     const post = (id: string) =>
-      toLoomEvents({ ...base, hook_event_name: "PostToolUse", tool_name: "Bash", tool_use_id: id, tool_input: { command: "x" }, tool_response: "" }, new Date(), lookup)[0];
+      toAgentEvents({ ...base, hook_event_name: "PostToolUse", tool_name: "Bash", tool_use_id: id, tool_input: { command: "x" }, tool_response: "" }, new Date(), lookup)[0];
     expect(post("exec-1")).toMatchObject({ ok: false, error: "exit 1" });
     expect(post("exec-2")).toMatchObject({ ok: true });
     expect(post("exec-9")).toMatchObject({ ok: true });
   });
 
   it("maps Stop to the end of a turn and ignores other events", () => {
-    expect(toLoomEvents({ ...base, hook_event_name: "Stop" })).toMatchObject([{ kind: "turn.end" }]);
-    expect(toLoomEvents({ ...base, hook_event_name: "SessionStart" })).toEqual([]);
+    expect(toAgentEvents({ ...base, hook_event_name: "Stop" })).toMatchObject([{ kind: "turn.end" }]);
+    expect(toAgentEvents({ ...base, hook_event_name: "SessionStart" })).toEqual([]);
   });
 });
 
@@ -93,22 +93,22 @@ describe("toCodexOutput", () => {
 
 describe("installCodexHooks", () => {
   it("writes .codex/hooks.json once and keeps other hooks", () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "loom-codex-"));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "agent-together-codex-"));
     fs.mkdirSync(path.join(dir, ".codex"));
     fs.writeFileSync(path.join(dir, ".codex", "hooks.json"), JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: "command", command: "say" }] }] } }));
-    installCodexHooks(dir, "node /x/loom-hook.js --platform codex");
-    installCodexHooks(dir, "node /x/loom-hook.js --platform codex");
+    installCodexHooks(dir, "node /x/agent-together-hook.js --platform codex");
+    installCodexHooks(dir, "node /x/agent-together-hook.js --platform codex");
     const config = JSON.parse(fs.readFileSync(path.join(dir, ".codex", "hooks.json"), "utf8"));
     expect(config.hooks.PreToolUse).toHaveLength(1);
     expect(config.hooks.Stop).toHaveLength(2);
   });
 
   it("installs at the git repository root when the project is a subfolder", () => {
-    const top = fs.mkdtempSync(path.join(os.tmpdir(), "loom-codex-repo-"));
+    const top = fs.mkdtempSync(path.join(os.tmpdir(), "agent-together-codex-repo-"));
     execFileSync("git", ["init", "-q"], { cwd: top });
     const project = path.join(top, "apps", "web");
     fs.mkdirSync(project, { recursive: true });
-    const file = installCodexHooks(project, "node /x/loom-hook.js --platform codex");
+    const file = installCodexHooks(project, "node /x/agent-together-hook.js --platform codex");
     expect(fs.realpathSync(path.dirname(path.dirname(file)))).toBe(fs.realpathSync(top));
   });
 });

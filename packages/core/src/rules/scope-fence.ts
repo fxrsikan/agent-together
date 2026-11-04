@@ -9,8 +9,8 @@ export const scopeFence: Rule = {
   check(event, { root, activeNode }) {
     if (event.kind !== "tool.before" || event.action.type !== "write" || !activeNode) return null;
     const rel = relativeToRoot(root, event.action.path);
-    if (rel?.startsWith(".loom/")) {
-      return { nodeId: activeNode.id, message: `${rel} belongs to Loom itself; agents do not edit it.` };
+    if (rel?.startsWith(".agent-together/")) {
+      return { nodeId: activeNode.id, message: `${rel} belongs to Agent Together itself; agents do not edit it.` };
     }
     if (rel && activeNode.files.length > 0 && picomatch(activeNode.files)(rel)) return null;
     return {

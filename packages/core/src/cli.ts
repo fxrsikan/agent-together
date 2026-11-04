@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 import { Daemon } from "./daemon.js";
 import { createLlm, loadLlmConfig } from "./llm.js";
-import { LoomStore } from "./store.js";
+import { ProjectStore } from "./store.js";
 
-// Usage: loom-daemon [projectDir] [activeNodeId]
-const store = LoomStore.find(process.argv[2] ?? process.cwd());
+// Usage: agent-together-daemon [projectDir] [activeNodeId]
+const store = ProjectStore.find(process.argv[2] ?? process.cwd());
 if (!store) {
-  console.error("No .loom directory found. Run this inside a Loom project.");
+  console.error("No .agent-together directory found. Run this inside a Agent Together project.");
   process.exit(1);
 }
 const config = loadLlmConfig(store.root);
@@ -22,7 +22,7 @@ daemon.on("memory", (ms) => ms.forEach((m) => console.log(`[memory ${m.status}] 
 daemon.on("judgment", (j) => console.log(`[L2 ${j.onTrack ? "on track" : "OFF TRACK"}] ${j.nodeId}: ${j.reason}`));
 daemon.on("l2error", (e) => console.log(`[L2 error] ${e}`));
 const port = await daemon.start();
-console.log(`Loom daemon for ${store.root} on 127.0.0.1:${port} · L2: ${llm?.name ?? "off"}`);
+console.log(`Agent Together daemon for ${store.root} on 127.0.0.1:${port} · L2: ${llm?.name ?? "off"}`);
 const shutdown = () => daemon.stop().then(() => process.exit(0));
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);

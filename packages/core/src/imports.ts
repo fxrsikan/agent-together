@@ -1,6 +1,6 @@
 import path from "node:path";
 
-/** JS/TS source files Loom can read imports from (v0.1; tree-sitter comes later). */
+/** JS/TS source files Agent Together can read imports from (v0.1; tree-sitter comes later). */
 export const SOURCE_FILE = /\.[cm]?[jt]sx?$/;
 
 // import x from "y" · import "y" · export * from "y" · require("y") · import("y")

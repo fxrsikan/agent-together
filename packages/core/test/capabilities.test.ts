@@ -2,14 +2,14 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { claudeCodeCompiler } from "@loom/adapter-claude-code";
-import { agentSkillsCompiler } from "@loom/adapter-codex";
-import { cursorRulesCompiler } from "@loom/adapter-cursor";
-import { Canvas, Capability, type LoomEvent } from "@loom/schema";
-import { CapabilityStore, capabilityFromNode, checkCapability, compileCapabilities, Daemon } from "@loom/core";
+import { claudeCodeCompiler } from "@agent-together/adapter-claude-code";
+import { agentSkillsCompiler } from "@agent-together/adapter-codex";
+import { cursorRulesCompiler } from "@agent-together/adapter-cursor";
+import { Canvas, Capability, type AgentEvent } from "@agent-together/schema";
+import { CapabilityStore, capabilityFromNode, checkCapability, compileCapabilities, Daemon } from "@agent-together/core";
 
 const compilers = [claudeCodeCompiler, agentSkillsCompiler, cursorRulesCompiler];
-const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), "loom-cap-"));
+const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), "agent-together-cap-"));
 
 const canvas = Canvas.parse({
   version: 1,
@@ -46,12 +46,12 @@ describe("compileCapabilities", () => {
     const [report] = compileCapabilities(root, [skill], compilers);
     expect(report.errors).toEqual([]);
     expect(report.written).toEqual({
-      "claude-code": [".claude/skills/loom-login-form/SKILL.md"],
-      "agent-skills": [".agents/skills/loom-login-form/SKILL.md"],
-      cursor: [".cursor/rules/loom-login-form.mdc"],
+      "claude-code": [".claude/skills/agent-together-login-form/SKILL.md"],
+      "agent-skills": [".agents/skills/agent-together-login-form/SKILL.md"],
+      cursor: [".cursor/rules/agent-together-login-form.mdc"],
     });
-    expect(fs.readFileSync(path.join(root, ".cursor/rules/loom-login-form.mdc"), "utf8")).toContain("globs: src/auth/**");
-    expect(fs.readFileSync(path.join(root, ".agents/skills/loom-login-form/SKILL.md"), "utf8")).toContain("用户服务");
+    expect(fs.readFileSync(path.join(root, ".cursor/rules/agent-together-login-form.mdc"), "utf8")).toContain("globs: src/auth/**");
+    expect(fs.readFileSync(path.join(root, ".agents/skills/agent-together-login-form/SKILL.md"), "utf8")).toContain("用户服务");
   });
 
   it("skips targets that have no equivalent, and compiles nothing with errors", () => {
@@ -78,8 +78,8 @@ describe("capabilityFromNode", () => {
 describe("observer capabilities", () => {
   it("become rules the daemon enforces on every platform", () => {
     const root = tmp();
-    fs.mkdirSync(path.join(root, ".loom", "canvas"), { recursive: true });
-    fs.writeFileSync(path.join(root, ".loom", "canvas", "login-form.json"), JSON.stringify(canvas.nodes[0]));
+    fs.mkdirSync(path.join(root, ".agent-together", "canvas"), { recursive: true });
+    fs.writeFileSync(path.join(root, ".agent-together", "canvas", "login-form.json"), JSON.stringify(canvas.nodes[0]));
     new CapabilityStore(root).save(
       Capability.parse({
         id: "no-console-log",
@@ -92,14 +92,14 @@ describe("observer capabilities", () => {
       }),
     );
     const daemon = new Daemon(root);
-    const write = (platform: "claude-code" | "codex", file: string, after: string, before?: string): LoomEvent => ({
+    const write = (platform: "claude-code" | "codex", file: string, after: string, before?: string): AgentEvent => ({
       kind: "tool.before",
       platform,
       sessionId: platform,
       at: "2026-11-04T00:00:00.000Z",
       action: { type: "write", path: path.join(root, file), after, before },
     });
-    const rules = (e: LoomEvent) => daemon.handle(e).findings.map((f) => `${f.rule}:${f.level}`);
+    const rules = (e: AgentEvent) => daemon.handle(e).findings.map((f) => `${f.rule}:${f.level}`);
     expect(rules(write("claude-code", "src/auth/a.ts", "console.log(email)"))).toEqual(["capability:no-console-log:ask"]);
     expect(rules(write("codex", "src/auth/a.ts", "console.log(email)"))).toEqual(["capability:no-console-log:ask"]);
     expect(rules(write("codex", "src/other/a.ts", "console.log(email)"))).toEqual([]);

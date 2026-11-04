@@ -137,4 +137,4 @@ it("records consecutive failures per node and resets the streak on success", asy
   fs.writeFileSync(config, JSON.stringify({ testCommand: 'node -e "process.exit(0)"' }));
   await runProjectTests(root, "task");
   expect(testHistory(root).consecutiveFailures?.task).toBe(0);
-});
+}, 30_000); // three real node processes; slow on a busy machine

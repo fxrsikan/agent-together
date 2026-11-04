@@ -174,7 +174,7 @@ export class Race {
     const id = `${randomUUID().slice(0, 8)}-${startedAt.replace(/[-:.]/g, "").replace("T", "-").slice(0, 15)}-${nodeId}`.slice(0, 80);
     const base = new Checkpoints(this.root).snapshot(`赛马起点 ${id}`);
     git(this.top, ["update-ref", `refs/agent-together/races/${id}/base`, base]);
-    const context = contextOverride ?? buildNodeContext(canvas, nodeId, task, memories, readProjectInfo(this.root));
+    const context = contextOverride ?? buildNodeContext(canvas, nodeId, task, memories, readProjectInfo(this.root), new CapabilityStore(this.root).list());
 
     const contestants = await Promise.all(
       runners.map(async (entry): Promise<ContestantResult> => {

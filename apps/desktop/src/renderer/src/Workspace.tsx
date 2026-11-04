@@ -12,7 +12,7 @@ import {
   type NodeChange,
   type ReactFlowInstance,
 } from "@xyflow/react";
-import { strongest, type AgentEvent, type Canvas, type Level } from "@agent-together/schema";
+import { strongest, type AgentEvent, type Canvas, type Capability, type Level } from "@agent-together/schema";
 import type { CompileReport } from "@agent-together/core";
 import type { Agent, EventRecord, Judgment, SessionInfo, TestHistory } from "../../preload";
 import { AgentRun, TestBadge, type RunView, auditSummary } from "./AgentRun";
@@ -23,6 +23,7 @@ import { NodeCard, type NodeCardType } from "./NodeCard";
 import { NodeEditor } from "./NodeEditor";
 import { ProjectSettings } from "./ProjectSettings";
 import { EvolutionPanel } from "./EvolutionPanel";
+import { RoleDraft } from "./RoleDraft";
 import { RacePanel } from "./RacePanel";
 
 const nodeTypes = { card: NodeCard };
@@ -40,7 +41,7 @@ function describe(event: AgentEvent): string {
 const message = (err: unknown) => (err instanceof Error ? err.message : String(err)).replace(/^Error invoking remote method '[^']+': (Error: )?/, "");
 
 /** An empty canvas: plan it from the product description with AI, or start drawing by hand. */
-function EmptyCanvas({ onAdd, onChange }: { onAdd: () => void; onChange: (notice: string) => void }) {
+function EmptyCanvas({ onAdd, onChange, onRoles }: { onRoles: (roles: Capability[], canvas: Canvas) => void; onAdd: () => void; onChange: (notice: string) => void }) {
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -53,7 +54,8 @@ function EmptyCanvas({ onAdd, onChange }: { onAdd: () => void; onChange: (notice
     setBusy(true);
     setError("");
     try {
-      const { canvas, stack } = await window.agentTogether.planCanvas(description);
+      const { canvas, stack, roles } = await window.agentTogether.planCanvas(description);
+      onRoles(roles, canvas);
       const { suggestions } = await window.agentTogether.evolutions();
       onChange(`AI 规划了 ${canvas.nodes.length} 个节点（${stack}）。逐个检查目标、验收标准和文件范围，改好再派发。${suggestions.length ? ` 有 ${suggestions.length} 条在别的项目用过的经验，选中卡片后可在“进化”里查看，同意后才会加入记忆。` : ""}`);
     } catch (err) {
@@ -89,6 +91,13 @@ function EmptyCanvas({ onAdd, onChange }: { onAdd: () => void; onChange: (notice
 
 /** One open project: the editable canvas on the left, the selected node and the observers on the right. */
 export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () => void }) {
+  const [roles, setRoles] = useState<Capability[]>([]);
+  const [drafts, setDrafts] = useState<Capability[]>([]);
+  /** Per draft, the id the plan assigned to nodes ("" for one-sentence drafts); the user may rename the draft before saving. */
+  const plannedIds = useRef<string[]>([]);
+  const [proposedCanvas, setProposedCanvas] = useState<Canvas | null>(null);
+  const [sentence, setSentence] = useState("");
+  const [roleBusy, setRoleBusy] = useState(false);
   const [judgments, setJudgments] = useState<Judgment[]>([]);
   const [version, setVersion] = useState(0); // bumped when files may have changed under us
   const [canvas, setCanvas] = useState<Canvas | null>(null);
@@ -138,6 +147,7 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
 
   useEffect(() => {
     window.agentTogether.canvas().then(setCanvas);
+    window.agentTogether.roles().then(setRoles);
     window.agentTogether.testHistory().then(setTestRuns);
   }, [version]);
 
@@ -214,6 +224,19 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
       await window.agentTogether.saveEdges(canvas.edges.filter((e) => !ids.has(`${e.from}->${e.to}`)));
       setNotice(`已删除 ${gone.length} 条连线`);
     });
+
+  const saveRole = (draft: Capability, index: number) => attempt(async () => {
+    const saved = await window.agentTogether.saveRole(draft);
+    for (const proposed of proposedCanvas?.nodes ?? []) {
+      const node = canvas?.nodes.find((n) => n.id === proposed.id);
+      if (node && proposed.role && proposed.role === plannedIds.current[index]) {
+        await window.agentTogether.saveNode({ ...node, role: saved.id });
+      }
+    }
+    plannedIds.current.splice(index, 1);
+    setDrafts((items) => items.filter((_, i) => i !== index));
+    changed(saved.description);
+  });
 
   const install = async () =>
     setNotice(`已写入 ${(await window.agentTogether.installHooks()).join("、")}。Codex 需要在项目里运行 codex 并用 /hooks 信任后才生效；Cursor 需要信任该工作区。`);
@@ -306,9 +329,21 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
         </div>
       )}
       <main className="body">
-        <div className="canvas">
+        <div className="canvas" onDragOver={(e) => e.preventDefault()} onDrop={(e) => {
+          e.preventDefault();
+          const role = roles.find((r) => r.id === e.dataTransfer.getData("application/agent-together-role"));
+          if (!role) return;
+          const target = (e.target as HTMLElement).closest(".react-flow__node")?.getAttribute("data-id");
+          attempt(async () => {
+            const existing = canvas?.nodes.find((n) => n.id === target);
+            const position = flow.current?.screenToFlowPosition({ x: e.clientX, y: e.clientY }) ?? { x: 0, y: 0 };
+            const node = existing ?? await window.agentTogether.addNode(role.description, "flow", position);
+            await window.agentTogether.saveNode({ ...node, role: role.id });
+            changed("已分配角色，请检查这一步的目标和文件范围");
+          });
+        }}>
           {canvas && canvas.nodes.length === 0 ? (
-            <EmptyCanvas onAdd={addNode} onChange={changed} />
+            <EmptyCanvas onAdd={addNode} onChange={changed} onRoles={(items, plan) => { plannedIds.current = items.map((r) => r.id); setDrafts(items); setProposedCanvas(plan); }} />
           ) : (
             <ReactFlow
               nodes={flowNodes}
@@ -335,6 +370,51 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
           )}
         </div>
         <aside className="side">
+          <section>
+            <h4>专职角色</h4>
+            <p className="muted">把角色拖到空白处添加一步，拖到卡片上交给它来做。草稿同意后才会保存。</p>
+            {roles.map((role) => (
+              <div
+                key={role.id}
+                draggable
+                onDragStart={(e) => e.dataTransfer.setData("application/agent-together-role", role.id)}
+                className="finding"
+              >
+                {role.description}
+              </div>
+            ))}
+            <textarea className="task" value={sentence} onChange={(e) => setSentence(e.target.value)} placeholder="例如：做一个只写测试、不改业务代码的测试员" />
+            <button disabled={roleBusy || !sentence.trim()} onClick={() => attempt(async () => {
+              setRoleBusy(true);
+              try {
+                const draft = await window.agentTogether.draftRole(sentence);
+                plannedIds.current.push("");
+                setDrafts((items) => [...items, draft]);
+              } finally {
+                setRoleBusy(false);
+              }
+            })}>{roleBusy ? "正在写角色说明…" : "AI 帮我写角色"}</button>
+            {drafts.map((draft, index) => (
+              <RoleDraft
+                key={index}
+                draft={draft}
+                onEdit={(updated) => {
+                  setDrafts((items) => items.map((r, i) => i === index ? updated : r));
+                  if (updated.id !== draft.id) {
+                    setProposedCanvas((plan) => plan && ({
+                      ...plan,
+                      nodes: plan.nodes.map((n) => n.role === draft.id ? { ...n, role: updated.id } : n),
+                    }));
+                  }
+                }}
+                onSave={() => saveRole(draft, index)}
+                onDiscard={() => {
+                  plannedIds.current.splice(index, 1);
+                  setDrafts((items) => items.filter((_, i) => i !== index));
+                }}
+              />
+            ))}
+          </section>
           {selected ? (
             <>
               <NodeEditor node={selected} onChange={changed} />

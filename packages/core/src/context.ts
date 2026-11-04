@@ -1,4 +1,4 @@
-import type { Canvas, CanvasNode, Memory } from "@agent-together/schema";
+import type { Canvas, CanvasNode, Capability, Memory } from "@agent-together/schema";
 
 const list = (items: string[]) => (items.length ? items.map((i) => `- ${i}`).join("\n") : "- （无）");
 const files = (n: CanvasNode) => n.files.map((f) => `\`${f}\``).join("、") || "（未绑定）";
@@ -59,11 +59,16 @@ export function buildNodeContext(
   task: string,
   memories: Memory[] = [],
   project?: { name: string; description?: string; stack?: string },
+  roles: Capability[] = [],
 ): string {
+  const roleId = canvas.nodes.find((n) => n.id === nodeId)?.role;
+  const role = roles.find((r) => r.id === roleId && r.kind === "agent");
+  if (roleId && !role) throw new Error(`角色“${roleId}”还没有保存，请先保存或取消分配`);
+  const roleSection = role ? `## 角色：${role.description}\n\n${role.body}\n\n` : "";
   const guide = buildNodeGuide(canvas, nodeId, memories);
   const about = [project?.description?.trim(), project?.stack?.trim() && `技术栈：${project.stack.trim()}`].filter(Boolean);
   const projectSection = project && about.length ? `## 项目：${project.name}\n\n${about.join("\n\n")}\n\n` : "";
-  return `# 任务\n\n${task.trim() || "（未填写，请按节点的任务清单推进）"}\n\n${projectSection}${guide}`;
+  return `# 任务\n\n${task.trim() || "（未填写，请按节点的任务清单推进）"}\n\n${projectSection}${roleSection}${guide}`;
 }
 
 /**

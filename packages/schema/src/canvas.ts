@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CapabilityId } from "./capability.js";
 
 /** Node kinds on the canvas. See design doc: "核心概念：画布与节点". */
 export const NodeKind = z.enum(["feature", "module", "decision", "flow"]);
@@ -21,6 +22,8 @@ export const CanvasNode = z.object({
   files: z.array(z.string()).default([]),
   status: NodeStatus.default("todo"),
   executor: z.string().optional(),
+  /** Saved agent capability used for this step. */
+  role: CapabilityId.optional(),
   position: z.object({ x: z.number(), y: z.number() }).optional(),
 });
 export type CanvasNode = z.infer<typeof CanvasNode>;

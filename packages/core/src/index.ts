@@ -29,3 +29,5 @@ export { allowTestCommands, failingTestFiles, runProjectTests, testCommandFor, t
 export { loadRaceConfig, Race, scoreContestant, type ContestantResult, type RaceContestant, type RaceConfig, type RaceReport, type ScorePart } from "./race.js";
 export * from "./evolution.js";
 export * from "./audit.js";
+
+export { draftRole, roleFromDraft, rolesFromDraft } from "./roles.js";

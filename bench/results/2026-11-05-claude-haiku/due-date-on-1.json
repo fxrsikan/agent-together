@@ -1,0 +1,40 @@
+{
+  "task": "due-date",
+  "node": "todo-model",
+  "condition": "on",
+  "repeat": 1,
+  "agent": "claude-code",
+  "model": "haiku",
+  "ok": true,
+  "summary": "The model node now supports an optional due date, but I could not run the tests. Running `node --test` needs a permission approval that wasn't granted, so the changes are checked by reading only.\n\n**Changes (all in `src/model/`):**\n- **`todo.ts`**\n  - `Todo` gets an optional `due?: string`. When there is no due date, the key is absent rather than `undefined`, so existing equality checks and `todos.json` contents are unchanged.\n  - `addTodo(state, title, due?)` takes an optional third argument. Existing two-argument calls behave exactly as before.\n  - New `parseDue(input)` accepts only a real c",
+  "costUsd": 0.013882920000000002,
+  "durationMs": 80567,
+  "outputTokens": 6617,
+  "files": [
+    {
+      "path": "src/model/todo.test.ts",
+      "added": 42,
+      "removed": 0,
+      "owner": "todo-model"
+    },
+    {
+      "path": "src/model/todo.ts",
+      "added": 37,
+      "removed": 5,
+      "owner": "todo-model"
+    }
+  ],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 34
+  },
+  "tests": {
+    "passed": true,
+    "pass": 105,
+    "fail": 0
+  }
+}

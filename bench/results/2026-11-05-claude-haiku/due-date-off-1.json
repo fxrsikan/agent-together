@@ -1,0 +1,40 @@
+{
+  "task": "due-date",
+  "node": "todo-model",
+  "condition": "off",
+  "repeat": 1,
+  "agent": "claude-code",
+  "model": "haiku",
+  "ok": true,
+  "summary": "The due-date field is in the todo model, but I couldn't run the tests. Running `node --test` needed approval, and the permission prompt was not granted, so the test results are unverified.\n\n**Changes (only in `src/model/`):**\n- `todo.ts`:\n  - `Todo` gets an optional `due?: string`. The key is omitted when no date is set, so existing data and tests are unchanged.\n  - `addTodo(state, title, due?)` takes an optional third argument. Existing two-argument calls still work.\n  - New `parseDue(input)` accepts only `YYYY-MM-DD` as a real calendar date (rejects `2026-02-30`, `2027-02-29`, `2026-1-01`, a",
+  "costUsd": 0.01332526,
+  "durationMs": 83621,
+  "outputTokens": 6703,
+  "files": [
+    {
+      "path": "src/model/todo.test.ts",
+      "added": 49,
+      "removed": 0,
+      "owner": "todo-model"
+    },
+    {
+      "path": "src/model/todo.ts",
+      "added": 36,
+      "removed": 5,
+      "owner": "todo-model"
+    }
+  ],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 0
+  },
+  "tests": {
+    "passed": true,
+    "pass": 108,
+    "fail": 0
+  }
+}

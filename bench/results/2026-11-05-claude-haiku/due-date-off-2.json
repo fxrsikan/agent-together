@@ -1,0 +1,40 @@
+{
+  "task": "due-date",
+  "node": "todo-model",
+  "condition": "off",
+  "repeat": 2,
+  "agent": "claude-code",
+  "model": "haiku",
+  "ok": true,
+  "summary": "The due-date support is in the model, but I could not run the tests. Every `node --test` call was refused with \"requires approval\", including the plain command, so the new tests have not been run.\n\n**What changed (all in `src/model/todo.ts` and `src/model/todo.test.ts`):**\n- `Todo` has an optional `due?: string`. Todos without a due date have no `due` key, so existing data and tests are unaffected.\n- `addTodo(state, title, due?)` takes an optional due date. It throws `截止日期无效` for anything that isn't a real `YYYY-MM-DD` date (e.g. `2026-02-30`, `2026/12/01`). Numbering is unchanged.\n- `formatLi",
+  "costUsd": 0.016559809999999998,
+  "durationMs": 107792,
+  "outputTokens": 9121,
+  "files": [
+    {
+      "path": "src/model/todo.test.ts",
+      "added": 65,
+      "removed": 0,
+      "owner": "todo-model"
+    },
+    {
+      "path": "src/model/todo.ts",
+      "added": 37,
+      "removed": 5,
+      "owner": "todo-model"
+    }
+  ],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 0
+  },
+  "tests": {
+    "passed": true,
+    "pass": 99,
+    "fail": 0
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "task": "list-filter",
+  "node": "cmd-list",
+  "condition": "on",
+  "repeat": 2,
+  "agent": "claude-code",
+  "model": "haiku",
+  "ok": true,
+  "summary": "`--done` and `--todo` are not wired into the CLI yet, and I could not run the tests.\n\n**Done (in `src/commands/list.*`, the only files this node may change):**\n- `runList(dir, filter = 'all')` in `src/commands/list.ts` takes `'all' | 'done' | 'todo'`. Calling `runList(dir)` behaves as before, so existing callers are unaffected.\n- `'done'` lists only completed items and `'todo'` lists only unfinished ones. The summary line counts the items shown.\n- If the filter matches nothing, it returns `暂无已完成的待办` or `暂无未完成的待办`. If there are no todos at all, it still returns `暂无待办`.\n- `src/commands/list.test",
+  "costUsd": 0.01094494,
+  "durationMs": 69965,
+  "outputTokens": 4308,
+  "files": [
+    {
+      "path": "src/commands/list.test.ts",
+      "added": 50,
+      "removed": 0,
+      "owner": "cmd-list"
+    },
+    {
+      "path": "src/commands/list.ts",
+      "added": 27,
+      "removed": 5,
+      "owner": "cmd-list"
+    }
+  ],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 16
+  },
+  "tests": {
+    "passed": true,
+    "pass": 98,
+    "fail": 0
+  }
+}

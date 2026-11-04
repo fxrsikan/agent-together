@@ -1,0 +1,27 @@
+{
+  "id": "cmd-done",
+  "kind": "feature",
+  "title": "完成命令",
+  "intent": {
+    "goal": "实现 todo done <编号>：把指定编号的待办标记为完成。",
+    "acceptance": [
+      "runDone(['2'], dir) 把编号 2 的待办标记为完成，并返回「已完成 #2」之类的确认文本；随后 runList 显示 [x]。",
+      "编号不存在时抛出「未找到编号」错误，且 todos.json 不被修改。",
+      "缺少参数或编号无效（如 'abc'）时抛出对应错误信息。"
+    ],
+    "tasks": [
+      "实现 src/commands/done.ts 中的 runDone(args, dir)，依次调用 parseId、markDone、saveState。",
+      "处理缺少参数、编号无效、编号不存在三种错误分支。",
+      "编写 src/commands/done.test.ts，使用临时目录验证状态变化与错误分支。"
+    ]
+  },
+  "files": [
+    "src/commands/done.*"
+  ],
+  "status": "done",
+  "executor": "claude-code",
+  "position": {
+    "x": 320,
+    "y": 320
+  }
+}

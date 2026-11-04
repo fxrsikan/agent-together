@@ -1,0 +1,40 @@
+{
+  "task": "due-date",
+  "node": "todo-model",
+  "condition": "on",
+  "repeat": 2,
+  "agent": "claude-code",
+  "model": "haiku",
+  "ok": true,
+  "summary": "The model now supports an optional due date, but I could not run the tests. The permission system blocked every Node invocation in this session, including `node --test`, so the new tests are unverified.\n\n**What changed (only `src/model/todo.ts` and `src/model/todo.test.ts`, which are within this node's scope):**\n- `Todo` has an optional `due?: string`. The key is omitted when no date is given, so existing `todos.json` data and the existing tests keep working.\n- `addTodo(state, title, due?)` takes an optional date as a third argument. The change is backward-compatible.\n- New `parseDue(input)` a",
+  "costUsd": 0.01554125,
+  "durationMs": 88287,
+  "outputTokens": 7813,
+  "files": [
+    {
+      "path": "src/model/todo.test.ts",
+      "added": 54,
+      "removed": 0,
+      "owner": "todo-model"
+    },
+    {
+      "path": "src/model/todo.ts",
+      "added": 34,
+      "removed": 5,
+      "owner": "todo-model"
+    }
+  ],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 29
+  },
+  "tests": {
+    "passed": true,
+    "pass": 108,
+    "fail": 0
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "task": "done-many",
+  "node": "cmd-done",
+  "condition": "off",
+  "repeat": 2,
+  "agent": "claude-code",
+  "model": "haiku",
+  "ok": true,
+  "summary": "I extended `todo done` to accept several ids, but I could not run the tests. Running `node` was blocked by the permission prompt, so the new behaviour is verified only by reading the code against the test expectations.\n\nWhat changed, all within `src/commands/done.*` as the node allows:\n\n- **`src/commands/done.ts`**: `runDone` now takes a list of ids.\n  - Every id is parsed before any file access, so one bad id like `abc` aborts with nothing written.\n  - Missing ids are skipped and reported as `未找到编号 N，已跳过`. The other ids still complete.\n  - If every id is missing, it throws `未找到编号 …` and leave",
+  "costUsd": 0.01443041,
+  "durationMs": 78410,
+  "outputTokens": 7488,
+  "files": [
+    {
+      "path": "src/commands/done.test.ts",
+      "added": 83,
+      "removed": 0,
+      "owner": "cmd-done"
+    },
+    {
+      "path": "src/commands/done.ts",
+      "added": 42,
+      "removed": 15,
+      "owner": "cmd-done"
+    }
+  ],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 0
+  },
+  "tests": {
+    "passed": true,
+    "pass": 98,
+    "fail": 0
+  }
+}

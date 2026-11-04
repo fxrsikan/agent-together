@@ -1,0 +1,40 @@
+{
+  "task": "done-many",
+  "node": "cmd-done",
+  "condition": "off",
+  "repeat": 1,
+  "agent": "claude-code",
+  "model": "haiku",
+  "ok": true,
+  "summary": "`todo done` now accepts several IDs, but I have not run the tests. Every attempt to run `node --test` was blocked by a permission prompt, so the new code is checked only by reading it.\n\n**What changed** (both files are inside the node's allowed `src/commands/done.*` scope):\n\n- **`src/commands/done.ts`**: `runDone(args, dir)` now takes one or more IDs.\n  - Any invalid ID (e.g. `abc`, `0`) fails the whole command before anything is written.\n  - Duplicate IDs are handled once.\n  - Missing IDs don't stop the others. The rest are completed and the output adds `未找到编号 N`.\n  - If every ID is missing, ",
+  "costUsd": 0.01484511,
+  "durationMs": 89348,
+  "outputTokens": 6844,
+  "files": [
+    {
+      "path": "src/commands/done.test.ts",
+      "added": 65,
+      "removed": 0,
+      "owner": "cmd-done"
+    },
+    {
+      "path": "src/commands/done.ts",
+      "added": 42,
+      "removed": 14,
+      "owner": "cmd-done"
+    }
+  ],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 0
+  },
+  "tests": {
+    "passed": true,
+    "pass": 97,
+    "fail": 0
+  }
+}

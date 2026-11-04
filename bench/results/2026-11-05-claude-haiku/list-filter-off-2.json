@@ -1,0 +1,40 @@
+{
+  "task": "list-filter",
+  "node": "cmd-list",
+  "condition": "off",
+  "repeat": 2,
+  "agent": "claude-code",
+  "model": "haiku",
+  "ok": true,
+  "summary": "I implemented the filter in `src/commands/list.ts` and added tests, but I have not run them. Every attempt to run `node --test` was blocked by the permission prompt (\"requires approval\"), and I did not try to get around it.\n\n**What changed (both files are inside the node's allowed `src/commands/list.*` scope):**\n- `runList(dir, filter = 'all')` takes a new optional `ListFilter` value: `'all' | 'done' | 'todo'`. Calling `runList(dir)` with no second argument behaves as before, so `src/cli.ts` still compiles and works.\n- `'done'` shows only completed items and `'todo'` shows only incomplete ones",
+  "costUsd": 0.012622870000000001,
+  "durationMs": 74606,
+  "outputTokens": 5456,
+  "files": [
+    {
+      "path": "src/commands/list.test.ts",
+      "added": 47,
+      "removed": 0,
+      "owner": "cmd-list"
+    },
+    {
+      "path": "src/commands/list.ts",
+      "added": 36,
+      "removed": 6,
+      "owner": "cmd-list"
+    }
+  ],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 0
+  },
+  "tests": {
+    "passed": true,
+    "pass": 97,
+    "fail": 0
+  }
+}

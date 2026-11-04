@@ -1,0 +1,40 @@
+{
+  "task": "list-filter",
+  "node": "cmd-list",
+  "condition": "off",
+  "repeat": 1,
+  "agent": "claude-code",
+  "model": "haiku",
+  "ok": true,
+  "summary": "`runList` now takes an optional filter, but I couldn't run the tests, and `todo list --done` / `--todo` won't work from the command line until `src/cli.ts` is wired up.\n\n**Changes (both inside `src/commands/list.*`):**\n- `src/commands/list.ts`: `runList(dir, filter = 'all')` with `filter` as `'all' | 'done' | 'todo'`. The one-argument call behaves as before.\n  - With no matches after filtering, it returns `暂无已完成待办` or `暂无未完成待办`. The spec didn't cover this case, so I chose these messages.\n  - The summary line counts only the rows shown.\n- `src/commands/list.test.ts`: a new `runList 过滤` block wi",
+  "costUsd": 0.011271960000000001,
+  "durationMs": 63001,
+  "outputTokens": 5210,
+  "files": [
+    {
+      "path": "src/commands/list.test.ts",
+      "added": 56,
+      "removed": 0,
+      "owner": "cmd-list"
+    },
+    {
+      "path": "src/commands/list.ts",
+      "added": 25,
+      "removed": 6,
+      "owner": "cmd-list"
+    }
+  ],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 0
+  },
+  "tests": {
+    "passed": true,
+    "pass": 99,
+    "fail": 0
+  }
+}

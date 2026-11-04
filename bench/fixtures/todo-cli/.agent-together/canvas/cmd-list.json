@@ -1,0 +1,27 @@
+{
+  "id": "cmd-list",
+  "kind": "feature",
+  "title": "列表命令",
+  "intent": {
+    "goal": "实现 todo list：读取待办并以编号、完成状态和标题逐行展示。",
+    "acceptance": [
+      "已有待办时，runList(dir) 返回的每行包含编号、[x] 或 [ ] 标记以及标题。",
+      "todos.json 不存在或没有待办时返回「暂无待办」。",
+      "runList 只读取数据，执行前后 todos.json 内容不变。"
+    ],
+    "tasks": [
+      "实现 src/commands/list.ts 中的 runList(dir)，调用 todo-store 的 loadState 与 todo-model 的 formatList。",
+      "处理文件不存在的情况，返回空列表提示。",
+      "编写 src/commands/list.test.ts，覆盖有数据、无数据、文件不存在三种输出。"
+    ]
+  },
+  "files": [
+    "src/commands/list.*"
+  ],
+  "status": "done",
+  "executor": "claude-code",
+  "position": {
+    "x": 320,
+    "y": 160
+  }
+}

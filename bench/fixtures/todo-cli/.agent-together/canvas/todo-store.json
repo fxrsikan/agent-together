@@ -1,0 +1,27 @@
+{
+  "id": "todo-store",
+  "kind": "module",
+  "title": "数据存储",
+  "intent": {
+    "goal": "把待办状态读写到指定目录下的 todos.json：文件缺失时视为空状态，文件损坏时报错而不是覆盖。",
+    "acceptance": [
+      "loadState(dir) 在 dir/todos.json 不存在时返回 {lastId: 0, todos: []}，且不会创建文件。",
+      "saveState(dir, state) 之后 loadState(dir) 得到结构相等的状态；文件为 UTF-8 编码的 JSON。",
+      "文件内容不是合法 JSON，或结构不符（缺少 lastId/todos、字段类型错误）时抛出错误，错误信息包含文件路径。"
+    ],
+    "tasks": [
+      "实现 loadState 与 saveState，路径固定为 join(dir, 'todos.json')。",
+      "实现结构校验：lastId 为非负整数，todos 每项的 id、title、done 类型正确。",
+      "在 src/store/ 下用 fs.mkdtemp 创建临时目录编写测试，覆盖缺失文件、往返读写、损坏文件三种情况。"
+    ]
+  },
+  "files": [
+    "src/store/**"
+  ],
+  "status": "done",
+  "executor": "claude-code",
+  "position": {
+    "x": 640,
+    "y": 0
+  }
+}

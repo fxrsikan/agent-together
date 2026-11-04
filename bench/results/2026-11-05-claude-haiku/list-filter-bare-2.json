@@ -1,0 +1,66 @@
+{
+  "task": "list-filter",
+  "node": "cmd-list",
+  "condition": "bare",
+  "repeat": 2,
+  "agent": "claude-code",
+  "model": "haiku",
+  "ok": true,
+  "summary": "`todo list --done` now shows only completed items, and `todo list --todo` shows only unfinished ones. I could not run the tests: every `node` command in this session was blocked pending approval. The changes are checked by reading only, so please run `node --test \"src/**/*.test.ts\"` before relying on them.\n\nChanges:\n- **`src/commands/list.ts`**: `runList(dir, args)` parses the flags and filters before formatting. Also added `parseListArgs`.\n- **`src/cli.ts`**: passes the args through to `list` and adds the two flags to the usage text.\n- **Tests**: unit tests in `list.test.ts` and end-to-end te",
+  "costUsd": 0.01368452,
+  "durationMs": 93025,
+  "outputTokens": 7154,
+  "files": [
+    {
+      "path": "src/cli.test.ts",
+      "added": 35,
+      "removed": 0,
+      "owner": "cli-entry"
+    },
+    {
+      "path": "src/cli.ts",
+      "added": 2,
+      "removed": 1,
+      "owner": "cli-entry"
+    },
+    {
+      "path": "src/commands/list.test.ts",
+      "added": 52,
+      "removed": 0,
+      "owner": "cmd-list"
+    },
+    {
+      "path": "src/commands/list.ts",
+      "added": 46,
+      "removed": 8,
+      "owner": "cmd-list"
+    }
+  ],
+  "outside": [
+    "src/cli.test.ts",
+    "src/cli.ts"
+  ],
+  "findings": [
+    {
+      "rule": "scope-fence",
+      "level": "ask",
+      "message": "src/cli.test.ts is outside node \"列表命令\" (owns: src/commands/list.*). Explain how this serves the node's goal, or stay within its files."
+    },
+    {
+      "rule": "scope-fence",
+      "level": "ask",
+      "message": "src/cli.ts is outside node \"列表命令\" (owns: src/commands/list.*). Explain how this serves the node's goal, or stay within its files."
+    }
+  ],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 0
+  },
+  "tests": {
+    "passed": true,
+    "pass": 102,
+    "fail": 0
+  }
+}

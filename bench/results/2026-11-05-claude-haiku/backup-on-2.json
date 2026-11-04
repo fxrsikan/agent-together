@@ -1,0 +1,40 @@
+{
+  "task": "backup",
+  "node": "todo-store",
+  "condition": "on",
+  "repeat": 2,
+  "agent": "claude-code",
+  "model": "haiku",
+  "ok": true,
+  "summary": "The backup and restore behavior is implemented in `src/store/`, but I could not run the tests. Every `node --test` call was blocked with \"requires approval,\" and I did not retry further or bypass the sandbox. The changes are checked by reading only.\n\n**What changed (only `src/store/store.ts` and `src/store/store.test.ts`):**\n- **Backup on save:** before writing `todos.json`, the existing file is copied to `todos.json.bak`. The copy happens only if the current file is a valid state, so a corrupt file cannot overwrite a good backup.\n- **Restore on load:** if `todos.json` is corrupt or malformed ",
+  "costUsd": 0.014762760000000003,
+  "durationMs": 111815,
+  "outputTokens": 8766,
+  "files": [
+    {
+      "path": "src/store/store.test.ts",
+      "added": 38,
+      "removed": 0,
+      "owner": "todo-store"
+    },
+    {
+      "path": "src/store/store.ts",
+      "added": 60,
+      "removed": 17,
+      "owner": "todo-store"
+    }
+  ],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 26
+  },
+  "tests": {
+    "passed": true,
+    "pass": 96,
+    "fail": 0
+  }
+}

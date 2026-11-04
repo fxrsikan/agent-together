@@ -1,0 +1,6 @@
+node_modules/
+.claude/settings.local.json
+.agent-together/events/
+.agent-together/runtime.json
+.agent-together/context/
+.agent-together/tests.json

@@ -1,0 +1,40 @@
+{
+  "task": "done-many",
+  "node": "cmd-done",
+  "condition": "on",
+  "repeat": 1,
+  "agent": "claude-code",
+  "model": "haiku",
+  "ok": true,
+  "summary": "I implemented `todo done <编号> [编号...]` in `src/commands/done.ts` and added tests in `src/commands/done.test.ts`. I could not run the tests: every `node`/`npx` invocation was blocked by the permission prompt. The code and tests are checked by reading only, so please run `node --test src/commands/done.test.ts` (and `src/cli.test.ts`) to confirm.\n\n**Behaviour**\n- Several ids are completed in one run, and `todos.json` is written once, only when something changed.\n- A missing id doesn't stop the others. The result lists it, e.g. `已完成 #1 #3\\n未找到编号 99`.\n- If every id is missing, it throws `未找到编号 ...`",
+  "costUsd": 0.016133230000000002,
+  "durationMs": 95697,
+  "outputTokens": 7812,
+  "files": [
+    {
+      "path": "src/commands/done.test.ts",
+      "added": 81,
+      "removed": 0,
+      "owner": "cmd-done"
+    },
+    {
+      "path": "src/commands/done.ts",
+      "added": 54,
+      "removed": 14,
+      "owner": "cmd-done"
+    }
+  ],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 25
+  },
+  "tests": {
+    "passed": true,
+    "pass": 98,
+    "fail": 0
+  }
+}

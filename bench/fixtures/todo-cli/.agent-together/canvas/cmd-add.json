@@ -1,0 +1,27 @@
+{
+  "id": "cmd-add",
+  "kind": "feature",
+  "title": "添加命令",
+  "intent": {
+    "goal": "实现 todo add <标题>：把标题存为新待办并返回带编号的确认信息。",
+    "acceptance": [
+      "runAdd(['买', '牛奶'], dir) 把标题拼接为「买 牛奶」写入 todos.json，并返回包含新编号的确认文本。",
+      "没有标题或标题全为空白时抛出「请提供待办标题」，且不修改 todos.json。",
+      "连续调用 runAdd 时编号严格递增（1、2、3……）。"
+    ],
+    "tasks": [
+      "实现 src/commands/add.ts 中的 runAdd(args, dir)，内部调用 todo-store 读写、todo-model 的 addTodo。",
+      "校验并规范化标题（去除首尾空白）。",
+      "编写 src/commands/add.test.ts，使用临时目录验证写入内容、错误分支与编号递增。"
+    ]
+  },
+  "files": [
+    "src/commands/add.*"
+  ],
+  "status": "done",
+  "executor": "claude-code",
+  "position": {
+    "x": 320,
+    "y": 0
+  }
+}

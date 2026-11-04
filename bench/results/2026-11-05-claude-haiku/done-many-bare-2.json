@@ -1,0 +1,54 @@
+{
+  "task": "done-many",
+  "node": "cmd-done",
+  "condition": "bare",
+  "repeat": 2,
+  "agent": "claude-code",
+  "model": "haiku",
+  "ok": true,
+  "summary": "`todo done` now accepts several IDs, e.g. `todo done 1 3 5`. I haven't run the tests, though: every attempt to run `node --test` was blocked by the approval prompt.\n\nThe change is in `src/commands/done.ts`, with the usage line updated in `src/cli.ts`:\n\n- **Partial success:** the IDs that exist are completed and saved in one write. Missing IDs are reported as `未找到编号 99`, or `未找到编号 98、99` when several are missing.\n- **Output:** `done 1 3 5` prints `已完成 #1 #3 #5`. Already-done IDs get the existing `#N 已经是完成状态` line.\n- **All missing:** if no ID can be completed and none is already done, it throws ",
+  "costUsd": 0.014711579999999998,
+  "durationMs": 92620,
+  "outputTokens": 7686,
+  "files": [
+    {
+      "path": "src/cli.ts",
+      "added": 1,
+      "removed": 1,
+      "owner": "cli-entry"
+    },
+    {
+      "path": "src/commands/done.test.ts",
+      "added": 72,
+      "removed": 0,
+      "owner": "cmd-done"
+    },
+    {
+      "path": "src/commands/done.ts",
+      "added": 45,
+      "removed": 14,
+      "owner": "cmd-done"
+    }
+  ],
+  "outside": [
+    "src/cli.ts"
+  ],
+  "findings": [
+    {
+      "rule": "scope-fence",
+      "level": "ask",
+      "message": "src/cli.ts is outside node \"完成命令\" (owns: src/commands/done.*). Explain how this serves the node's goal, or stay within its files."
+    }
+  ],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 0
+  },
+  "tests": {
+    "passed": true,
+    "pass": 98,
+    "fail": 0
+  }
+}

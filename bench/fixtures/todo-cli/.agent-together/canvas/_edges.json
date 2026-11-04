@@ -1,0 +1,67 @@
+[
+  {
+    "from": "todo-store",
+    "to": "todo-model",
+    "label": "用类型"
+  },
+  {
+    "from": "cmd-add",
+    "to": "todo-store",
+    "label": "读写"
+  },
+  {
+    "from": "cmd-add",
+    "to": "todo-model",
+    "label": "调用"
+  },
+  {
+    "from": "cmd-list",
+    "to": "todo-store",
+    "label": "读取"
+  },
+  {
+    "from": "cmd-list",
+    "to": "todo-model",
+    "label": "调用"
+  },
+  {
+    "from": "cmd-done",
+    "to": "todo-store",
+    "label": "读写"
+  },
+  {
+    "from": "cmd-done",
+    "to": "todo-model",
+    "label": "调用"
+  },
+  {
+    "from": "cmd-rm",
+    "to": "todo-store",
+    "label": "读写"
+  },
+  {
+    "from": "cmd-rm",
+    "to": "todo-model",
+    "label": "调用"
+  },
+  {
+    "from": "cli-entry",
+    "to": "cmd-add",
+    "label": "调用"
+  },
+  {
+    "from": "cli-entry",
+    "to": "cmd-list",
+    "label": "调用"
+  },
+  {
+    "from": "cli-entry",
+    "to": "cmd-done",
+    "label": "调用"
+  },
+  {
+    "from": "cli-entry",
+    "to": "cmd-rm",
+    "label": "调用"
+  }
+]

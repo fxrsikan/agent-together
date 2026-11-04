@@ -1,0 +1,40 @@
+{
+  "task": "list-filter",
+  "node": "cmd-list",
+  "condition": "on",
+  "repeat": 1,
+  "agent": "claude-code",
+  "model": "haiku",
+  "ok": true,
+  "summary": "I added `--done` and `--todo` filtering to `runList`, but I haven't run the tests. Running `node --test` was blocked by the permission system (\"This command requires approval\"), so the new tests are unverified.\n\n**Changes (both inside `src/commands/`):**\n- `src/commands/list.ts`: `runList(dir, args = [])` now takes an optional argument list.\n  - `--done` lists only completed items, and `--todo` lists only unfinished ones. The summary line counts only the items shown.\n  - With no arguments the output is unchanged, so `runList(dir)` still satisfies the existing acceptance criteria.\n  - An empty ",
+  "costUsd": 0.01253877,
+  "durationMs": 71753,
+  "outputTokens": 6113,
+  "files": [
+    {
+      "path": "src/commands/list.test.ts",
+      "added": 59,
+      "removed": 0,
+      "owner": "cmd-list"
+    },
+    {
+      "path": "src/commands/list.ts",
+      "added": 47,
+      "removed": 6,
+      "owner": "cmd-list"
+    }
+  ],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 16
+  },
+  "tests": {
+    "passed": true,
+    "pass": 100,
+    "fail": 0
+  }
+}

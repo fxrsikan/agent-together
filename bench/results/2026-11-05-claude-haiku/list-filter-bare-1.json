@@ -1,0 +1,66 @@
+{
+  "task": "list-filter",
+  "node": "cmd-list",
+  "condition": "bare",
+  "repeat": 1,
+  "agent": "claude-code",
+  "model": "haiku",
+  "ok": true,
+  "summary": "`todo list --done` and `todo list --todo` are implemented, with tests added. I could not run the test suite: every shell command I tried to run `node --test` was rejected as requiring approval. The changes are checked by reading the code only, so please run `node --test src/` before relying on them.\n\n**Behaviour**\n- `todo list --done` lists only completed items and ends with `共 N 项已完成。`\n- `todo list --todo` lists only incomplete items and ends with `共 N 项未完成。`\n- With no flag, output is unchanged.\n- If nothing matches, the output is `暂无已完成的待办` or `暂无未完成的待办`.\n- Passing both flags, or an unknown ",
+  "costUsd": 0.01410698,
+  "durationMs": 83501,
+  "outputTokens": 7511,
+  "files": [
+    {
+      "path": "src/cli.test.ts",
+      "added": 34,
+      "removed": 0,
+      "owner": "cli-entry"
+    },
+    {
+      "path": "src/cli.ts",
+      "added": 4,
+      "removed": 2,
+      "owner": "cli-entry"
+    },
+    {
+      "path": "src/commands/list.test.ts",
+      "added": 63,
+      "removed": 1,
+      "owner": "cmd-list"
+    },
+    {
+      "path": "src/commands/list.ts",
+      "added": 59,
+      "removed": 5,
+      "owner": "cmd-list"
+    }
+  ],
+  "outside": [
+    "src/cli.test.ts",
+    "src/cli.ts"
+  ],
+  "findings": [
+    {
+      "rule": "scope-fence",
+      "level": "ask",
+      "message": "src/cli.test.ts is outside node \"列表命令\" (owns: src/commands/list.*). Explain how this serves the node's goal, or stay within its files."
+    },
+    {
+      "rule": "scope-fence",
+      "level": "ask",
+      "message": "src/cli.ts is outside node \"列表命令\" (owns: src/commands/list.*). Explain how this serves the node's goal, or stay within its files."
+    }
+  ],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 0
+  },
+  "tests": {
+    "passed": true,
+    "pass": 105,
+    "fail": 0
+  }
+}

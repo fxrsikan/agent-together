@@ -8,7 +8,8 @@
   "bin": {
     "agent-together-hook": "dist/agent-together-hook.js",
     "agent-together-compile": "dist/agent-together-compile.js",
-    "agent-together-race": "dist/agent-together-race.js"
+    "agent-together-race": "dist/agent-together-race.js",
+    "agent-together-bench": "dist/agent-together-bench.js"
   },
   "scripts": {
     "build": "tsc -b"

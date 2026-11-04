@@ -1,0 +1,27 @@
+{
+  "id": "cli-entry",
+  "kind": "feature",
+  "title": "命令行入口",
+  "intent": {
+    "goal": "提供 todo 命令入口：解析 argv，分发到各子命令，统一输出结果、错误与退出码。",
+    "acceptance": [
+      "执行 node src/cli.ts add 买牛奶 输出确认信息且退出码为 0；随后 node src/cli.ts list 能看到该待办。",
+      "没有子命令或未知子命令时打印用法说明，并以非 0 退出码结束。",
+      "子命令抛出的错误信息输出到 stderr，退出码为 1，且不打印堆栈。"
+    ],
+    "tasks": [
+      "在 src/cli.ts 中实现 main(argv, dir)：按第一个参数分发到 add、list、done、rm，并捕获错误。",
+      "仅当文件被直接运行时执行 main（用 import.meta.url 与 process.argv[1] 判断），以便测试可以导入。",
+      "编写 src/cli.test.ts，用 child_process 以 process.execPath 启动 src/cli.ts，在临时目录中验证输出与退出码。"
+    ]
+  },
+  "files": [
+    "src/cli.*"
+  ],
+  "status": "done",
+  "executor": "claude-code",
+  "position": {
+    "x": 0,
+    "y": 0
+  }
+}

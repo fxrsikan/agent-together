@@ -1,0 +1,7 @@
+{
+  "name": "todo-cli",
+  "createdAt": "2026-11-04T09:58:03.908Z",
+  "description": "一个命令行待办清单：todo add <标题>、todo list、todo done <编号>、todo rm <编号>。编号是从 1 开始递增的整数（新待办的编号 = 现有最大编号 + 1，删除后不复用），list 显示编号、是否完成和标题。数据存在当前目录的 todos.json 里。用 Node.js + TypeScript 写（Node 22 直接运行 .ts 文件，入口 src/cli.ts），node --test 跑测试，不用任何第三方依赖。",
+  "stack": "Node.js 22 + TypeScript，直接运行 .ts 文件，不使用任何第三方依赖（只用 node:fs、node:path、node:url、node:child_process 等内置模块）；测试使用 node:test 与 node:assert。",
+  "testCommand": "node --test \"src/**/*.test.ts\""
+}

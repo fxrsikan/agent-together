@@ -1,0 +1,28 @@
+{
+  "id": "todo-model",
+  "kind": "module",
+  "title": "待办模型",
+  "intent": {
+    "goal": "提供待办数据的纯函数逻辑：编号分配、增删改、列表格式化与编号解析，不做任何 IO。",
+    "acceptance": [
+      "addTodo 在空状态下分配编号 1；之后新编号 = max(lastId, 现有最大编号) + 1，即使删除了编号最大的待办，新编号也不会复用。",
+      "markDone 与 removeTodo 对不存在的编号抛出包含「未找到编号 X」的错误，且返回新状态而不修改传入对象。",
+      "formatList 每行包含编号、完成标记（[x] 或 [ ]）和标题；待办为空时返回「暂无待办」。",
+      "parseId 接受 '1'、'12'，拒绝 '0'、'-1'、'1.5'、'abc' 等并抛出「编号无效」错误。"
+    ],
+    "tasks": [
+      "定义类型 Todo {id, title, done} 与 TodoState {lastId, todos}，并实现 emptyState()。",
+      "实现 addTodo、markDone、removeTodo、formatList、parseId 五个纯函数。",
+      "在 src/model/ 下编写 node:test 单元测试，覆盖编号分配、不复用、错误分支与格式化输出。"
+    ]
+  },
+  "files": [
+    "src/model/**"
+  ],
+  "status": "done",
+  "executor": "claude-code",
+  "position": {
+    "x": 960,
+    "y": 0
+  }
+}

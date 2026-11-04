@@ -123,3 +123,19 @@ describe("project context", () => {
     expect(md).toContain("技术栈：Node.js");
   });
 });
+
+describe("recentLog", () => {
+  it("reads events and judgments back newest first, across days, skipping broken lines", () => {
+    const root = createProject(path.join(tmp(), "log"));
+    const store = new ProjectStore(root);
+    const event = (at: string) => ({ kind: "turn.end" as const, platform: "claude-code" as const, sessionId: "s", at });
+    store.appendEvent({ event: event("2026-11-03T10:00:00.000Z"), verdict: { level: "off", findings: [] } });
+    store.appendEvent({ event: event("2026-11-04T09:00:00.000Z"), verdict: { level: "off", findings: [] } });
+    store.appendJudgment({ at: "2026-11-04T09:00:01.000Z" });
+    fs.appendFileSync(path.join(root, ".agent-together/events/2026-11-04.jsonl"), '{"event": broken');
+    const log = store.recentLog();
+    expect(log.events.map((r) => r.event.at.slice(0, 10))).toEqual(["2026-11-04", "2026-11-03"]);
+    expect(log.judgments).toHaveLength(1);
+    expect(store.recentLog(1).events).toHaveLength(1);
+  });
+});

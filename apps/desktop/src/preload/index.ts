@@ -28,6 +28,7 @@ const api = {
   projectInfo: () => invoke<ProjectInfo>("projectInfo"),
   saveProjectInfo: (patch: { description?: string; stack?: string; testCommand?: string }) => invoke<ProjectInfo>("saveProjectInfo", patch),
   onProject: (cb: (info: SessionInfo) => void) => on("project", cb),
+  recentLog: () => invoke<{ events: EventRecord[]; judgments: Judgment[] }>("recentLog"),
 
   // Canvas
   canvas: () => invoke<Canvas>("canvas"),

@@ -120,6 +120,7 @@ async function main() {
     win.setTitle("Agent Together");
   });
   ipcMain.handle("agent-together:info", () => session?.info() ?? null);
+  ipcMain.handle("agent-together:recentLog", () => need().daemon.store.recentLog(100));
   ipcMain.handle("agent-together:projectInfo", () => readProjectInfo(need().root));
   ipcMain.handle("agent-together:saveProjectInfo", (_e, patch: { description?: string; stack?: string; testCommand?: string }) =>
     writeProjectInfo(need().root, patch),

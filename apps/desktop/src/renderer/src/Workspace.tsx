@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  applyEdgeChanges,
   applyNodeChanges,
   Background,
   Controls,
@@ -7,6 +8,7 @@ import {
   ReactFlow,
   type Connection,
   type Edge,
+  type EdgeChange,
   type NodeChange,
   type ReactFlowInstance,
 } from "@xyflow/react";
@@ -106,6 +108,11 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
   const context = inspecting ? contextText : undefined;
 
   useEffect(() => {
+    // History from the log first; live events arrive on top of it.
+    window.agentTogether.recentLog().then(({ events, judgments: past }) => {
+      setFeed((live) => [...live, ...events].slice(0, FEED_LIMIT));
+      setJudgments((live) => [...live, ...past].slice(0, FEED_LIMIT));
+    });
     const offs = [
       window.agentTogether.onEvent((r) => {
         setFeed((f) => [r, ...f].slice(0, FEED_LIMIT));
@@ -167,8 +174,10 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
     );
   }, [canvas, activeId, signals, selectedId, testRuns]);
 
-  const edges: Edge[] = useMemo(
-    () =>
+  // Edges too: React Flow keeps selection here, so a clicked edge can be deleted with the Delete key.
+  const [edges, setEdges] = useState<Edge[]>([]);
+  useEffect(() => {
+    setEdges(
       (canvas?.edges ?? []).map((e) => ({
         id: `${e.from}->${e.to}`,
         source: e.from,
@@ -176,8 +185,8 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
         label: e.label,
         markerEnd: { type: MarkerType.ArrowClosed },
       })),
-    [canvas],
-  );
+    );
+  }, [canvas]);
 
   const selected = canvas?.nodes.find((n) => n.id === selectedId) ?? null;
 
@@ -304,11 +313,13 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
               nodeTypes={nodeTypes}
               onInit={(instance) => (flow.current = instance)}
               onNodesChange={(changes: NodeChange<NodeCardType>[]) => setFlowNodes((ns) => applyNodeChanges(changes, ns))}
+              onEdgesChange={(changes: EdgeChange<Edge>[]) => setEdges((es) => applyEdgeChanges(changes, es))}
               onNodeDragStop={(_e, _node, dragged) =>
                 attempt(() => window.agentTogether.moveNodes(dragged.map((n) => ({ id: n.id, x: n.position.x, y: n.position.y }))))
               }
               onConnect={connect}
-              // The Delete key removes edges only; nodes go through the editor's button (with a confirmation).
+              // Delete or Backspace removes edges only; nodes go through the editor's button (with a confirmation).
+              deleteKeyCode={["Delete", "Backspace"]}
               onBeforeDelete={async ({ edges: gone }) => ({ nodes: [], edges: gone })}
               onEdgesDelete={deleteEdges}
               onNodeClick={(_e, n) => setSelectedId(n.id)}
@@ -361,9 +372,13 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
               {runView && runView.nodeId === selected.id && (
                 <AgentRun
                   view={runView}
+                  titles={Object.fromEntries((canvas?.nodes ?? []).map((n) => [n.id, n.title]))}
                   onStop={() => window.agentTogether.stopAgent()}
                   onDone={() => markDone(selected.id)}
-                  onRetry={(retryTask) => dispatch(selected.id, retryTask)}
+                  onRetry={(nodeId, retryTask) => {
+                    setSelectedId(nodeId);
+                    dispatch(nodeId, retryTask);
+                  }}
                 />
               )}
               {info.hasGit && <RacePanel nodeId={selected.id} task={task} context={context} version={version} onChange={changed} />}

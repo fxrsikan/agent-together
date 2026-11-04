@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { runProjectTests, streamJsonResult, streamJsonText, testCommandFor, testCounts, testHistory, writeProjectInfo } from "@agent-together/core";
+import { failingTestFiles, runProjectTests, streamJsonResult, streamJsonText, testCommandFor, testCounts, testHistory, writeProjectInfo } from "@agent-together/core";
 
 const project = () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "agent-together-tests-"));
@@ -67,5 +67,14 @@ describe("stream-json (Claude Code, cursor-agent)", () => {
   it("finds the final result", () => {
     expect(streamJsonResult(lines.join("\n"))).toMatchObject({ result: "你好", total_cost_usd: 0.002 });
     expect(streamJsonResult("not json")).toBeNull();
+  });
+});
+
+describe("failingTestFiles", () => {
+  it("names failing files from node:test and Vitest/Jest output, project-relative", () => {
+    const root = "D:\\AI\\proj";
+    const nodeTest = "✖ add (1ms)\ntest at src\\cli.test.ts:69:3\n  at TestContext.<anonymous> (file:///D:/AI/proj/src/cli.test.ts:75:12)\ntest at D:\\AI\\proj\\src\\store\\s.test.ts:3:1\n";
+    expect(failingTestFiles(nodeTest, root)).toEqual(["src/cli.test.ts", "src/store/s.test.ts"]);
+    expect(failingTestFiles(" FAIL  src/a.test.ts > adds\nFAIL src/b.test.js\n", root)).toEqual(["src/a.test.ts", "src/b.test.js"]);
   });
 });

@@ -17,6 +17,21 @@ export function cursorAgentCommand(env: NodeJS.ProcessEnv = process.env): string
 }
 
 /**
+ * On Windows, when SHELL or MSYSTEM is set (anything started from Git Bash),
+ * cursor-agent 2026.10 runs hooks under bash yet still prefixes them with
+ * PowerShell: every hook fails to start and Cursor blocks every tool. Without
+ * them it uses PowerShell. Each one alone is enough to break it.
+ */
+function cursorEnv(): NodeJS.ProcessEnv {
+  const env = cleanEnv(process.env);
+  if (process.platform === "win32") {
+    delete env.SHELL;
+    delete env.MSYSTEM;
+  }
+  return env;
+}
+
+/**
  * Cursor headless: `cursor-agent -p --output-format stream-json`, prompt on stdin,
  * the agent's text streaming to `onText`. File edits apply in print mode; shell
  * commands still need approval, so the agent cannot run them (Agent Together runs
@@ -30,7 +45,7 @@ export function cursorRunner(model?: string): AgentRunner {
       const args = ["-p", "--trust", "--output-format", "stream-json", ...(model ? ["--model", model] : [])];
       const r = await execCli(cursorAgentCommand(), args, {
         cwd,
-        env: cleanEnv(process.env),
+        env: cursorEnv(),
         input: prompt,
         timeoutMs,
         signal: options.signal,

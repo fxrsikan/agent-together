@@ -28,14 +28,18 @@ export function TestBadge({ run }: { run: TestRun | null | undefined }) {
  */
 export function AgentRun({
   view,
+  titles,
   onStop,
   onDone,
   onRetry,
 }: {
   view: RunView;
+  /** Node id → title, to name the node a failing test belongs to. */
+  titles: Record<string, string>;
   onStop: () => void;
   onDone: () => void;
-  onRetry: (task: string) => void;
+  /** Hand a failure to a node: this one, or the one that owns the failing test. */
+  onRetry: (nodeId: string, task: string) => void;
 }) {
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -44,6 +48,9 @@ export function AgentRun({
 
   const { run, tests, checkpoint } = view.outcome ?? {};
   const failureTask = tests && !tests.passed ? `项目测试没有通过（${tests.command}），请修复。测试输出的最后部分：\n\n${tests.output.slice(-1500)}` : "";
+  // A change here can break a test another node owns; that node is the one to fix it.
+  const owners = (tests?.failingNodes ?? []).filter((id) => id !== view.nodeId && titles[id]);
+  const ownTestsFail = !tests?.failingNodes?.length || tests.failingNodes.includes(view.nodeId);
 
   return (
     <section className="agent-run">
@@ -77,6 +84,9 @@ export function AgentRun({
           ) : (
             <p className="muted small">项目没有测试命令，没跑测试。在"项目设置"里填一个。</p>
           )}
+          {tests && !tests.passed && owners.length > 0 && (
+            <p className="muted small">失败的测试在 {owners.map((id) => `"${titles[id]}"`).join("、")} 负责的文件里，本节点改不了它们。</p>
+          )}
           {tests && !tests.passed && <pre className="test-output">{tests.output.slice(-1200)}</pre>}
           <div className="actions">
             {tests?.passed && (
@@ -84,11 +94,23 @@ export function AgentRun({
                 标记为完成
               </button>
             )}
-            {failureTask && (
-              <button className="primary" onClick={() => onRetry(failureTask)}>
+            {failureTask && ownTestsFail && (
+              <button className="primary" onClick={() => onRetry(view.nodeId, failureTask)}>
                 把失败交回给 agent
               </button>
             )}
+            {failureTask &&
+              owners.map((id) => (
+                <button
+                  key={id}
+                  className="primary"
+                  onClick={() =>
+                    onRetry(id, `${failureTask}\n\n（这些失败可能来自"${titles[view.nodeId] ?? view.nodeId}"节点刚做的改动，请按它的新行为更新你负责的测试或代码。）`)
+                  }
+                >
+                  交给"{titles[id]}"修复
+                </button>
+              ))}
           </div>
         </>
       )}

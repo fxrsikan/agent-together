@@ -1,7 +1,9 @@
 import { exec } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { ownerOf } from "./owners.js";
 import { readProjectInfo } from "./project.js";
+import { ProjectStore } from "./store.js";
 
 /** One run of the project's tests, kept per node in .agent-together/tests.json (git-ignored). */
 export interface TestRun {
@@ -14,6 +16,10 @@ export interface TestRun {
   output: string;
   /** The node whose work the run checked, if any. */
   nodeId: string | null;
+  /** Project-relative test files that failed, as far as the output names them. */
+  failingFiles?: string[];
+  /** The nodes that own those files: the right place to hand a failure back to. */
+  failingNodes?: string[];
   at: string;
   durationMs: number;
 }
@@ -56,6 +62,23 @@ export function testCounts(output: string): { pass?: number; fail?: number } {
   return { pass: Number(/(\d+) passed/.exec(summary)?.[1] ?? 0), fail: Number(/(\d+) failed/.exec(summary)?.[1] ?? 0) };
 }
 
+/**
+ * Failing test files named in a runner's output: node:test's "test at <file>:line:col",
+ * Vitest's and Jest's "FAIL <file>". Returned project-relative with forward slashes.
+ */
+export function failingTestFiles(output: string, root: string): string[] {
+  const found = new Set<string>();
+  const add = (raw: string) => {
+    let file = raw.trim().replace(/^file:\/\/\/?/, "").replace(/\\/g, "/");
+    const base = root.replace(/\\/g, "/").replace(/\/$/, "");
+    if (file.toLowerCase().startsWith(base.toLowerCase() + "/")) file = file.slice(base.length + 1);
+    if (!/^[a-zA-Z]:\//.test(file) && !file.startsWith("/") && !file.startsWith("node:")) found.add(file);
+  };
+  for (const m of output.matchAll(/^\s*test at (.+?):\d+:\d+\s*$/gm)) add(m[1]);
+  for (const m of output.matchAll(/^\s*FAIL\s+(\S+\.\w+)/gm)) add(m[1]);
+  return [...found];
+}
+
 export function testHistory(root: string): TestHistory {
   try {
     return JSON.parse(fs.readFileSync(historyFile(root), "utf8"));
@@ -72,12 +95,19 @@ export function runProjectTests(root: string, nodeId: string | null, timeoutMs =
   return new Promise((resolve) =>
     exec(command, { cwd: root, timeout: timeoutMs, maxBuffer: 16 * 1024 * 1024 }, (err, stdout, stderr) => {
       const output = `${stdout}${stderr}`.trim();
+      const failingFiles = err ? failingTestFiles(output, root) : [];
+      let failingNodes: string[] = [];
+      try {
+        const canvas = new ProjectStore(root).loadCanvas();
+        failingNodes = [...new Set(failingFiles.map((f) => ownerOf(canvas, f)?.id).filter((id): id is string => !!id))];
+      } catch {} // a canvas being edited mid-run: leave the owners out
       const run: TestRun = {
         command,
         passed: !err,
         ...testCounts(output),
         output: output.slice(-3000),
         nodeId,
+        ...(failingFiles.length ? { failingFiles, failingNodes } : {}),
         at: new Date().toISOString(),
         durationMs: Date.now() - started,
       };

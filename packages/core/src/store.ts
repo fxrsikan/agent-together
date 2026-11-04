@@ -111,6 +111,30 @@ export class ProjectStore {
     fs.appendFileSync(path.join(eventsDir, `${day}.jsonl`), JSON.stringify(record) + "\n");
   }
 
+  /**
+   * The newest records of the daily logs, newest first: `{event, verdict}` lines and
+   * `{judgment}` lines, up to `limit` of each. Used to show history when a project opens.
+   */
+  recentLog(limit = 100): { events: { event: AgentEvent; verdict: unknown }[]; judgments: { at: string }[] } {
+    const eventsDir = path.join(this.dir, "events");
+    const events: { event: AgentEvent; verdict: unknown }[] = [];
+    const judgments: { at: string }[] = [];
+    if (!fs.existsSync(eventsDir)) return { events, judgments };
+    const days = fs.readdirSync(eventsDir).filter((f) => f.endsWith(".jsonl")).sort().reverse();
+    for (const day of days) {
+      const lines = fs.readFileSync(path.join(eventsDir, day), "utf8").trimEnd().split("\n").reverse();
+      for (const line of lines) {
+        try {
+          const record = JSON.parse(line);
+          if (record.event && events.length < limit) events.push(record);
+          else if (record.judgment && judgments.length < limit) judgments.push(record.judgment);
+        } catch {} // a line cut short by a crash
+      }
+      if (events.length >= limit && judgments.length >= limit) break;
+    }
+    return { events, judgments };
+  }
+
   /** Appends an L2 judgment to the same daily log as events. */
   appendJudgment(judgment: { at: string }): void {
     const eventsDir = path.join(this.dir, "events");

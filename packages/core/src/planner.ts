@@ -1,4 +1,5 @@
-import { Canvas, NodeKind, type CanvasEdge, type CanvasNode } from "@agent-together/schema";
+import { Canvas, NodeKind, type CanvasEdge, type CanvasNode, type Capability } from "@agent-together/schema";
+import { rolesFromDraft } from "./roles.js";
 import { layoutCanvas } from "./init.js";
 import { parseJsonObject } from "./judge.js";
 import type { Llm } from "./llm.js";
@@ -6,6 +7,8 @@ import { newNodeId } from "./project.js";
 
 export interface CanvasPlan {
   canvas: Canvas;
+  /** Unsaved specialist proposals for user review. */
+  roles: Capability[];
   /** The stack the plan builds on, in a few words ("Node.js + TypeScript, node:test"). */
   stack: string;
   /** The command that runs every test from the project root, e.g. "node --test". */
@@ -13,6 +16,7 @@ export interface CanvasPlan {
 }
 
 interface DraftNode {
+  role?: string;
   id?: string;
   kind?: string;
   title?: string;
@@ -36,6 +40,7 @@ ${description.trim()}
 要求：
 - 3 到 8 个节点，按"能独立实现、独立测试"来切分；最先能跑起来的核心放在被依赖的一侧。
 - 每个节点：id（小写英文短横线，如 todo-store）、kind（module 代码模块 / feature 用户可见的功能）、title（中文短名）、goal（一句话）、acceptance（2 到 4 条可以用测试验证的验收标准）、tasks（2 到 4 条任务）、files（这个节点拥有的文件 glob，如 "src/store/**"，节点之间不要重叠，测试文件放在各自节点的目录里）。
+- roles：按项目实际需要提出 0 到 4 个专职角色，小项目可以为空。每个角色包含 id（小写英文短横线）、description（中文说明用于什么情况）、body（完整工作说明），可选 tools 和 model。节点可用 role 填角色 id，不要硬凑角色。
 - edges：from 依赖 to，label 用两三个字说明关系（如"调用""读取"）。不要有环。
 - 描述里没指定技术栈时，选最简单够用的（例如 Node.js + TypeScript，测试用 node:test），不要引入数据库或框架，除非描述需要。
 - stack：用一句话写出技术栈和测试方式。
@@ -78,9 +83,15 @@ export function canvasFromDraft(draft: { nodes?: DraftNode[]; edges?: Partial<Ca
 
 /** 规划官: one paragraph about the product → a canvas of nodes and dependencies, for a person to review. */
 export async function planCanvas(llm: Llm, description: string): Promise<CanvasPlan> {
-  const draft = parseJsonObject<{ stack?: string; testCommand?: string; nodes?: DraftNode[]; edges?: Partial<CanvasEdge>[] }>(
+  const draft = parseJsonObject<{ stack?: string; testCommand?: string; nodes?: DraftNode[]; edges?: Partial<CanvasEdge>[]; roles?: unknown }>(
     await llm.complete(planPrompt(description), { timeoutMs: 180_000, maxTokens: 8000 }),
   );
   if (!draft) throw new Error("模型的回复不是 JSON，请重试");
-  return { canvas: canvasFromDraft(draft), stack: draft.stack?.trim() ?? "", testCommand: draft.testCommand?.trim() ?? "" };
+  const roles = rolesFromDraft(draft.roles);
+  const canvas = canvasFromDraft(draft);
+  const nodes = draft.nodes?.filter((d) => d.title?.trim() || d.id?.trim()) ?? [];
+  for (const [i, node] of canvas.nodes.entries()) {
+    if (roles.some((r) => r.id === nodes[i]?.role)) node.role = nodes[i].role;
+  }
+  return { canvas, roles, stack: draft.stack?.trim() ?? "", testCommand: draft.testCommand?.trim() ?? "" };
 }

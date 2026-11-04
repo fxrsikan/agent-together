@@ -19,6 +19,7 @@ export function NodeCard({ data }: NodeProps<NodeCardType>) {
         <span className="tag">{KIND[node.kind]}</span>
         <span className={`signal signal-${signal}`} title={`观察者信号：${signal}`} />
       </div>
+      {node.role && <div className="tag">角色：{node.role}</div>}
       <div className="card-title">{node.title}</div>
       <div className="card-meta row">
         <span>

@@ -1,7 +1,7 @@
 import type { EvolutionReport, Experience } from "@agent-together/core";
 import { contextBridge, ipcRenderer } from "electron";
 import type { AuditResult, CanvasPlan, Checkpoint, CompileReport, Judgment, ProjectInfo, RaceReport, TestHistory, TestRun } from "@agent-together/core";
-import type { AgentEvent, Canvas, CanvasEdge, CanvasNode, Memory, RunResult, Verdict } from "@agent-together/schema";
+import type { AgentEvent, Capability, Canvas, CanvasEdge, CanvasNode, Memory, RunResult, Verdict } from "@agent-together/schema";
 
 export type EventRecord = { event: AgentEvent; verdict: Verdict };
 export type { Judgment, RaceReport, RunResult, TestHistory, TestRun };
@@ -31,6 +31,10 @@ const api = {
   saveProjectInfo: (patch: { description?: string; stack?: string; testCommand?: string }) => invoke<ProjectInfo>("saveProjectInfo", patch),
   onProject: (cb: (info: SessionInfo) => void) => on("project", cb),
   recentLog: () => invoke<{ events: EventRecord[]; judgments: Judgment[] }>("recentLog"),
+
+  roles: () => invoke<Capability[]>("roles"),
+  draftRole: (sentence: string) => invoke<Capability>("draftRole", sentence),
+  saveRole: (role: Capability) => invoke<Capability>("saveRole", role),
 
   // Canvas
   canvas: () => invoke<Canvas>("canvas"),

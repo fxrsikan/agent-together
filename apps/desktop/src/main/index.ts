@@ -6,6 +6,7 @@ import { agentSkillsCompiler, codexRunner } from "@agent-together/adapter-codex"
 import { cursorAgentCommand, cursorRulesCompiler, cursorRunner } from "@agent-together/adapter-cursor";
 import { grokAgentCommand, grokRunner } from "@agent-together/adapter-grok";
 import {
+  draftRole,
   Evolution,
   ExperienceStore,
   buildNodeContext,
@@ -26,6 +27,7 @@ import {
   testHistory,
   writeProjectInfo,
 } from "@agent-together/core";
+import { Capability } from "@agent-together/schema";
 import type { AgentRunner, CanvasEdge, CanvasNode, Memory } from "@agent-together/schema";
 import { Session } from "./session";
 
@@ -133,10 +135,26 @@ async function main() {
     const s = need();
     if (!s.llm) throw new Error("没有可用的模型：登录 claude 命令行，或设置 ANTHROPIC_API_KEY，或在 .agent-together/llm.json 里配置");
     const plan = await planCanvas(s.llm, description);
-    s.daemon.store.writeCanvas(plan.canvas);
+    s.daemon.store.writeCanvas({ ...plan.canvas, nodes: plan.canvas.nodes.map(({ role, ...node }) => node) });
     writeProjectInfo(s.root, { description: description.trim(), stack: plan.stack, ...(plan.testCommand ? { testCommand: plan.testCommand } : {}) });
     s.canvasChanged();
     return plan;
+  });
+  ipcMain.handle("agent-together:roles", () => need().daemon.capabilities.list().filter((c) => c.kind === "agent"));
+  ipcMain.handle("agent-together:draftRole", (_e, sentence: string) => draftRole(need().llm, sentence));
+  ipcMain.handle("agent-together:saveRole", (_e, input: unknown) => {
+    const s = need();
+    const parsed = Capability.safeParse(input);
+    if (!parsed.success) throw new Error("角色没有填完整：请检查编号、使用说明和工作说明");
+    const role = parsed.data;
+    if (role.kind !== "agent") throw new Error("只能保存角色");
+    if (s.daemon.capabilities.list().some((c) => c.id === role.id)) {
+      throw new Error("这个名字已经用过，请换一个角色编号");
+    }
+    s.daemon.capabilities.save(role);
+    compileCapabilities(s.root, s.daemon.capabilities.list(), compilers);
+    s.canvasChanged();
+    return role;
   });
   ipcMain.handle("agent-together:canvas", () => need().daemon.canvas);
   ipcMain.handle("agent-together:addNode", (_e, title: string, kind: CanvasNode["kind"], position?: { x: number; y: number }) => {
@@ -191,7 +209,7 @@ async function main() {
   // Context inspector: what the agent would get, with sizes; memories can be left out per dispatch.
   const nodeMemories = (s: Session, nodeId: string, without: string[] = []) => s.daemon.memory.forNode(nodeId).filter((m) => !without.includes(m.id));
   const contextFor = (s: Session, nodeId: string, task: string, without: string[] = []) =>
-    buildNodeContext(s.daemon.canvas, nodeId, task, nodeMemories(s, nodeId, without), readProjectInfo(s.root));
+    buildNodeContext(s.daemon.canvas, nodeId, task, nodeMemories(s, nodeId, without), readProjectInfo(s.root), s.daemon.capabilities.list());
   ipcMain.handle("agent-together:previewContext", (_e, nodeId: string, task: string, without: string[]) => {
     const s = need();
     return { markdown: contextFor(s, nodeId, task, without), memories: s.daemon.memory.forNode(nodeId) };

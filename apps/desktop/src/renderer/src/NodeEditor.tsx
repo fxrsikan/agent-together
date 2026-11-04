@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { CanvasNode } from "@agent-together/schema";
+import type { Capability, CanvasNode } from "@agent-together/schema";
 
 const lines = (text: string) =>
   text
@@ -7,9 +7,10 @@ const lines = (text: string) =>
     .map((l) => l.trim())
     .filter(Boolean);
 
-type Form = { title: string; kind: CanvasNode["kind"]; status: CanvasNode["status"]; goal: string; acceptance: string; tasks: string; files: string };
+type Form = { role: string; title: string; kind: CanvasNode["kind"]; status: CanvasNode["status"]; goal: string; acceptance: string; tasks: string; files: string };
 
 const toForm = (n: CanvasNode): Form => ({
+  role: n.role ?? "",
   title: n.title,
   kind: n.kind,
   status: n.status,
@@ -24,6 +25,10 @@ const toForm = (n: CanvasNode): Form => ({
  * (one per line) and the file globs it owns. Saves on demand; the id never changes.
  */
 export function NodeEditor({ node, onChange }: { node: CanvasNode; onChange: (notice: string) => void }) {
+  const [roles, setRoles] = useState<Capability[]>([]);
+  useEffect(() => {
+    window.agentTogether.roles().then(setRoles);
+  }, [node]);
   const [form, setForm] = useState<Form>(() => toForm(node));
   const [error, setError] = useState("");
 
@@ -42,6 +47,7 @@ export function NodeEditor({ node, onChange }: { node: CanvasNode; onChange: (no
       await window.agentTogether.saveNode({
         ...node,
         title: form.title.trim() || node.title,
+        role: form.role || undefined,
         kind: form.kind,
         status: form.status,
         intent: { goal: form.goal.trim(), acceptance: lines(form.acceptance), tasks: lines(form.tasks) },
@@ -75,6 +81,15 @@ export function NodeEditor({ node, onChange }: { node: CanvasNode; onChange: (no
         </select>
         <span className="muted small grow">id：{node.id}</span>
       </div>
+      <label>
+        角色
+        <select value={form.role} onChange={set("role")}>
+          <option value="">不指定角色</option>
+          {roles.map((r) => (
+            <option key={r.id} value={r.id}>{r.description}</option>
+          ))}
+        </select>
+      </label>
       <label>
         目标
         <textarea className="task" rows={2} value={form.goal} onChange={set("goal")} placeholder="这个节点要做成什么" />

@@ -53,19 +53,19 @@ export function NodeEditor({ node, onChange }: { node: CanvasNode; onChange: (no
         intent: { goal: form.goal.trim(), acceptance: lines(form.acceptance), tasks: lines(form.tasks) },
         files: lines(form.files).map((f) => f.replace(/\\/g, "/")),
       });
-      onChange(`已保存节点"${form.title}"`);
+      onChange(`已保存卡片"${form.title}"`);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
   };
 
   const remove = async () => {
-    if (await window.agentTogether.deleteNode(node.id)) onChange(`已删除节点"${node.title}"`);
+    if (await window.agentTogether.deleteNode(node.id)) onChange(`已删除卡片"${node.title}"`);
   };
 
   return (
     <section className="editor">
-      <input className="title-input" value={form.title} onChange={set("title")} aria-label="节点名" />
+      <input className="title-input" value={form.title} onChange={set("title")} aria-label="卡片名" />
       <div className="row">
         <select value={form.kind} onChange={set("kind")} aria-label="类型">
           <option value="feature">功能</option>
@@ -92,7 +92,7 @@ export function NodeEditor({ node, onChange }: { node: CanvasNode; onChange: (no
       </label>
       <label>
         目标
-        <textarea className="task" rows={2} value={form.goal} onChange={set("goal")} placeholder="这个节点要做成什么" />
+        <textarea className="task" rows={2} value={form.goal} onChange={set("goal")} placeholder="这张卡片要做成什么" />
       </label>
       <label>
         验收标准（每行一条）
@@ -109,11 +109,11 @@ export function NodeEditor({ node, onChange }: { node: CanvasNode; onChange: (no
       {error && <div className="finding finding-block">{error}</div>}
       <div className="actions">
         <button className="primary" disabled={!dirty} onClick={save}>
-          {dirty ? "保存节点" : "已保存"}
+          {dirty ? "保存卡片" : "已保存"}
         </button>
         {dirty && <button onClick={() => setForm(toForm(node))}>撤销修改</button>}
         <span className="spacer" />
-        <button onClick={remove}>删除节点</button>
+        <button onClick={remove}>删除卡片</button>
       </div>
     </section>
   );

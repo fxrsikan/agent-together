@@ -63,7 +63,7 @@ export function RacePanel({
 
   const discard = async (report: RaceReport) => {
     await window.agentTogether.discardRace(report.id);
-    onChange("已放弃这场赛马，worktree 已清理");
+    onChange("已放弃这场赛马，独立工作区已清理");
   };
 
   const mine = reports.filter((r) => r.nodeId === nodeId);
@@ -80,14 +80,14 @@ export function RacePanel({
       </div>
       {running === nodeId && (
         <ol className="feed">
-          <li className="muted">每个 agent 在各自的 worktree 里跑同一个任务，可能要几分钟。</li>
+          <li className="muted">每个 AI 助手在各自的独立工作区里跑同一个任务，可能要几分钟。</li>
           {progress.map((m, i) => (
             <li key={i}>{m}</li>
           ))}
         </ol>
       )}
-      {running && running !== nodeId && <p className="muted">节点 {running} 正在赛马。</p>}
-      {!latest && running !== nodeId && <p className="muted">用上面的任务描述，同一起点让每个参赛 agent 各做一遍，按测试和观察者打分。</p>}
+      {running && running !== nodeId && <p className="muted">卡片 {running} 正在赛马。</p>}
+      {!latest && running !== nodeId && <p className="muted">用上面的任务描述，同一起点让每个参赛的 AI 助手各做一遍，按测试和观察者打分。</p>}
       {latest && (
         <>
           <p className="muted">

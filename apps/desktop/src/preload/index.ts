@@ -1,4 +1,4 @@
-import type { EvolutionReport, Experience } from "@agent-together/core";
+import type { EvolutionReport, Experience, SetupReport } from "@agent-together/core";
 import { contextBridge, ipcRenderer } from "electron";
 import type { AuditResult, CanvasPlan, Checkpoint, CompileReport, Judgment, ProjectInfo, RaceReport, TestHistory, TestRun } from "@agent-together/core";
 import type { AgentEvent, Capability, Canvas, CanvasEdge, CanvasNode, Memory, RunResult, Verdict } from "@agent-together/schema";
@@ -20,6 +20,13 @@ function on<T>(channel: string, cb: (payload: T) => void) {
 }
 
 const api = {
+  // First-launch setup wizard (completion is stored in the app's userData)
+  setupCheck: () => invoke<SetupReport>("setupCheck"),
+  setupCompleted: () => invoke<boolean>("setupCompleted"),
+  setupMarkDone: () => invoke<void>("setupMarkDone"),
+  setupOpenTerminal: (id: string) => invoke<void>("setupOpenTerminal", id),
+  setupCopy: (text: string) => invoke<void>("setupCopy", text),
+
   // Projects
   recentProjects: () => invoke<{ root: string; name: string; exists: boolean }[]>("recentProjects"),
   chooseFolder: (title: string) => invoke<string | null>("chooseFolder", title),

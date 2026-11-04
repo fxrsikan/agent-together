@@ -75,7 +75,7 @@ export class Session {
   /** Saves the pre-dispatch checkpoint and starts remembering what the observer sees for this node. */
   startDispatch(nodeId: string, agent: string) {
     if (!this.hasGit) return;
-    const checkpoint = this.checkpoints.create(`派发前（${agent}）`, nodeId);
+    const checkpoint = this.checkpoints.create(`交给 AI 之前（${agent}）`, nodeId);
     this.watches.set(nodeId, { base: checkpoint.commit, events: [] });
   }
 

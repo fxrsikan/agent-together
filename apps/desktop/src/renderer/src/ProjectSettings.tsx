@@ -19,14 +19,14 @@ export function ProjectSettings({ version, onChange }: { version: number; onChan
   const save = async () => {
     await window.agentTogether.saveProjectInfo({ description: form.description.trim(), stack: form.stack.trim(), testCommand: form.testCommand.trim() });
     setSaved(form);
-    onChange("已保存项目设置，下次派发生效");
+    onChange("已保存项目设置，下次交给 AI 时生效");
   };
 
   return (
     <section className="editor">
       <h4>项目设置</h4>
       <label>
-        产品描述（每次派发都会带给 agent）
+        产品描述（每次交给 AI 都会带上）
         <textarea className="task" rows={3} value={form.description} onChange={set("description")} />
       </label>
       <label>
@@ -34,7 +34,7 @@ export function ProjectSettings({ version, onChange }: { version: number; onChan
         <input value={form.stack} onChange={set("stack")} />
       </label>
       <label>
-        测试命令（在项目根目录运行；应用里派发的 agent 做完后自动跑）
+        测试命令（在项目根目录运行；应用里的 AI 助手做完后自动跑）
         <input className="mono" value={form.testCommand} onChange={set("testCommand")} placeholder="例如 node --test 或 npm test" />
       </label>
       <div className="actions">

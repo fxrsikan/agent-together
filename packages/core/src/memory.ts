@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { Memory, type Canvas, type Finding } from "@agent-together/schema";
 import { formatFrontmatter, parseFrontmatter } from "./frontmatter.js";
+import { ruleLabel } from "./setup.js";
 
 const FIELDS = ["id", "nodeId", "kind", "status", "source", "createdAt", "evidence"] as const;
 const BLOCK_START = "<!-- agent-together:memory:start -->";
@@ -97,14 +98,6 @@ export class MemoryStore {
   }
 }
 
-const RULE_LABEL: Record<string, string> = {
-  "scope-fence": "越界写入",
-  "design-guard": "违反依赖关系",
-  "test-tampering": "篡改测试",
-  "repeated-failure": "命令反复失败",
-  "repeated-read": "反复读取同一文件",
-};
-
 /**
  * 记忆官 (rule-based for v0.1): turns what the observer caught during one agent
  * session into memory drafts for a human to approve. LLM summarisation is L2.
@@ -122,7 +115,7 @@ export function draftsFromFindings(canvas: Canvas, findings: Finding[], sessionI
       nodeId: node?.id ?? null,
       kind: "pitfall",
       status: "draft",
-      content: `${RULE_LABEL[f.rule] ?? f.rule}：${f.message}`,
+      content: `${ruleLabel(f.rule)}：${f.message}`,
       source: `observer:${f.rule} session ${sessionId.slice(0, 8)}`,
     });
   }

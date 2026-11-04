@@ -42,7 +42,7 @@ export function MemoryPanel({
 
   return (
     <section>
-      <h4>{nodeId ? "节点记忆" : "全项目记忆"}</h4>
+      <h4>{nodeId ? "卡片记忆" : "全项目记忆"}</h4>
       {drafts.length > 0 && <p className="muted">待审批草稿 {drafts.length} 条（来自观察者）</p>}
       <ol className="feed">
         {drafts.map((m) => (

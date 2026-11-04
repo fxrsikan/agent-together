@@ -80,9 +80,9 @@ describe("scoreContestant", () => {
       tests: { command: "t", passed: true, output: "" },
     });
     expect(score.parts.map((p) => `${p.label}:${p.points}`)).toEqual([
-      "agent 没有正常结束:-30",
+      "AI 助手没有正常结束:-30",
       "测试通过:40",
-      "违反 design-guard:-15",
+      "拦下：违反依赖关系:-15",
       "改动 60 行:-3",
     ]);
     expect(score.total).toBe(92);

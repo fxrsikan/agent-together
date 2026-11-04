@@ -13,6 +13,7 @@ import { ownerOf } from "./owners.js";
 import { Observer } from "./observer.js";
 import { builtinRules } from "./rules/index.js";
 import { ProjectStore } from "./store.js";
+import { ruleLabel } from "./setup.js";
 import { dispatchPrompt } from "./terminal.js";
 
 /** .agent-together/race.json */
@@ -97,12 +98,13 @@ function runShell(command: string, cwd: string, timeoutMs: number): Promise<{ pa
  */
 export function scoreContestant(c: Pick<ContestantResult, "run" | "files" | "findings" | "tests">): { total: number; parts: ScorePart[] } {
   const parts: ScorePart[] = [];
-  if (!c.run.ok) parts.push({ label: "agent 没有正常结束", points: -30 });
+  if (!c.run.ok) parts.push({ label: "AI 助手没有正常结束", points: -30 });
   if (!c.files.length) parts.push({ label: "没有任何改动", points: -30 });
   if (c.tests) parts.push(c.tests.passed ? { label: "测试通过", points: 40 } : { label: "测试失败", points: -40 });
   for (const f of c.findings) {
-    if (f.level === "ask" || f.level === "block") parts.push({ label: `违反 ${f.rule}`, points: -15 });
-    else if (f.level === "warn") parts.push({ label: `提醒 ${f.rule}`, points: -5 });
+    // ruleLabel is already plain Chinese (e.g. "越界写入"); prefix without repeating "违反".
+    if (f.level === "ask" || f.level === "block") parts.push({ label: `拦下：${ruleLabel(f.rule)}`, points: -15 });
+    else if (f.level === "warn") parts.push({ label: `提醒：${ruleLabel(f.rule)}`, points: -5 });
   }
   const lines = c.files.reduce((n, f) => n + f.added + f.removed, 0);
   const sizePenalty = Math.min(15, Math.floor(lines / 20));

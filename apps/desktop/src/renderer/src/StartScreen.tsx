@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
  * No project open: reopen a recent one, open any folder (set up on first open),
  * or create a new one. Opening switches the window to the workspace.
  */
-export function StartScreen() {
+export function StartScreen({ onOpenSetup }: { onOpenSetup: () => void }) {
   const [recent, setRecent] = useState<{ root: string; name: string; exists: boolean }[]>([]);
   const [name, setName] = useState("");
   const [parent, setParent] = useState("");
@@ -44,7 +44,13 @@ export function StartScreen() {
   return (
     <div className="start">
       <h1>Agent Together</h1>
-      <p className="muted">在画布上规划项目，把节点派给 Claude Code、Codex、Cursor 或 Grok Build，观察者在旁边看着它们不跑偏。</p>
+      <p className="muted">在画布上规划项目，把卡片交给 Claude Code、Codex、Cursor 或 Grok Build，观察者在旁边看着它们不跑偏。</p>
+      <p className="muted small">
+        <button className="link" onClick={onOpenSetup}>
+          安装向导
+        </button>
+        ：检查 Node.js、git 和 AI 助手是否装好、登录好。
+      </p>
       {error && <div className="finding finding-block">{error}</div>}
       <div className="start-columns">
         <section className="start-card">
@@ -73,7 +79,7 @@ export function StartScreen() {
           <button className="primary" disabled={busy || !name.trim() || !parent} onClick={create}>
             {busy ? "创建中…" : "创建"}
           </button>
-          <p className="muted small">会创建文件夹并初始化 git，装好 Claude Code、Codex、Cursor 的 hooks（Grok Build 会读 Claude Code 的）。</p>
+          <p className="muted small">会创建文件夹并初始化 git，装好各家 AI 助手的观察者对接（Grok Build 会读 Claude Code 的）。</p>
         </section>
         <section className="start-card">
           <h3>打开</h3>

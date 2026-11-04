@@ -26,7 +26,7 @@ export function CheckpointsPanel({ version, onChange }: { version: number; onCha
         <h4>检查点</h4>
         <button onClick={save}>存检查点</button>
       </div>
-      {list.length === 0 && <p className="muted">还没有检查点。派发任务前会自动保存一个。</p>}
+      {list.length === 0 && <p className="muted">还没有检查点。交给 AI 去做之前会自动保存一个。</p>}
       <ol className="feed">
         {list.slice(0, SHOWN).map((cp) => (
           <li key={cp.id} className="row">

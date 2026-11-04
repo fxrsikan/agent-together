@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { app, BrowserWindow, dialog, ipcMain } from "electron";
+import { app, BrowserWindow, clipboard, dialog, ipcMain } from "electron";
 import { claudeCodeCompiler, claudeCodeRunner } from "@agent-together/adapter-claude-code";
 import { agentSkillsCompiler, codexRunner } from "@agent-together/adapter-codex";
 import { cursorAgentCommand, cursorRulesCompiler, cursorRunner } from "@agent-together/adapter-cursor";
@@ -10,6 +10,7 @@ import {
   ExperienceStore,
   buildNodeContext,
   capabilityFromNode,
+  checkSetup,
   compileCapabilities,
   contextSections,
   createProject,
@@ -51,8 +52,9 @@ function agentCommandLine(agent: Agent, prompt: string): string {
   }
 }
 
-// Recent projects live in the app's own folder, newest first.
+// Recent projects and setup completion live in the app's own folder (not in projects).
 const recentFile = () => path.join(app.getPath("userData"), "recent-projects.json");
+const setupDoneFile = () => path.join(app.getPath("userData"), "setup-done.json");
 function recentProjects(): string[] {
   try {
     return JSON.parse(fs.readFileSync(recentFile(), "utf8"));
@@ -64,6 +66,17 @@ function remember(root: string) {
   const list = [root, ...recentProjects().filter((r) => r !== root)].slice(0, 12);
   fs.mkdirSync(path.dirname(recentFile()), { recursive: true });
   fs.writeFileSync(recentFile(), JSON.stringify(list, null, 2));
+}
+function setupCompleted(): boolean {
+  try {
+    return Boolean(JSON.parse(fs.readFileSync(setupDoneFile(), "utf8")).completed);
+  } catch {
+    return false;
+  }
+}
+function markSetupCompleted() {
+  fs.mkdirSync(path.dirname(setupDoneFile()), { recursive: true });
+  fs.writeFileSync(setupDoneFile(), JSON.stringify({ completed: true, at: new Date().toISOString() }, null, 2));
 }
 
 async function main() {
@@ -89,6 +102,23 @@ async function main() {
     win.webContents.send("agent-together:project", session.info());
     return session.info();
   };
+
+  // First-launch setup wizard: probes live in packages/core (testable); completion in userData.
+  ipcMain.handle("agent-together:setupCheck", () => checkSetup());
+  ipcMain.handle("agent-together:setupCompleted", () => setupCompleted());
+  ipcMain.handle("agent-together:setupMarkDone", () => {
+    markSetupCompleted();
+  });
+  // The page names an assistant; the command comes from the probe here, never from the page.
+  ipcMain.handle("agent-together:setupOpenTerminal", async (_e, id: string) => {
+    const report = await checkSetup();
+    const command = report.requirements.find((r) => r.id === id)?.loginCommand;
+    if (!command) throw new Error("这个助手现在不需要登录，或者还没装好");
+    openTerminal(app.getPath("home"), command, "Agent Together - 安装向导");
+  });
+  ipcMain.handle("agent-together:setupCopy", (_e, text: string) => {
+    clipboard.writeText(text);
+  });
 
   // Projects: start screen, create, open, switch.
   ipcMain.handle("agent-together:recentProjects", () =>
@@ -131,7 +161,7 @@ async function main() {
   // Canvas: AI plan, then edit by hand. Every change is validated and written to .agent-together/canvas/.
   ipcMain.handle("agent-together:planCanvas", async (_e, description: string) => {
     const s = need();
-    if (!s.llm) throw new Error("没有可用的模型：登录 claude 命令行，或设置 ANTHROPIC_API_KEY，或在 .agent-together/llm.json 里配置");
+    if (!s.llm) throw new Error("没有可用的模型：请先登录 claude 命令行，或设置 ANTHROPIC_API_KEY，或在项目的 .agent-together/llm.json 里配置");
     const plan = await planCanvas(s.llm, description);
     s.daemon.store.writeCanvas(plan.canvas);
     writeProjectInfo(s.root, { description: description.trim(), stack: plan.stack, ...(plan.testCommand ? { testCommand: plan.testCommand } : {}) });
@@ -169,8 +199,8 @@ async function main() {
       buttons: ["删除", "取消"],
       defaultId: 1,
       cancelId: 1,
-      message: `删除节点"${node?.title ?? id}"？`,
-      detail: "只删除画布上的节点和它的连线，不删除代码文件。",
+      message: `删除卡片"${node?.title ?? id}"？`,
+      detail: "只删除画布上的卡片和它的连线，不删除代码文件。",
     });
     if (response !== 0) return false;
     s.daemon.store.deleteNode(id);
@@ -234,7 +264,7 @@ async function main() {
   // its actions go through the hooks to the observer as usual; then the tests run.
   ipcMain.handle("agent-together:runAgent", async (_e, nodeId: string, task: string, agent: Agent, context?: string) => {
     const s = need();
-    if (s.running) throw new Error(`已有 agent 在运行（${s.running.nodeId}）`);
+    if (s.running) throw new Error(`已有 AI 助手在运行（${s.running.nodeId}）`);
     s.startDispatch(nodeId, agent);
     const file = s.daemon.store.writeContext(nodeId, context ?? contextFor(s, nodeId, task));
     s.daemon.setActiveNode(nodeId);
@@ -378,7 +408,7 @@ async function main() {
       defaultId: 0,
       cancelId: 1,
       message: `把 ${contestantId} 的改动应用到项目？`,
-      detail: "应用前会自动存一个检查点，之后可以回滚。其他参赛者的 worktree 会被清理。",
+      detail: "应用前会自动存一个检查点，之后可以回滚。其他参赛者的独立工作区会被清理。",
     });
     if (response !== 0) return false;
     s.race!.adopt(id, contestantId);

@@ -14,6 +14,23 @@ export { canvasFromDraft, planCanvas, planPrompt, type CanvasPlan } from "./plan
 export { Checkpoints, type Checkpoint } from "./checkpoints.js";
 export { cleanEnv, dispatchPrompt, openTerminal } from "./terminal.js";
 export {
+  checkSetup,
+  defaultProbeRunner,
+  nodeVersionOk,
+  parseVersion,
+  resolveCursorCommand,
+  resolveGrokCommand,
+  ruleLabel,
+  RULE_LABEL,
+  type LoginState,
+  type ProbeResult,
+  type ProbeRunner,
+  type RequirementId,
+  type SetupOptions,
+  type SetupReport,
+  type SetupRequirement,
+} from "./setup.js";
+export {
   CapabilityStore,
   capabilityFromNode,
   capabilityRules,

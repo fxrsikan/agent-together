@@ -46,7 +46,7 @@ export function AuditNotice({ audit }: { audit: AgentRunOutcome["audit"] | undef
           </li>
         ))}
       </ul>
-      {strong && <p className="small">先看一下这些改动再标记完成；不想要可以在"检查点"里回到派发前。</p>}
+      {strong && <p className="small">先看一下这些改动再标记完成；不想要可以在"检查点"里回到交给 AI 之前。</p>}
     </div>
   );
 }
@@ -92,7 +92,7 @@ export function AgentRun({
         {view.state === "running" && <button onClick={onStop}>停止</button>}
       </div>
       <div className="agent-lines" ref={box}>
-        {view.lines.length === 0 && view.state === "running" && <p className="muted">agent 已启动，它的每个动作会出现在下面的"观察者事件"里。</p>}
+        {view.lines.length === 0 && view.state === "running" && <p className="muted">AI 助手已启动，它的每个动作会出现在下面的"观察者事件"里。</p>}
         {view.lines.map((line, i) => (
           <p key={i}>{line}</p>
         ))}
@@ -116,7 +116,7 @@ export function AgentRun({
             <p className="muted small">项目没有测试命令，没跑测试。在"项目设置"里填一个。</p>
           )}
           {tests && !tests.passed && owners.length > 0 && (
-            <p className="muted small">失败的测试在 {owners.map((id) => `"${titles[id]}"`).join("、")} 负责的文件里，本节点改不了它们。</p>
+            <p className="muted small">失败的测试在 {owners.map((id) => `"${titles[id]}"`).join("、")} 负责的文件里，本卡片改不了它们。</p>
           )}
           {tests && !tests.passed && <pre className="test-output">{tests.output.slice(-1200)}</pre>}
           <div className="actions">
@@ -127,7 +127,7 @@ export function AgentRun({
             )}
             {failureTask && ownTestsFail && (
               <button className="primary" onClick={() => onRetry(view.nodeId, failureTask)}>
-                把失败交回给 agent
+                把失败交回给 AI 助手
               </button>
             )}
             {failureTask &&
@@ -136,7 +136,7 @@ export function AgentRun({
                   key={id}
                   className="primary"
                   onClick={() =>
-                    onRetry(id, `${failureTask}\n\n（这些失败可能来自"${titles[view.nodeId] ?? view.nodeId}"节点刚做的改动，请按它的新行为更新你负责的测试或代码。）`)
+                    onRetry(id, `${failureTask}\n\n（这些失败可能来自"${titles[view.nodeId] ?? view.nodeId}"卡片刚做的改动，请按它的新行为更新你负责的测试或代码。）`)
                   }
                 >
                   交给"{titles[id]}"修复

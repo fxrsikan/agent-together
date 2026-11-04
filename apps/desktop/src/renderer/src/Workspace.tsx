@@ -55,7 +55,7 @@ function EmptyCanvas({ onAdd, onChange }: { onAdd: () => void; onChange: (notice
     try {
       const { canvas, stack } = await window.agentTogether.planCanvas(description);
       const { suggestions } = await window.agentTogether.evolutions();
-      onChange(`AI 规划了 ${canvas.nodes.length} 个节点（${stack}）。逐个检查目标、验收标准和文件范围，改好再派发。${suggestions.length ? ` 有 ${suggestions.length} 条在别的项目用过的经验，选中卡片后可在“进化”里查看，同意后才会加入记忆。` : ""}`);
+      onChange(`AI 规划了 ${canvas.nodes.length} 张卡片（${stack}）。逐个检查目标、验收标准和文件范围，改好再交给 AI。${suggestions.length ? ` 有 ${suggestions.length} 条在别的项目用过的经验，选中卡片后可在“进化”里查看，同意后才会加入记忆。` : ""}`);
     } catch (err) {
       setError(message(err));
     } finally {
@@ -66,7 +66,7 @@ function EmptyCanvas({ onAdd, onChange }: { onAdd: () => void; onChange: (notice
   return (
     <div className="empty-canvas">
       <h3>画布是空的</h3>
-      <p className="muted">描述这个产品，让 AI 拆成节点、目标、验收标准和依赖；生成后可以随意修改。</p>
+      <p className="muted">描述这个产品，让 AI 拆成卡片、目标、验收标准和依赖；生成后可以随意修改。</p>
       <textarea
         className="task"
         rows={6}
@@ -80,7 +80,7 @@ function EmptyCanvas({ onAdd, onChange }: { onAdd: () => void; onChange: (notice
           {busy ? "生成中…（约半分钟）" : "AI 生成画布"}
         </button>
         <button onClick={onAdd} disabled={busy}>
-          手动添加节点
+          手动添加卡片
         </button>
       </div>
     </div>
@@ -123,11 +123,11 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
       }),
       window.agentTogether.onActive(setActiveId),
       window.agentTogether.onMemoryDrafts((drafts) => {
-        setNotice(`有 ${drafts.length} 条记忆草稿待审批，点开对应节点查看`);
+        setNotice(`有 ${drafts.length} 条记忆草稿待审批，点开对应卡片查看`);
         setVersion((v) => v + 1);
       }),
       window.agentTogether.onJudgment((j) => setJudgments((js) => [j, ...js].slice(0, FEED_LIMIT))),
-      window.agentTogether.onL2Error((e) => setNotice(`L2 判断没能运行：${e}`)),
+      window.agentTogether.onL2Error((e) => setNotice(`事后智能判断没能运行：${e}`)),
       window.agentTogether.onCanvasChanged(() => setVersion((v) => v + 1)),
       window.agentTogether.onAgentText(({ text }) => setRunView((r) => (r ? { ...r, lines: [...r.lines, text].slice(-200) } : r))),
       window.agentTogether.onAgentStatus(({ state }) => setRunView((r) => (r && state !== "idle" ? { ...r, state } : r))),
@@ -196,9 +196,9 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
     attempt(async () => {
       const box = document.querySelector(".canvas")?.getBoundingClientRect();
       const center = box && flow.current ? flow.current.screenToFlowPosition({ x: box.left + box.width / 2, y: box.top + box.height / 2 }) : { x: 0, y: 0 };
-      const node = await window.agentTogether.addNode("新节点", "module", { x: Math.round(center.x - 110), y: Math.round(center.y - 50) });
+      const node = await window.agentTogether.addNode("新卡片", "module", { x: Math.round(center.x - 110), y: Math.round(center.y - 50) });
       setSelectedId(node.id);
-      changed("已添加节点：在右边填写名字、目标、验收标准和它拥有的文件；从节点右侧的圆点拖到另一个节点，表示它依赖那个节点。");
+      changed("已添加卡片：在右边填写名字、目标、验收标准和它拥有的文件；从卡片右侧的圆点拖到另一张卡片，表示它依赖那张卡片。");
     });
 
   const connect = (c: Connection) =>
@@ -216,21 +216,21 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
     });
 
   const install = async () =>
-    setNotice(`已写入 ${(await window.agentTogether.installHooks()).join("、")}。Codex 需要在项目里运行 codex 并用 /hooks 信任后才生效；Cursor 需要信任该工作区。`);
+    setNotice(`已写入 ${(await window.agentTogether.installHooks()).join("、")}。Codex 需要在项目里运行 codex，并在它的 /hooks 菜单里信任后才生效；Cursor 需要信任该工作区。`);
 
   const describeReport = (r: CompileReport) =>
     r.errors.length
       ? `${r.id} 未编译：${r.errors.join("；")}`
       : r.kind === "observer"
-        ? `${r.id} → 由 Agent Together 观察者对所有 agent 执行`
+        ? `${r.id} → 由 Agent Together 观察者对所有 AI 助手执行`
         : `${r.id} → ${Object.values(r.written).flat().join("、")}` + (r.warnings.length ? `（提醒：${r.warnings.join("；")}）` : "");
 
   const exportCapability = async (nodeId: string) =>
-    setNotice(`已保存为能力单元并编译：${describeReport(await window.agentTogether.exportCapability(nodeId))}`);
+    setNotice(`已保存为可复用技能说明并编译：${describeReport(await window.agentTogether.exportCapability(nodeId))}`);
 
   const compileAll = async () => {
     const reports = await window.agentTogether.compileCapabilities();
-    setNotice(reports.length ? reports.map(describeReport).join(" · ") : "还没有能力单元（.agent-together/capabilities/ 为空）");
+    setNotice(reports.length ? reports.map(describeReport).join(" · ") : "还没有可复用技能说明（.agent-together/capabilities/ 为空）");
   };
 
   const dispatch = (nodeId: string, taskText = task) =>
@@ -291,11 +291,11 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
         <button onClick={runTests} disabled={testing || runView?.state === "running"}>
           {testing ? "测试中…" : "运行测试"}
         </button>
-        <span className="muted">L2：{info.l2 ?? "关闭"}</span>
-        <span className="muted">当前节点：{canvas?.nodes.find((n) => n.id === activeId)?.title ?? "无"}</span>
-        <button onClick={addNode}>＋ 节点</button>
-        <button onClick={compileAll}>编译能力</button>
-        <button onClick={install}>安装 hooks</button>
+        <span className="muted">事后判断：{info.l2 ?? "关闭"}</span>
+        <span className="muted">当前卡片：{canvas?.nodes.find((n) => n.id === activeId)?.title ?? "无"}</span>
+        <button onClick={addNode}>＋ 卡片</button>
+        <button onClick={compileAll}>编译技能说明</button>
+        <button onClick={install}>安装观察者对接</button>
       </header>
       {notice && (
         <div className="notice row">
@@ -339,7 +339,7 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
             <>
               <NodeEditor node={selected} onChange={changed} />
               <section>
-                <h4>派发任务</h4>
+                <h4>交给 AI 去做</h4>
                 <textarea
                   className="task"
                   rows={3}
@@ -348,7 +348,7 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
                   onChange={(e) => setTask(e.target.value)}
                 />
                 <div className="actions">
-                  <select value={mode} onChange={(e) => setMode(e.target.value as typeof mode)} title="在应用里运行：agent 在后台工作，输出显示在这里，做完自动跑测试">
+                  <select value={mode} onChange={(e) => setMode(e.target.value as typeof mode)} title="在应用里运行：AI 助手在后台工作，输出显示在这里，做完自动跑测试">
                     <option value="app">在应用里运行</option>
                     <option value="terminal">在终端窗口打开</option>
                   </select>
@@ -360,15 +360,15 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
                     ))}
                   </select>
                   <button className="primary" onClick={() => dispatch(selected.id)} disabled={runView?.state === "running" || runView?.state === "testing"}>
-                    派发
+                    交给 AI 去做
                   </button>
                   {selected.id === activeId ? (
-                    <button onClick={() => window.agentTogether.setActive(null)}>取消当前节点</button>
+                    <button onClick={() => window.agentTogether.setActive(null)}>取消当前卡片</button>
                   ) : (
-                    <button onClick={() => window.agentTogether.setActive(selected.id)}>设为当前节点</button>
+                    <button onClick={() => window.agentTogether.setActive(selected.id)}>设为当前卡片</button>
                   )}
                   <button onClick={() => setInspecting((v) => !v)}>{inspecting ? "收起上下文" : "检查上下文"}</button>
-                  <button onClick={() => exportCapability(selected.id)}>导出为能力单元</button>
+                  <button onClick={() => exportCapability(selected.id)}>导出为可复用技能说明</button>
                 </div>
                 {inspecting && <ContextInspector nodeId={selected.id} task={task} version={version} onContext={setContextText} />}
               </section>
@@ -391,11 +391,11 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
           ) : (
             <>
               <p className="muted">
-                点节点查看和编辑；拖动节点调整位置；从节点右侧圆点拖到另一个节点表示依赖，选中连线按 Delete 删除。设为当前节点后，观察者按它的范围检查 agent。
+                点卡片查看和编辑；拖动卡片调整位置；从卡片右侧圆点拖到另一张卡片表示依赖，选中连线按 Delete 删除。设为当前卡片后，观察者按它的范围检查 AI 助手。
               </p>
               {runView && (runView.state === "running" || runView.state === "testing") && (
                 <p className="finding finding-warn">
-                  {runView.agent} 正在处理"{canvas?.nodes.find((n) => n.id === runView.nodeId)?.title}"，点那个节点查看进度。
+                  {runView.agent} 正在处理"{canvas?.nodes.find((n) => n.id === runView.nodeId)?.title}"，点那张卡片查看进度。
                 </p>
               )}
               <ProjectSettings version={version} onChange={changed} />
@@ -405,7 +405,7 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
           {info.hasGit ? <CheckpointsPanel version={version} onChange={changed} /> : <p className="muted">项目不在 git 仓库中，检查点和赛马不可用。</p>}
           {judgments.length > 0 && (
             <>
-              <h4>L2 定向判断</h4>
+              <h4>事后智能判断</h4>
               <ol className="feed">
                 {judgments.slice(0, 5).map((j) => (
                   <li key={j.at + j.nodeId}>
@@ -417,7 +417,7 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
             </>
           )}
           <h4>观察者事件</h4>
-          {feed.length === 0 && <p className="muted">暂无事件。派发任务后，agent 的每个动作都会出现在这里。</p>}
+          {feed.length === 0 && <p className="muted">暂无事件。交给 AI 去做之后，它的每个动作都会出现在这里。</p>}
           <ol className="feed">
             {feed.map(({ event, verdict }, i) => (
               <li key={feed.length - i}>

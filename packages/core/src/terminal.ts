@@ -16,7 +16,7 @@ export function cleanEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
  */
 export function openTerminal(cwd: string, commandLine: string, title = "Agent Together"): void {
   if (process.platform !== "win32") {
-    throw new Error(`暂只支持在 Windows 上打开终端窗口；请在项目目录手动运行：${commandLine}`);
+    throw new Error(`暂只支持在 Windows 上打开终端窗口；请在本机终端手动运行：${commandLine}`);
   }
   // `start` opens a new console window; its first quoted argument is the title.
   const child = spawn("cmd.exe", ["/c", `start "${title}" cmd /k ${commandLine}`], {

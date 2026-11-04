@@ -23,7 +23,7 @@ export function EvolutionPanel({ nodeId, task, version, onChange }: { nodeId: st
     try { await action(); } catch (e) { onChange(String(e)); }
     finally { await refresh(); }
   };
-    const penalty = (c: NonNullable<EvolutionReport["race"]>["contestants"][number]) => c.score.parts.filter(p => p.label.startsWith("违反 ") || p.label.startsWith("提醒 ")).reduce((sum,p) => sum + p.points, 0);
+    const penalty = (c: NonNullable<EvolutionReport["race"]>["contestants"][number]) => c.score.parts.filter(p => p.label.startsWith("拦下") || p.label.startsWith("提醒")).reduce((sum,p) => sum + p.points, 0);
   const lines = (c: NonNullable<EvolutionReport["race"]>["contestants"][number]) => c.files.reduce((sum,f) => sum + f.added + f.removed, 0);
   const latest = reports.find(r => r.id === reportId) ?? reports[0];
   const rank = (id: string) => { const i = latest?.ranking?.indexOf(id) ?? -1; return i < 0 ? 99 : i; };
@@ -44,7 +44,7 @@ export function EvolutionPanel({ nodeId, task, version, onChange }: { nodeId: st
           <details><summary>测试输出</summary><pre>{c.tests?.output}</pre></details>
         </div>;
       })}
-      {latest.approved && <p>已同意，以后派发会带上这条经验。</p>}
+      {latest.approved && <p>已同意，以后交给 AI 时会带上这条经验。</p>}
       {latest.winner && !latest.approved && !latest.discarded && <>
         <button disabled={busy} onClick={() => act(async () => { await window.agentTogether.approveEvolution(latest.id, false); onChange("已记住这个做法"); })}>同意</button>
         <button disabled={busy} onClick={() => act(async () => { await window.agentTogether.approveEvolution(latest.id, true); onChange("已记住做法并采用代码，采用前已存检查点"); })}>同意并采用代码</button>

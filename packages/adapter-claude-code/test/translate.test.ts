@@ -75,6 +75,26 @@ describe("toAgentEvent", () => {
   it("ignores events Agent Together does not use", () => {
     expect(toAgentEvent({ ...base, hook_event_name: "Notification" })).toBeNull();
   });
+
+  // Grok Build runs Claude settings hooks with its own tool names (shapes from a real Grok 1.0.70 run).
+  it("reads Grok Build's tool names and marks the platform", () => {
+    const grok = { ...base, hookEventName: "pre_tool_use" };
+    const edit = toAgentEvent({
+      ...grok,
+      hook_event_name: "PreToolUse",
+      tool_name: "search_replace",
+      tool_input: { file_path: "/p/src/a.ts", old_string: "a", new_string: "b" },
+    });
+    expect(edit).toMatchObject({ platform: "grok-build", action: { type: "write", path: "/p/src/a.ts", before: "a", after: "b" } });
+    const read = toAgentEvent({ ...grok, hook_event_name: "PreToolUse", tool_name: "read_file", tool_input: { target_file: "/p/x.ts" } });
+    expect(read).toMatchObject({ action: { type: "read", path: "/p/x.ts" } });
+  });
+
+  it("treats a Grok Build shell result with a non-zero exit code as a failure", () => {
+    const shell = { ...base, hookEventName: "post_tool_use", hook_event_name: "PostToolUse", tool_name: "run_terminal_command", tool_input: { command: "npm test" } };
+    expect(toAgentEvent({ ...shell, toolResult: { type: "Bash", exit_code: 1 } })).toMatchObject({ ok: false, error: "exit 1", action: { type: "shell" } });
+    expect(toAgentEvent({ ...shell, toolResult: { type: "Bash", exit_code: 0 } })).toMatchObject({ ok: true });
+  });
 });
 
 describe("toHookOutput", () => {

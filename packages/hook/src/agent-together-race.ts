@@ -3,11 +3,12 @@ import path from "node:path";
 import { claudeCodeRunner } from "@agent-together/adapter-claude-code";
 import { codexRunner } from "@agent-together/adapter-codex";
 import { cursorRunner } from "@agent-together/adapter-cursor";
+import { grokRunner } from "@agent-together/adapter-grok";
 import { loadRaceConfig, ProjectStore, MemoryStore, Race, type RaceReport } from "@agent-together/core";
 import type { AgentRunner } from "@agent-together/schema";
 
 const usage = `Usage:
-  agent-together-race <projectDir> <nodeId> "<task>" [--agents claude-code,codex,cursor] [--claude-model haiku] [--codex-model <m>] [--cursor-model <m>]
+  agent-together-race <projectDir> <nodeId> "<task>" [--agents claude-code,codex,cursor,grok-build] [--claude-model haiku] [--codex-model <m>] [--cursor-model <m>] [--grok-model <m>]
   agent-together-race adopt <projectDir> <raceId> <contestant>
   agent-together-race discard <projectDir> <raceId>`;
 
@@ -21,6 +22,7 @@ const modelOptions: Record<string, string | undefined> = {
   "claude-code": option("--claude-model"),
   codex: option("--codex-model"),
   cursor: option("--cursor-model"),
+  "grok-build": option("--grok-model"),
 };
 
 function project(dir: string | undefined): string {
@@ -62,7 +64,7 @@ if (args[0] === "adopt") {
   }
   const config = loadRaceConfig(root);
   const agents = agentsOption?.split(",") ?? config.agents ?? ["claude-code", "codex"];
-  const factories: Record<string, (model?: string) => AgentRunner> = { "claude-code": claudeCodeRunner, codex: codexRunner, cursor: cursorRunner };
+  const factories: Record<string, (model?: string) => AgentRunner> = { "claude-code": claudeCodeRunner, codex: codexRunner, cursor: cursorRunner, "grok-build": grokRunner };
   const unknown = agents.filter((a) => !factories[a]);
   if (unknown.length) {
     console.error(`Unknown agent(s): ${unknown.join(", ")}. Known: ${Object.keys(factories).join(", ")}`);

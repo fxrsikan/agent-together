@@ -1,0 +1,16 @@
+{
+  "name": "@agent-together/adapter-grok",
+  "version": "0.0.1",
+  "description": "Grok Build adapter: race runner (Grok Build runs the Claude Code hooks, so hook payloads go through the Claude Code adapter)",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@agent-together/schema": "0.0.1",
+    "@agent-together/core": "0.0.1"
+  }
+}

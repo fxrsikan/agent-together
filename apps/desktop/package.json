@@ -15,7 +15,8 @@
     "@agent-together/core": "0.0.1",
     "@agent-together/schema": "0.0.1",
     "@agent-together/adapter-codex": "0.0.1",
-    "@agent-together/adapter-cursor": "0.0.1"
+    "@agent-together/adapter-cursor": "0.0.1",
+    "@agent-together/adapter-grok": "0.0.1"
   },
   "devDependencies": {
     "@types/react": "^19.3.0",

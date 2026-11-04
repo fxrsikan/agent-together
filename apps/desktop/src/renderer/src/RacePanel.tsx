@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { RaceReport } from "../../preload";
 
-const AGENT_NAMES: Record<string, string> = { "claude-code": "Claude Code", codex: "Codex", cursor: "Cursor" };
+const AGENT_NAMES: Record<string, string> = { "claude-code": "Claude Code", codex: "Codex", cursor: "Cursor", "grok-build": "Grok Build" };
 
 function seconds(ms: number) {
   return `${Math.round(ms / 1000)}s`;

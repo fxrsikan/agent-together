@@ -9,7 +9,7 @@
     "apps/*"
   ],
   "scripts": {
-    "build": "npm run build -w @agent-together/schema -w @agent-together/core -w @agent-together/adapter-claude-code -w @agent-together/adapter-codex -w @agent-together/adapter-cursor -w @agent-together/hook",
+    "build": "npm run build -w @agent-together/schema -w @agent-together/core -w @agent-together/adapter-claude-code -w @agent-together/adapter-codex -w @agent-together/adapter-cursor -w @agent-together/adapter-grok -w @agent-together/hook",
     "build:desktop": "npm run build -w @agent-together/desktop",
     "dev": "npm run dev -w @agent-together/desktop",
     "test": "vitest run",

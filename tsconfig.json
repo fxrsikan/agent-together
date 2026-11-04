@@ -17,6 +17,9 @@
       "path": "packages/adapter-cursor"
     },
     {
+      "path": "packages/adapter-grok"
+    },
+    {
       "path": "packages/hook"
     }
   ]

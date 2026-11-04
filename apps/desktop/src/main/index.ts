@@ -4,6 +4,7 @@ import { app, BrowserWindow, dialog, ipcMain } from "electron";
 import { claudeCodeCompiler, claudeCodeRunner, installHooks } from "@agent-together/adapter-claude-code";
 import { agentSkillsCompiler, codexRunner, installCodexHooks } from "@agent-together/adapter-codex";
 import { cursorRulesCompiler, cursorRunner, installCursorHooks } from "@agent-together/adapter-cursor";
+import { grokRunner } from "@agent-together/adapter-grok";
 import {
   buildNodeContext,
   capabilityFromNode,
@@ -135,7 +136,7 @@ async function main() {
   // Races: both agents in their own worktrees; the report is kept, the human adopts one or discards all.
   const race = hasGit ? new Race(root) : null;
   let racing: string | null = null; // node id while a race runs; one at a time
-  const factories: Record<string, (model?: string) => AgentRunner> = { "claude-code": claudeCodeRunner, codex: codexRunner, cursor: cursorRunner };
+  const factories: Record<string, (model?: string) => AgentRunner> = { "claude-code": claudeCodeRunner, codex: codexRunner, cursor: cursorRunner, "grok-build": grokRunner };
   const raceAgents = () => (loadRaceConfig(root).agents ?? ["claude-code", "codex"]).filter((a) => factories[a]);
   ipcMain.handle("agent-together:races", () => ({ running: racing, reports: race?.list() ?? [], agents: raceAgents() }));
   ipcMain.handle("agent-together:race", async (_e, nodeId: string, task: string, context?: string) => {

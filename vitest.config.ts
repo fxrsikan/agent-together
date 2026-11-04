@@ -11,6 +11,7 @@ export default defineConfig({
       "@agent-together/adapter-claude-code": src("adapter-claude-code"),
       "@agent-together/adapter-codex": src("adapter-codex"),
       "@agent-together/adapter-cursor": src("adapter-cursor"),
+      "@agent-together/adapter-grok": src("adapter-grok"),
     },
   },
   test: {

@@ -2,7 +2,7 @@ import { defineConfig } from "electron-vite";
 import react from "@vitejs/plugin-react";
 
 // Workspace packages are bundled into main (they are ESM, main is CJS); everything else stays external.
-const bundled = ["@agent-together/core", "@agent-together/schema", "@agent-together/adapter-claude-code", "@agent-together/adapter-codex", "@agent-together/adapter-cursor"];
+const bundled = ["@agent-together/core", "@agent-together/schema", "@agent-together/adapter-claude-code", "@agent-together/adapter-codex", "@agent-together/adapter-cursor", "@agent-together/adapter-grok"];
 
 export default defineConfig({
   main: { build: { externalizeDeps: { exclude: bundled } } },

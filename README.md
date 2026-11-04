@@ -1,8 +1,7 @@
 # Agent Together
 
 AI 编码 agent 的画布控制台：人在画布上表达意图，agent 按节点领任务，观察者实时检查是否跑偏。
-支持 Claude Code、Codex、Cursor（编辑器与命令行）。
-设计文档：<https://claude.ai/artifact/VHLouGg6CnmTdgnDqKVVBT>
+支持 Claude Code、Codex、Cursor（编辑器与命令行）、Grok Build。
 
 ## 当前状态：v0.3
 
@@ -17,13 +16,14 @@ AI 编码 agent 的画布控制台：人在画布上表达意图，agent 按节�
 | 记忆 | 每轮结束时观察者的拦截生成草稿，人工批准后进入派发上下文，并同步到项目 `CLAUDE.md` 的 Agent Together 区块；也可手动添加 |
 | L2 语义判断（v0.2） | 每轮结束后在后台运行，不拖慢 agent：把记忆草稿提炼成一句中文经验（原始记录保留为 evidence）；对照节点目标和派发任务判断这一轮是否跑偏，结果显示在画布信号灯和"L2 定向判断"中 |
 | 能力单元（v0.2） | `.agent-together/capabilities/<id>.md` 写一次，编译到各平台：skill → `.claude/skills/`、`.agents/skills/`（Codex、Grok Build 等开放标准）、`.cursor/rules/*.mdc`；agent 角色 → `.claude/agents/`；observer（范围 + 禁止出现的正则）由 Agent Together 观察者对所有 agent 执行。编译前校验，节点可"导出为能力单元"，内容变化时自动升版本 |
-| 多 agent 赛马（v0.3） | 同一节点、同一任务、同一起点，Claude Code、Codex、Cursor 在各自的 git worktree 里并行跑（参赛者由 `.agent-together/race.json` 的 `agents` 指定，默认前两个）；按测试、观察者回放（越界、依赖、篡改测试等）、改动大小打分并列出每一项；花费与耗时只展示。采用胜者前自动存检查点，之后清理 worktree。桌面应用里在节点详情点赛马按钮发起，结果并排对比后一键采用或放弃；`.agent-together/race.json` 的 `models` 可按 agent 指定模型 |
+| 多 agent 赛马（v0.3） | 同一节点、同一任务、同一起点，Claude Code、Codex、Cursor、Grok Build 在各自的 git worktree 里并行跑（参赛者由 `.agent-together/race.json` 的 `agents` 指定，默认前两个）；按测试、观察者回放（越界、依赖、篡改测试等）、改动大小打分并列出每一项；花费与耗时只展示。采用胜者前自动存检查点，之后清理 worktree。桌面应用里在节点详情点赛马按钮发起，结果并排对比后一键采用或放弃；`.agent-together/race.json` 的 `models` 可按 agent 指定模型 |
 | 派发任务 | 选中节点 → 填任务 → 生成节点邻域上下文 `.agent-together/context/<节点>.md`，在新终端窗口启动 Claude Code（v0.1 仅 Windows） |
 | 上下文检查器（v0.3） | 派发或赛马前点"检查上下文"：看到要交给 agent 的完整上下文、总 token 估算和每一节的占比；可以这一次不带某条记忆，也可以直接改文字，改过的版本原样交给 agent |
 | 干预 | `ask` 让 Claude Code 询问用户，`block` 拒绝，`warn` 注入提醒 |
 | Claude Code 适配器 | hook 载荷 ↔ 统一事件，写入 `.claude/settings.local.json` |
 | Codex 适配器（v0.2） | 解析 `apply_patch`（一个补丁多个文件各自检查），`ask` 转为拒绝并要求 agent 询问用户，退出码从会话记录读取；hooks 写入 git 仓库根目录的 `.codex/hooks.json`，需在 Codex 的 `/hooks` 中信任 |
 | Cursor 适配器（v0.3） | hooks 写入项目的 `.cursor/hooks.json`（工作区需信任）；`ask` 转为拒绝并要求 agent 询问用户；Windows 上 Cursor 经 PowerShell 传入的数据会被按 GBK 转码导致中文乱码，适配器会还原后再检查（个别紧挨空格或引号的中文字可能损坏，不影响路径、命令和 import 检查）；回复一律用纯 ASCII；守护进程不在时明确放行。编辑器从打开的文件夹读 hooks，`cursor-agent` 命令行从 git 仓库根目录读，安装时两处都写。已在 Cursor 3.19 编辑器和 cursor-agent 2026.10.22 中实测；命令行的 `-p` 模式不发"一轮结束"事件，所以不会生成记忆草稿 |
+| Grok Build | Grok Build 会执行项目里 Claude Code 的 hooks（`.claude/settings.local.json`），所以装好 Claude Code 的 hooks 就同时管住了 Grok；适配器识别 Grok 的工具名（`search_replace`、`write`、`read_file`、`run_terminal_command`），事件标记为 grok-build，支持"询问"。已用 Grok Build 1.0.70 实测：范围内修改放行，越界新建在无界面模式下被拒绝。赛马可用 `--agents grok-build`（去掉了命令行和 monitor 工具，测试由 Agent Together 来跑），但还没跑出一场正常结束的赛马 |
 | 桌面应用 | Electron + React Flow：画布、节点信号灯、当前节点、事件流、记忆、检查点、赛马 |
 
 ## 目录

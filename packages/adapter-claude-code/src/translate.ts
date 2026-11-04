@@ -1,6 +1,10 @@
 import type { AgentEvent, ToolAction, Verdict } from "@agent-together/schema";
 
-/** The subset of Claude Code's hook stdin payload Agent Together reads. */
+/**
+ * The subset of Claude Code's hook stdin payload Agent Together reads. Grok Build
+ * runs the hooks in Claude settings files too and sends the same snake_case fields,
+ * plus its own camelCase ones (`hookEventName`) and its own tool names.
+ */
 export interface HookPayload {
   session_id: string;
   cwd: string;
@@ -8,13 +12,30 @@ export interface HookPayload {
   tool_name?: string;
   tool_input?: Record<string, any>;
   error?: string;
+  /** Grok Build only. */
+  hookEventName?: string;
+  /** Grok Build only: the tool's output; a shell's carries `exit_code`. */
+  toolResult?: unknown;
+}
+
+/** Grok Build reports a non-zero shell exit as PostToolUse with the code in toolResult. */
+function grokExitCode(result: unknown): number | null {
+  const code = result && typeof result === "object" ? (result as Record<string, unknown>).exit_code : undefined;
+  return typeof code === "number" ? code : null;
 }
 
 function toAction(tool: string, input: Record<string, any>, readFile: (p: string) => string | undefined): ToolAction {
   switch (tool) {
     case "Write":
-      return { type: "write", path: input.file_path, before: readFile(input.file_path), after: input.content ?? "" };
+    case "write": // Grok Build
+      return {
+        type: "write",
+        path: input.file_path ?? input.path,
+        before: readFile(input.file_path ?? input.path),
+        after: input.content ?? input.contents ?? "",
+      };
     case "Edit":
+    case "search_replace": // Grok Build
       return { type: "write", path: input.file_path, before: input.old_string, after: input.new_string ?? "" };
     case "MultiEdit": {
       const edits: { old_string: string; new_string: string }[] = input.edits ?? [];
@@ -29,7 +50,10 @@ function toAction(tool: string, input: Record<string, any>, readFile: (p: string
       return { type: "write", path: input.notebook_path, after: input.new_source ?? "" };
     case "Read":
       return { type: "read", path: input.file_path };
+    case "read_file": // Grok Build
+      return { type: "read", path: input.target_file ?? input.file_path };
     case "Bash":
+    case "run_terminal_command": // Grok Build
       return { type: "shell", command: input.command ?? "" };
     default:
       return { type: "other", tool };
@@ -45,13 +69,16 @@ export function toAgentEvent(
   readFile: (p: string) => string | undefined = () => undefined,
   now = new Date(),
 ): AgentEvent | null {
-  const base = { platform: "claude-code" as const, sessionId: payload.session_id, at: now.toISOString() };
+  const platform = payload.hookEventName ? ("grok-build" as const) : ("claude-code" as const);
+  const base = { platform, sessionId: payload.session_id, at: now.toISOString() };
   const action = () => toAction(payload.tool_name ?? "", payload.tool_input ?? {}, readFile);
   switch (payload.hook_event_name) {
     case "PreToolUse":
       return { kind: "tool.before", ...base, action: action() };
-    case "PostToolUse":
-      return { kind: "tool.after", ...base, action: action(), ok: true };
+    case "PostToolUse": {
+      const code = grokExitCode(payload.toolResult);
+      return code ? { kind: "tool.after", ...base, action: action(), ok: false, error: `exit ${code}` } : { kind: "tool.after", ...base, action: action(), ok: true };
+    }
     case "PostToolUseFailure":
       return { kind: "tool.after", ...base, action: action(), ok: false, error: payload.error };
     case "Stop":

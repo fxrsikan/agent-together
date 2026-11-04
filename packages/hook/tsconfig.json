@@ -22,6 +22,9 @@
     },
     {
       "path": "../adapter-cursor"
+    },
+    {
+      "path": "../adapter-grok"
     }
   ]
 }

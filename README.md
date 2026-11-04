@@ -1,48 +1,51 @@
 # Agent Together
 
-AI 编码 agent 的画布控制台：人在画布上表达意图，agent 按节点领任务，观察者实时检查是否跑偏。
-支持 Claude Code、Codex、Cursor（编辑器与命令行）、Grok Build。
+**说出你想做什么，AI 画出计划，一群 AI 分头去做；有人盯着它们不跑偏，越用越聪明。**
 
-## 当前状态：v1（第一版）
+不会写代码也能用 AI 做出能跑的项目。Agent Together 把你的想法画成一张画布：每张卡片是一块活，连线是先后顺序。AI 编程助手（Claude Code、Codex、Cursor、Grok Build，用哪个都行）按卡片一块一块地做；旁边的观察者盯着它们，谁想动不归自己管的东西就当场拦下；每做完一块自动跑测试，坏了就交给负责那块的 AI 去修。
 
-已跑通一条线：**Claude Code hook → agent-together-hook → 本地守护进程 → 观察者规则 → 裁决回给 Claude Code，同时显示在画布上。**
+## 为什么需要它
 
-| 已有 | 说明 |
-| --- | --- |
-| 画布数据格式 | `.agent-together/canvas/<节点>.json` + `_edges.json`，zod 校验 |
-| 观察者 L0 规则 | 越界写入、设计守护（import 必须沿画布连线）、篡改测试、重复失败、重复读取 |
-| 生成初始画布 | `agent-together-init`：按顶层目录（monorepo 按子包）建节点，按 import 关系连线 |
-| 检查点与回滚 | 派发前自动保存，可一键回滚；快照存为 `refs/agent-together/checkpoints/*`，不碰分支和暂存区，回滚本身可撤销 |
-| 记忆 | 每轮结束时观察者的拦截生成草稿，人工批准后进入派发上下文，并同步到项目 `CLAUDE.md` 的 Agent Together 区块；也可手动添加 |
-| L2 语义判断（v0.2） | 每轮结束后在后台运行，不拖慢 agent：把记忆草稿提炼成一句中文经验（原始记录保留为 evidence）；对照节点目标和派发任务判断这一轮是否跑偏，结果显示在画布信号灯和"L2 定向判断"中 |
-| 能力单元（v0.2） | `.agent-together/capabilities/<id>.md` 写一次，编译到各平台：skill → `.claude/skills/`、`.agents/skills/`（Codex、Grok Build 等开放标准）、`.cursor/rules/*.mdc`；agent 角色 → `.claude/agents/`；observer（范围 + 禁止出现的正则）由 Agent Together 观察者对所有 agent 执行。编译前校验，节点可"导出为能力单元"，内容变化时自动升版本 |
-| 多 agent 赛马（v0.3） | 同一节点、同一任务、同一起点，Claude Code、Codex、Cursor、Grok Build 在各自的 git worktree 里并行跑（参赛者由 `.agent-together/race.json` 的 `agents` 指定，默认前两个）；按测试、观察者回放（越界、依赖、篡改测试等）、改动大小打分并列出每一项；花费与耗时只展示。采用胜者前自动存检查点，之后清理 worktree。桌面应用里在节点详情点赛马按钮发起，结果并排对比后一键采用或放弃；`.agent-together/race.json` 的 `models` 可按 agent 指定模型 |
-| 派发任务 | 选中节点 → 填任务 → 生成节点邻域上下文 `.agent-together/context/<节点>.md`，在新终端窗口启动 Claude Code（v0.1 仅 Windows） |
-| 上下文检查器（v0.3） | 派发或赛马前点"检查上下文"：看到要交给 agent 的完整上下文、总 token 估算和每一节的占比；可以这一次不带某条记忆，也可以直接改文字，改过的版本原样交给 agent |
-| 干预 | `ask` 让 Claude Code 询问用户，`block` 拒绝，`warn` 注入提醒 |
-| Claude Code 适配器 | hook 载荷 ↔ 统一事件，写入 `.claude/settings.local.json` |
-| Codex 适配器（v0.2） | 解析 `apply_patch`（一个补丁多个文件各自检查），`ask` 转为拒绝并要求 agent 询问用户，退出码从会话记录读取；hooks 写入 git 仓库根目录的 `.codex/hooks.json`，需在 Codex 的 `/hooks` 中信任 |
-| Cursor 适配器（v0.3） | hooks 写入项目的 `.cursor/hooks.json`（工作区需信任）；`ask` 转为拒绝并要求 agent 询问用户；Windows 上 Cursor 经 PowerShell 传入的数据会被按 GBK 转码导致中文乱码，适配器会还原后再检查（个别紧挨空格或引号的中文字可能损坏，不影响路径、命令和 import 检查）；回复一律用纯 ASCII；守护进程不在时明确放行。编辑器从打开的文件夹读 hooks，`cursor-agent` 命令行从 git 仓库根目录读，安装时两处都写。已在 Cursor 3.19 编辑器和 cursor-agent 2026.10.22 中实测；命令行的 `-p` 模式不发"一轮结束"事件，所以不会生成记忆草稿 |
-| Grok Build | Grok Build 会执行项目里 Claude Code 的 hooks（`.claude/settings.local.json`），所以装好 Claude Code 的 hooks 就同时管住了 Grok；适配器识别 Grok 的工具名（`search_replace`、`write`、`read_file`、`run_terminal_command`），事件标记为 grok-build，支持"询问"。已用 Grok Build 1.0.70 实测：范围内修改放行，越界新建在无界面模式下被拒绝。赛马可用 `--agents grok-build`（去掉了命令行和 monitor 工具，测试由 Agent Together 来跑），但还没跑出一场正常结束的赛马 |
-| 项目 | 启动页新建或打开项目，最近项目列表，切换不用重启；新项目自动 `git init`、写 `.gitignore`、装好各平台 hooks |
-| AI 规划画布 | 一段产品描述 → 节点（目标、验收标准、任务、文件范围）+ 依赖连线 + 技术栈；描述和技术栈写进 `.agent-together/project.json`，每次派发都带上 |
-| 画布编辑 | 增删改节点、拖线建依赖、Delete 删连线、拖动保存位置、节点状态；每次修改都按 schema 校验后写回 `.agent-together/canvas/` |
-| 桌面应用 | Electron + React Flow：画布、节点信号灯、当前节点、事件流、记忆、检查点、赛马、上下文检查器 |
+AI 写代码很快，但做着做着容易跑偏：让它改购物车，它顺手把登录页也改了；测试不过，它去改测试而不是改代码；新开一次对话，之前定好的规矩全忘了。
 
-## 目录
+现在已经有很多工具能让几个 AI 同时干活，但它们只管"开工"，不管"按计划干"。各家 AI 公司也只会管好自家的助手。Agent Together 做的是它们之上的那一层：**一份计划，所有 AI 都得遵守。**
 
-```
-packages/schema               画布、事件、裁决的类型与校验
-packages/core                 .agent-together 存储、观察者规则、本地守护进程（agent-together-daemon）
-packages/adapter-claude-code  Claude Code hook 载荷转换与安装
-packages/hook                 agent-together-hook：hook 调用的小程序，守护进程不在时放行
-apps/desktop                  桌面应用
-examples/demo                 示例项目（登录表单 → 用户服务 → 数据库）
-```
+## 怎么用
+
+1. **说想法**：新建项目，写一段话，比如"做一个命令行记账工具，能记收支、按月统计"。
+2. **看计划**：点"AI 生成画布"，AI 把想法拆成几张卡片，标好每张做什么、负责哪些文件、依赖谁。不满意可以直接在画布上改。
+3. **让 AI 干活**：点一张卡片，选一个 AI 助手，点"派发"。它干活的过程实时显示在应用里。
+4. **看结果**：做完自动跑测试。
+   - 通过了：自动存一个检查点，点"标记为完成"，接着做下一张。
+   - 没通过：一键把失败交回给 AI；如果坏的是别的卡片负责的部分，就交给那张卡片去修。
+   - 越做越乱：一键回到上一个检查点重来。
+
+卡片上的信号灯告诉你现在怎么样：顺利、被拦了一次、需要你看一下。
+
+## 现在能做什么
+
+**已经能用（v1）**
+
+- 新建或打开项目，AI 生成画布，在画布上增删改卡片和连线
+- 在应用里派发给 Claude Code、Codex、Cursor，实时看 AI 的输出（Grok Build 也支持，但还没在应用里完整跑通）
+- 观察者：拦下越界修改、违反依赖、篡改测试、原地打转
+- 每次做完自动跑测试，失败交给负责的卡片修复，通过自动存检查点
+- 记忆：AI 犯过的错整理成经验，你批准后，以后每次派发都会带上
+- 同一张卡片让几个 AI 比赛，按测试结果和越界情况打分，选最好的那个
+- 派发前可以看到、也可以修改要交给 AI 的全部内容
+
+用这一版从零做出了一个命令行待办工具：7 张卡片，91 个测试全部通过，模型花费约 0.08 美元。
+
+**正在做**
+
+- **AI 自己做 agent**：规划时按项目需要自动生成专职角色（界面设计员、测试员……）；你也可以用一句话让 AI 做一个新的 agent，拖进画布就成为工作流的一步。
+- **进化**：卡片反复失败时，AI 提出几种改进办法各试一次，用测试结果决定哪个有效，你点"同意"后它就学会了；在多个项目里都有效的经验会沉淀下来，下个项目直接用。方法参考了 Google Research 的 [Harness²](https://github.com/google-research/harness2)。
+- **更容易上手**：安装向导帮你装好、登录好一个 AI 助手；界面上的提示全部改成大白话。
+- **用数据说话**：同一组任务分别开、关观察者各跑一遍，比较越界次数、测试通过率和花费。
 
 ## 开始
 
-需要 Node 22+、git，以及至少一个已登录的 agent 命令行（Claude Code、Codex、Cursor 或 Grok Build）。
+现在还需要自己装好这几样东西：[Node.js 22+](https://nodejs.org)、[git](https://git-scm.com)，以及至少一个已登录的 AI 编程助手（[Claude Code](https://claude.com/claude-code)、Codex、Cursor 或 Grok Build 的命令行）。
 
 ```bash
 npm install
@@ -50,42 +53,93 @@ npm run build
 npm run dev
 ```
 
-### 用 Agent Together 做一个项目
+应用打开后，在启动页填项目名、选位置、写一段想法，点"创建"，然后按上面"怎么用"的四步走。已有代码的文件夹用"打开文件夹…"，第一次打开会按目录结构自动生成画布。
 
-1. **新建项目**：启动页填项目名、选位置、写一段产品描述，点"创建"。会建文件夹、`git init`，并装好 Claude Code、Codex、Cursor 的 hooks（Grok Build 读 Claude Code 的）。已有代码的文件夹用"打开文件夹…"，第一次打开会按目录结构生成画布。
-2. **规划画布**：空画布上点"AI 生成画布"，模型把描述拆成节点（目标、验收标准、任务、拥有的文件）和依赖连线。用 `.agent-together/llm.json` 选模型，默认用已登录的 `claude` 命令行（Haiku）。
-3. **修改画布**：点节点在右侧编辑；拖动调整位置；从节点右侧圆点拖到另一个节点表示依赖，选中连线按 Delete 删除；"＋ 节点"手动添加。
-4. **派发**：选中节点，写这次的任务（可留空），选 agent，点"派发"。会先存检查点，把节点设为当前节点，生成只含该节点邻域的上下文，在新终端窗口里启动 agent（目前仅 Windows）。节点状态变为"进行中"。
-5. **看着它**：agent 的每个动作出现在"观察者事件"里；越界写入、违反依赖、改测试会被拦下或要求确认；跑偏可以回滚到检查点。做完把节点状态改成"完成"，再派发下一个。
+---
 
-其他方式打开项目：环境变量 `AGENT_TOGETHER_PROJECT=<目录>` 启动时直接打开；命令行生成画布：
+## 给开发者
 
-```bash
-node packages/core/dist/init-cli.js <你的项目目录>
+### 它是怎么工作的
+
+各家 AI 助手在动手之前会调用项目里配置的 hook。Agent Together 把这些 hook 指向一个小程序 `agent-together-hook`，由它去问本地守护进程，守护进程按画布和规则判断后，回复"放行""拦下"或"先问用户"，同时把结果显示在画布上。
+
+所有状态都是项目里 `.agent-together/` 下的文件，可以 diff，也可以随 git 共享：
+
+```
+.agent-together/
+  canvas/        画布节点（每个节点一个 JSON）与 _edges.json
+  rules.json     观察者规则级别
+  memory/        记忆条目
+  capabilities/  能力单元
+  project.json   产品描述、技术栈、测试命令
+  race.json      赛马设置
+  llm.json       L2 判断用的模型
+  events/        事件日志（不提交）
 ```
 
-不开桌面应用时也可以只跑守护进程（之后在该目录里运行 agent）：
+### 功能细节
 
-```bash
-node packages/core/dist/cli.js examples/demo login-form
+| 功能 | 说明 |
+| --- | --- |
+| 观察者 L0 规则 | 越界写入、设计守护（import 必须沿画布连线）、篡改测试、重复失败、重复读取。级别在 `rules.json` 里按规则设：`off` / `log` / `warn` / `ask` / `block` |
+| L2 语义判断 | 每轮结束后在后台运行：把记忆草稿提炼成一句经验，对照节点目标判断这一轮是否跑偏 |
+| 应用内运行 | Claude Code、Cursor 用 `--output-format stream-json`，Codex 用 JSONL，输出实时显示；结束后跑项目测试，并从测试输出找出失败文件属于哪个节点 |
+| 检查点与回滚 | 派发前和测试通过时自动保存，存为 `refs/agent-together/checkpoints/*`，不碰分支和暂存区，回滚本身可撤销 |
+| 记忆 | 拦截生成草稿，批准后进入派发上下文，并同步到 `CLAUDE.md` 的 Agent Together 区块 |
+| 能力单元 | `.agent-together/capabilities/<id>.md` 写一次，编译到各平台：skill → `.claude/skills/`、`.agents/skills/`、`.cursor/rules/*.mdc`；agent 角色 → `.claude/agents/`；observer 由 Agent Together 对所有 agent 执行 |
+| 多 agent 赛马 | 同一节点、同一起点，各 agent 在独立 git worktree 里并行跑；按测试、观察者回放、改动大小打分；采用前自动存检查点 |
+| 上下文检查器 | 派发前查看完整上下文、token 估算和每一节的占比，可以去掉某条记忆或直接改文字 |
+| Claude Code | hooks 写入 `.claude/settings.local.json` |
+| Codex | 解析 `apply_patch`，一个补丁里的每个文件分别检查；hooks 写入 git 根目录的 `.codex/hooks.json`，需在 Codex 的 `/hooks` 中信任 |
+| Cursor | hooks 写入项目和 git 根目录的 `.cursor/hooks.json`；还原 Windows 上 PowerShell 按 GBK 转码造成的中文乱码；回复一律用 ASCII；从 Git Bash 启动时去掉 `SHELL`、`MSYSTEM`（否则 cursor-agent 会用 bash 跑 PowerShell hook）。命令行的 `-p` 模式不发"一轮结束"事件，不会生成记忆草稿 |
+| Grok Build | 读取 Claude Code 的 hooks；适配器识别 Grok 的工具名（`search_replace`、`write`、`read_file`、`run_terminal_command`），事件标记为 grok-build |
+
+### 代码目录
+
+```
+packages/schema               画布、事件、裁决的类型与校验
+packages/core                 存储、观察者规则、守护进程、规划、测试、赛马
+packages/adapter-claude-code  Claude Code（含 Grok Build）hook 转换与运行
+packages/adapter-codex        Codex
+packages/adapter-cursor       Cursor
+packages/adapter-grok         Grok Build 运行
+packages/hook                 agent-together-hook、-compile、-race 命令
+apps/desktop                  桌面应用（Electron + React Flow）
+examples/demo                 示例项目
 ```
 
-给 Cursor 安装 hooks（之后用 Cursor 打开该项目并信任工作区）：
+测试：`npm test`（vitest）。
+
+### 命令行
+
+启动时直接打开某个项目：设置环境变量 `AGENT_TOGETHER_PROJECT=<目录>`。
+
+按目录结构生成画布：
 
 ```bash
-node packages/hook/dist/agent-together-hook.js install <你的项目目录> --platform cursor
+node packages/core/dist/init-cli.js <项目目录>
 ```
 
-给 Codex 安装 hooks（之后在项目里运行 `codex`，用 `/hooks` 信任它们）：
+不开桌面应用、只跑守护进程（之后在该目录里运行 agent）：
 
 ```bash
-node packages/hook/dist/agent-together-hook.js install <你的项目目录> --platform codex
+node packages/core/dist/cli.js <项目目录> <当前节点id>
+```
+
+给 Cursor 或 Codex 安装 hooks：
+
+```bash
+node packages/hook/dist/agent-together-hook.js install <项目目录> --platform cursor
+```
+
+```bash
+node packages/hook/dist/agent-together-hook.js install <项目目录> --platform codex
 ```
 
 编译能力单元：
 
 ```bash
-node packages/hook/dist/agent-together-compile.js <你的项目目录>
+node packages/hook/dist/agent-together-compile.js <项目目录>
 ```
 
 观察规则示例（`.agent-together/capabilities/no-console-log.md`）：
@@ -102,29 +156,25 @@ level: ask
 认证代码里不许留 console.log（会泄露邮箱等敏感信息），需要日志请用 logger。
 ```
 
-赛马（测试命令写在 `.agent-together/race.json` 的 `testCommand`）：
+赛马（测试命令写在 `project.json` 或 `race.json` 的 `testCommand`）：
 
 ```bash
-node packages/hook/dist/agent-together-race.js <你的项目目录> <节点id> "任务描述" --agents claude-code,codex,cursor --claude-model haiku
+node packages/hook/dist/agent-together-race.js <项目目录> <节点id> "任务描述" --agents claude-code,codex,cursor --claude-model haiku
 ```
 
 ```bash
-node packages/hook/dist/agent-together-race.js adopt <你的项目目录> <赛马id> <claude-code|codex|cursor>
+node packages/hook/dist/agent-together-race.js adopt <项目目录> <赛马id> <claude-code|codex|cursor>
 ```
 
-## L2 模型
+### L2 模型
 
-默认 `auto`：设置了 `ANTHROPIC_API_KEY` 时用 Claude API（`claude-haiku-5-5`），否则用已登录的 `claude` 命令行（Haiku），都没有则关闭 L2、只跑 L0 规则。可在 `.agent-together/llm.json` 中指定（不要写密钥）：
+默认 `auto`：设置了 `ANTHROPIC_API_KEY` 时用 Claude API（`claude-haiku-5-5`），否则用已登录的 `claude` 命令行（Haiku），都没有则只跑 L0 规则。也可以在 `.agent-together/llm.json` 中指定（不要在里面写密钥）：
 
 ```json
 { "provider": "claude-cli", "maxCallsPerSession": 20 }
 ```
 
-`provider` 可选 `auto` / `off` / `anthropic` / `claude-cli` / `openai-compatible`（另需 `baseUrl`、`model`，如本地 Ollama 的 `http://localhost:11434/v1`；密钥放环境变量 `AGENT_TOGETHER_LLM_API_KEY`）。环境变量 `AGENT_TOGETHER_LLM_PROVIDER` 可临时覆盖。
-
-## 规则级别
-
-在 `.agent-together/rules.json` 中按规则设置：`off` / `log` / `warn` / `ask` / `block`。
+`provider` 可选 `auto` / `off` / `anthropic` / `claude-cli` / `openai-compatible`。选 `openai-compatible` 时另需 `baseUrl` 和 `model`，比如本地 Ollama 的 `http://localhost:11434/v1`；密钥放在环境变量 `AGENT_TOGETHER_LLM_API_KEY`。环境变量 `AGENT_TOGETHER_LLM_PROVIDER` 可以临时覆盖。
 
 ## 协议
 

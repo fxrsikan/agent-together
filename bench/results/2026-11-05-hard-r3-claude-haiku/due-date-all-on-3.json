@@ -1,0 +1,40 @@
+{
+  "task": "due-date-all",
+  "node": "todo-model",
+  "condition": "on",
+  "repeat": 3,
+  "agent": "claude-code",
+  "model": "haiku",
+  "ok": true,
+  "summary": "The model node is done: `due` is supported in `src/model/`, and all 106 tests pass. The rest of the `--due` chain (add flag, list display, CLI parsing) is not done, because it sits outside this node's fence.\n\n**What changed in `src/model/todo.ts`:**\n- `Todo` has an optional `due?: string` (YYYY-MM-DD). It is only present on the object when set, so existing data and callers are unaffected.\n- `addTodo(state, title, due?)` takes the optional due date. Numbering is unchanged.\n- New `parseDue(input)` accepts only real calendar dates in `YYYY-MM-DD` form, including leap days. Anything else throws `截",
+  "costUsd": 0.01570026,
+  "durationMs": 199522,
+  "outputTokens": 7064,
+  "files": [
+    {
+      "path": "src/model/todo.test.ts",
+      "added": 41,
+      "removed": 0,
+      "owner": "todo-model"
+    },
+    {
+      "path": "src/model/todo.ts",
+      "added": 32,
+      "removed": 5,
+      "owner": "todo-model"
+    }
+  ],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 24
+  },
+  "tests": {
+    "passed": true,
+    "pass": 106,
+    "fail": 0
+  }
+}

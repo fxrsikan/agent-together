@@ -1,0 +1,44 @@
+{
+  "task": "add-message",
+  "node": "cmd-add",
+  "condition": "on",
+  "repeat": 1,
+  "agent": "cursor",
+  "ok": true,
+  "summary": "I'll read the add-command files and related interfaces, then update the success message and fix any failing tests.Updating the add success message and aligning tests that still expect the old format.`add.ts` and `add.test.ts` are updated. `cli.test.ts` is outside this node’s scope fence, but three assertions there still expect the old `已添加待办 N：标题` format and will fail after the change. Those expectations need updating to `已添加：标题（编号 N）` so the full suite can pass.本节点改动已完成：\n\n- `runAdd` 成功提示改为 `已添加：<标题>（编号 N）`\n- `add.test.ts` 同步断言新文案；本节点测试全部通过\n\n卡在范围外：`src/cli.test.ts` 里还有 3 处旧期望（`已添加待办 N：标题`），会失败",
+  "durationMs": 289642,
+  "outputTokens": 2586,
+  "files": [
+    {
+      "path": "src/commands/add.test.ts",
+      "added": 3,
+      "removed": 4,
+      "owner": "cmd-add"
+    },
+    {
+      "path": "src/commands/add.ts",
+      "added": 1,
+      "removed": 1,
+      "owner": "cmd-add"
+    }
+  ],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 0,
+    "ask": 2,
+    "block": 0,
+    "events": 38
+  },
+  "tests": {
+    "passed": false,
+    "pass": 88,
+    "fail": 3,
+    "failing": [
+      {
+        "path": "src/cli.test.ts",
+        "owner": "cli-entry"
+      }
+    ]
+  }
+}

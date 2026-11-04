@@ -1,0 +1,27 @@
+{
+  "task": "list-filter-e2e",
+  "node": "cmd-list",
+  "condition": "off",
+  "repeat": 1,
+  "agent": "claude-code",
+  "model": "haiku",
+  "ok": true,
+  "summary": "The list node is done and its tests pass, but I did not implement the `--done` / `--todo` filters from the task header.\n\n**What I verified**\n- `src/commands/list.ts` already implements `runList(dir)` as the acceptance criteria describe. It calls `loadState` and `formatList`, returns `暂无待办` when there is no data or no file, and never writes to `todos.json`. It also prints a summary line (`共 N 项，已完成 M 项。`), which the criteria don't require.\n- `src/commands/list.test.ts` has 7 tests covering data, empty data, a missing file, and read-only behaviour. All pass.\n- The whole project suite (7 test fil",
+  "costUsd": 0.01102527,
+  "durationMs": 163593,
+  "outputTokens": 2775,
+  "files": [],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 0
+  },
+  "tests": {
+    "passed": true,
+    "pass": 91,
+    "fail": 0
+  }
+}

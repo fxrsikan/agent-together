@@ -1,0 +1,38 @@
+{
+  "task": "due-date-all",
+  "node": "todo-model",
+  "condition": "off",
+  "repeat": 3,
+  "agent": "cursor",
+  "ok": true,
+  "summary": "I'll inspect the current model and related context so we can add optional `due` in the model layer only.I'll extend the model with optional `due` (YYYY-MM-DD), keeping `addTodo(state, title)` compatible for dependents, and only changing `src/model/**`.模型层已支持可选截止日期，且只改了 `src/model/**`。\n\n**改动：**\n- `Todo` 增加可选字段 `due?: string`（`YYYY-MM-DD`）\n- `addTodo(state, title, due?)`：第三参可选；未传时行为与原来一致\n- `parseDue`：校验真实日历日，非法抛出「截止日期无效」\n- `formatList`：有 due 时追加 `截止:YYYY-MM-DD`\n- 单元测试覆盖编号逻辑、due 写入/校验与列表展示\n\n全部 107 个测试通过。`addTodo(state, title)` 仍兼容依赖方。\n\n按节点规则未改 `add` / `list` / CLI / store；`--due` 解析与 store 对 `due",
+  "durationMs": 249588,
+  "outputTokens": 7837,
+  "files": [
+    {
+      "path": "src/model/todo.test.ts",
+      "added": 61,
+      "removed": 0,
+      "owner": "todo-model"
+    },
+    {
+      "path": "src/model/todo.ts",
+      "added": 50,
+      "removed": 5,
+      "owner": "todo-model"
+    }
+  ],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 0
+  },
+  "tests": {
+    "passed": true,
+    "pass": 107,
+    "fail": 0
+  }
+}

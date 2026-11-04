@@ -1,0 +1,46 @@
+{
+  "task": "add-message",
+  "node": "cmd-add",
+  "condition": "on",
+  "repeat": 3,
+  "agent": "claude-code",
+  "model": "haiku",
+  "ok": true,
+  "summary": "The add message is now `已添加：<标题>（编号 N）`, and the add node's own tests pass (5/5). The full suite is not green: 3 tests in `src/cli.test.ts` still expect the old text, and I did not edit that file.\n\n**What changed (inside the add node):**\n- `src/commands/add.ts`: the return value is now `已添加：${title}（编号 ${next.lastId}）`. The title trimming, the empty-title error, and the store/model calls are unchanged.\n- `src/commands/add.test.ts`: the loose regex checks on the message are replaced with exact-match assertions for `已添加：买 牛奶（编号 1）`, `已添加：第二（编号 2）`, and `已添加：第三（编号 3）`.\n\n**Why `cli.test.ts` is lef",
+  "costUsd": 0.012317439999999999,
+  "durationMs": 186607,
+  "outputTokens": 4003,
+  "files": [
+    {
+      "path": "src/commands/add.test.ts",
+      "added": 3,
+      "removed": 4,
+      "owner": "cmd-add"
+    },
+    {
+      "path": "src/commands/add.ts",
+      "added": 1,
+      "removed": 1,
+      "owner": "cmd-add"
+    }
+  ],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 21
+  },
+  "tests": {
+    "passed": false,
+    "pass": 88,
+    "fail": 3,
+    "failing": [
+      {
+        "path": "src/cli.test.ts",
+        "owner": "cli-entry"
+      }
+    ]
+  }
+}

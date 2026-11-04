@@ -4,6 +4,8 @@ import type { AgentRunner, RunResult } from "@agent-together/schema";
 /**
  * Codex headless: `codex exec --json` with a workspace-write sandbox. Agent messages
  * stream to `onText`; the last one and the token usage come from the JSONL events.
+ * Codex runs project hooks only after someone trusts them in its own UI, so a
+ * headless run in a fresh folder (a bench copy, a race worktree) has no live observer.
  */
 export function codexRunner(model?: string): AgentRunner {
   return {

@@ -1,0 +1,40 @@
+{
+  "task": "due-date-all",
+  "node": "todo-model",
+  "condition": "on",
+  "repeat": 1,
+  "agent": "claude-code",
+  "model": "haiku",
+  "ok": true,
+  "summary": "The model part of the `due` change is done and its 44 tests pass. I did not touch the rest of the chain, because the rules in this node only allow writes under `src/model/**`.\n\n**Changed (only in `src/model/`):**\n- `src/model/todo.ts`\n  - `Todo` gets an optional `due?: string`. The field is only present when a due date was given, so existing `todos.json` data stays valid.\n  - `addTodo(state, title, due?)` accepts an optional due date. If one is passed, it is validated, and an invalid one throws `截止日期无效`. Calls without `due` behave as before.\n  - New `parseDue(input)`: accepts only a real calen",
+  "costUsd": 0.012978920000000001,
+  "durationMs": 96470,
+  "outputTokens": 6002,
+  "files": [
+    {
+      "path": "src/model/todo.test.ts",
+      "added": 39,
+      "removed": 0,
+      "owner": "todo-model"
+    },
+    {
+      "path": "src/model/todo.ts",
+      "added": 33,
+      "removed": 5,
+      "owner": "todo-model"
+    }
+  ],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 21
+  },
+  "tests": {
+    "passed": true,
+    "pass": 104,
+    "fail": 0
+  }
+}

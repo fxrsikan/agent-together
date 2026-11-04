@@ -1,0 +1,38 @@
+{
+  "task": "due-date-all",
+  "node": "todo-model",
+  "condition": "on",
+  "repeat": 1,
+  "agent": "codex",
+  "ok": true,
+  "summary": "Implemented the authorized model changes:\n\n- Added optional `due` and backward-compatible `addTodo(state, title, due?)`.\n- Validates `YYYY-MM-DD` calendar dates.\n- Displays due dates in formatted lists.\n- Added tests; all 110 tests pass.\n\nThe full CLI chain remains incomplete because the task file explicitly restricts edits to `src/model/**`. CLI, command, and storage changes require expanding that scope.",
+  "durationMs": 215931,
+  "outputTokens": 2067,
+  "files": [
+    {
+      "path": "src/model/todo.test.ts",
+      "added": 45,
+      "removed": 0,
+      "owner": "todo-model"
+    },
+    {
+      "path": "src/model/todo.ts",
+      "added": 24,
+      "removed": 3,
+      "owner": "todo-model"
+    }
+  ],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 0
+  },
+  "tests": {
+    "passed": true,
+    "pass": 110,
+    "fail": 0
+  }
+}

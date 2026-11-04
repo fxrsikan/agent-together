@@ -1,0 +1,38 @@
+{
+  "task": "list-filter-e2e",
+  "node": "cmd-list",
+  "condition": "on",
+  "repeat": 1,
+  "agent": "cursor",
+  "ok": true,
+  "summary": "I'll inspect the project structure and the list/CLI code so we can add `--done` / `--todo` filtering end-to-end.Implementing `--done` / `--todo` filtering in `runList`, then wiring the CLI so those flags work end-to-end.CLI edits were blocked by the scope fence. The task requires end-to-end CLI wiring (`todo list --done` / `--todo`), so I'm retrying those changes with that rationale.`runList` filtering is in place and its tests pass. Scope fence still blocks `src/cli.ts`.\n\n**Why CLI must change:** `main` currently calls `runList(dir)` and drops argv after `list`, so `todo list --done` / `todo ",
+  "durationMs": 320532,
+  "outputTokens": 6043,
+  "files": [
+    {
+      "path": "src/commands/list.test.ts",
+      "added": 46,
+      "removed": 0,
+      "owner": "cmd-list"
+    },
+    {
+      "path": "src/commands/list.ts",
+      "added": 43,
+      "removed": 7,
+      "owner": "cmd-list"
+    }
+  ],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 1,
+    "ask": 3,
+    "block": 0,
+    "events": 60
+  },
+  "tests": {
+    "passed": true,
+    "pass": 97,
+    "fail": 0
+  }
+}

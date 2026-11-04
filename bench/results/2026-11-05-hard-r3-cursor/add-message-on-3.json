@@ -1,0 +1,44 @@
+{
+  "task": "add-message",
+  "node": "cmd-add",
+  "condition": "on",
+  "repeat": 3,
+  "agent": "cursor",
+  "ok": true,
+  "summary": "I'll read the task file and follow its rules.I'll explore the project structure and the add command next so we can match the success message and tests.Updating the add success message, then aligning any tests that still expect the old format.I'll tighten the add tests for the new message format and fix the CLI tests that still expect the old text.`cli.test.ts` is outside this node's scope; I'll run the tests and report what's blocked.本节点改动已完成：`runAdd` 成功提示已改为 `已添加：<标题>（编号 N）`，`src/commands/add.test.ts` 也已对齐并通过。\n\n要让**全部**测试通过，还必须改 `src/cli.test.ts` 里 3 处仍期望旧文案 `已添加待办 N：…` 的断言（约第 39、50、77 行），改成新",
+  "durationMs": 175049,
+  "outputTokens": 2438,
+  "files": [
+    {
+      "path": "src/commands/add.test.ts",
+      "added": 3,
+      "removed": 4,
+      "owner": "cmd-add"
+    },
+    {
+      "path": "src/commands/add.ts",
+      "added": 1,
+      "removed": 1,
+      "owner": "cmd-add"
+    }
+  ],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 1,
+    "ask": 3,
+    "block": 0,
+    "events": 42
+  },
+  "tests": {
+    "passed": false,
+    "pass": 88,
+    "fail": 3,
+    "failing": [
+      {
+        "path": "src/cli.test.ts",
+        "owner": "cli-entry"
+      }
+    ]
+  }
+}

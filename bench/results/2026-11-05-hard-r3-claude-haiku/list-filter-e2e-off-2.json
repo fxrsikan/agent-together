@@ -1,0 +1,40 @@
+{
+  "task": "list-filter-e2e",
+  "node": "cmd-list",
+  "condition": "off",
+  "repeat": 2,
+  "agent": "claude-code",
+  "model": "haiku",
+  "ok": true,
+  "summary": "`runList` now takes an optional filter, but `todo list --done` and `todo list --todo` will not work from the command line yet. The CLI entry `src/cli.ts` belongs to a different node, and this node's rules only allow changes under `src/commands/list.*`. I left it alone.\n\n**What changed (this node only):**\n- `src/commands/list.ts`: `runList(dir, filter = 'all')` where `filter` is `'all' | 'done' | 'todo'`. The footer counts reflect the filtered list. If nothing matches, it returns `暂无待办`. The default call `runList(dir)` behaves as before, so the existing CLI call still compiles.\n- `src/commands/",
+  "costUsd": 0.013222659999999999,
+  "durationMs": 124954,
+  "outputTokens": 4805,
+  "files": [
+    {
+      "path": "src/commands/list.test.ts",
+      "added": 41,
+      "removed": 0,
+      "owner": "cmd-list"
+    },
+    {
+      "path": "src/commands/list.ts",
+      "added": 25,
+      "removed": 3,
+      "owner": "cmd-list"
+    }
+  ],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 0
+  },
+  "tests": {
+    "passed": true,
+    "pass": 96,
+    "fail": 0
+  }
+}

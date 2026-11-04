@@ -1,0 +1,38 @@
+{
+  "task": "list-filter-e2e",
+  "node": "cmd-list",
+  "condition": "on",
+  "repeat": 3,
+  "agent": "cursor",
+  "ok": true,
+  "summary": "I'll read the task file and follow its rules.I'll inspect the list command, model, store, and CLI so we can add `--done` / `--todo` filtering end-to-end.Checking project context and whether filter behavior is already sketched anywhere.Implementing `--done` / `--todo` filtering in `runList`, then updating the CLI so those flags work end-to-end.CLI edits were blocked by the scope fence. Running list tests, then I'll explain why the CLI change is required.`runList` now supports `--done` / `--todo` (list unit tests pass). Scope fence blocked edits to `src/cli.ts`.\n\n**Why CLI must change for this n",
+  "durationMs": 254140,
+  "outputTokens": 6362,
+  "files": [
+    {
+      "path": "src/commands/list.test.ts",
+      "added": 50,
+      "removed": 11,
+      "owner": "cmd-list"
+    },
+    {
+      "path": "src/commands/list.ts",
+      "added": 45,
+      "removed": 7,
+      "owner": "cmd-list"
+    }
+  ],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 0,
+    "ask": 2,
+    "block": 0,
+    "events": 64
+  },
+  "tests": {
+    "passed": true,
+    "pass": 97,
+    "fail": 0
+  }
+}

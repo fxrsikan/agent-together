@@ -1,0 +1,40 @@
+{
+  "task": "list-filter-e2e",
+  "node": "cmd-list",
+  "condition": "on",
+  "repeat": 1,
+  "agent": "claude-code",
+  "model": "haiku",
+  "ok": true,
+  "summary": "The `list` node is done, but `todo list --done` and `todo list --todo` don't work from the command line yet. The CLI entry `src/cli.ts` still ignores extra arguments, and I did not edit it because it is outside this node's allowed files (`src/commands/list.*`).\n\n**What changed (within scope):**\n- `src/commands/list.ts`: `runList(dir, filter = 'all')` now takes an optional filter, `'all' | 'done' | 'todo'`. Calling it with no filter behaves exactly as before.\n  - `'done'` lists only completed items and `'todo'` lists only unfinished ones. The footer counts the items shown.\n  - When nothing matc",
+  "costUsd": 0.01318731,
+  "durationMs": 152204,
+  "outputTokens": 4741,
+  "files": [
+    {
+      "path": "src/commands/list.test.ts",
+      "added": 56,
+      "removed": 0,
+      "owner": "cmd-list"
+    },
+    {
+      "path": "src/commands/list.ts",
+      "added": 30,
+      "removed": 7,
+      "owner": "cmd-list"
+    }
+  ],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 26
+  },
+  "tests": {
+    "passed": true,
+    "pass": 99,
+    "fail": 0
+  }
+}

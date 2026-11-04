@@ -1,0 +1,26 @@
+{
+  "task": "list-filter-e2e",
+  "node": "cmd-list",
+  "condition": "on",
+  "repeat": 3,
+  "agent": "grok-build",
+  "ok": false,
+  "summary": "\n[grok stopReason: undefined; Error: You’ve reached your free Grok Build usage limit for now. Get SuperGrok for much higher limits, or try again later: https://grok.com/supergrok?referrer=grok-build]",
+  "costUsd": 0.031524,
+  "durationMs": 32114,
+  "outputTokens": 102,
+  "files": [],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 2
+  },
+  "tests": {
+    "passed": true,
+    "pass": 91,
+    "fail": 0
+  }
+}

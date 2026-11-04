@@ -1,0 +1,40 @@
+{
+  "task": "list-filter-e2e",
+  "node": "cmd-list",
+  "condition": "on",
+  "repeat": 3,
+  "agent": "claude-code",
+  "model": "haiku",
+  "ok": true,
+  "summary": "`list.ts` now supports the filters, but `todo list --done` and `--todo` will not work from the command line yet. The fix needs a change to `src/cli.ts`, which is outside this node's writable scope, so I didn't make it.\n\n**What changed (`src/commands/list.ts`, `src/commands/list.test.ts`):**\n- `runList(dir, filter = 'all')` takes an optional filter of `'all' | 'done' | 'todo'`. Calling `runList(dir)` still gives exactly the old output, so `cli.ts` and existing callers are unaffected.\n- `'done'` returns only completed rows. `'todo'` returns only incomplete rows.\n- A filtered view has no `共 N 项…`",
+  "costUsd": 0.019223419999999998,
+  "durationMs": 211970,
+  "outputTokens": 7693,
+  "files": [
+    {
+      "path": "src/commands/list.test.ts",
+      "added": 49,
+      "removed": 0,
+      "owner": "cmd-list"
+    },
+    {
+      "path": "src/commands/list.ts",
+      "added": 22,
+      "removed": 6,
+      "owner": "cmd-list"
+    }
+  ],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 20
+  },
+  "tests": {
+    "passed": true,
+    "pass": 98,
+    "fail": 0
+  }
+}

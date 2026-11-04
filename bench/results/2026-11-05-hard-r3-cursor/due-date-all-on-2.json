@@ -1,0 +1,38 @@
+{
+  "task": "due-date-all",
+  "node": "todo-model",
+  "condition": "on",
+  "repeat": 2,
+  "agent": "cursor",
+  "ok": true,
+  "summary": "I'll inspect the existing model and related interfaces so we can add optional `due` only under `src/model/**`.Checking related context and how dependents use the model so we can add `due` without breaking them.Extending the model with optional `due` (YYYY-MM-DD), keeping existing callers compatible, and only changing `src/model/**`.Model-layer due-date support is in place under `src/model/**`; all 106 tests pass.\n\n**Changes in `src/model/todo.ts`**\n- `Todo` has optional `due?: string` (YYYY-MM-DD)\n- `addTodo(state, title, due?)` — omits `due` when unset; validates via `parseDue` when set\n- `fo",
+  "durationMs": 324695,
+  "outputTokens": 8094,
+  "files": [
+    {
+      "path": "src/model/todo.test.ts",
+      "added": 60,
+      "removed": 0,
+      "owner": "todo-model"
+    },
+    {
+      "path": "src/model/todo.ts",
+      "added": 44,
+      "removed": 5,
+      "owner": "todo-model"
+    }
+  ],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 62
+  },
+  "tests": {
+    "passed": true,
+    "pass": 106,
+    "fail": 0
+  }
+}

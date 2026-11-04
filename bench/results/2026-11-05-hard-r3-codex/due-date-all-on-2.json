@@ -1,0 +1,38 @@
+{
+  "task": "due-date-all",
+  "node": "todo-model",
+  "condition": "on",
+  "repeat": 2,
+  "agent": "codex",
+  "ok": true,
+  "summary": "Implemented the permitted model changes:\n\n- Optional `due` field and backward-compatible `addTodo(state, title, due?)`.\n- Valid `YYYY-MM-DD` date validation.\n- Due dates in list output.\n- Tests for dates, formatting, and state preservation.\n\nAll 105 tests pass.\n\nCLI `--due` support remains unfinished because the task file explicitly limits edits to `src/model/**`.",
+  "durationMs": 102894,
+  "outputTokens": 1655,
+  "files": [
+    {
+      "path": "src/model/todo.test.ts",
+      "added": 32,
+      "removed": 0,
+      "owner": "todo-model"
+    },
+    {
+      "path": "src/model/todo.ts",
+      "added": 23,
+      "removed": 3,
+      "owner": "todo-model"
+    }
+  ],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 0
+  },
+  "tests": {
+    "passed": true,
+    "pass": 105,
+    "fail": 0
+  }
+}

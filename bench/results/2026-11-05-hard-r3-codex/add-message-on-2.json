@@ -1,0 +1,44 @@
+{
+  "task": "add-message",
+  "node": "cmd-add",
+  "condition": "on",
+  "repeat": 2,
+  "agent": "codex",
+  "ok": true,
+  "summary": "已将成功提示改为 `已添加：<标题>（编号 N）`，并更新 add 测试以精确验证格式。\n\n运行 `node --test`：88/91 通过。剩余 3 个失败均因 `src/cli.test.ts` 仍期待旧提示。\n\n任务文件明确规定“只修改本节点的文件”，允许范围仅为 `src/commands/add.*`。需要你授权修改 `src/cli.test.ts` 中这 3 处期望，才能让全部测试通过。",
+  "durationMs": 86354,
+  "outputTokens": 792,
+  "files": [
+    {
+      "path": "src/commands/add.test.ts",
+      "added": 5,
+      "removed": 5,
+      "owner": "cmd-add"
+    },
+    {
+      "path": "src/commands/add.ts",
+      "added": 1,
+      "removed": 1,
+      "owner": "cmd-add"
+    }
+  ],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 0
+  },
+  "tests": {
+    "passed": false,
+    "pass": 88,
+    "fail": 3,
+    "failing": [
+      {
+        "path": "src/cli.test.ts",
+        "owner": "cli-entry"
+      }
+    ]
+  }
+}

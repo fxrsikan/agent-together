@@ -1,0 +1,24 @@
+{
+  "task": "add-message",
+  "node": "cmd-add",
+  "condition": "on",
+  "repeat": 2,
+  "agent": "grok-build",
+  "ok": false,
+  "summary": "\n[grok stopReason: undefined; Error: You’ve reached your free Grok Build usage limit for now. Get SuperGrok for much higher limits, or try again later: https://grok.com/supergrok?referrer=grok-build]",
+  "durationMs": 20197,
+  "files": [],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 0
+  },
+  "tests": {
+    "passed": true,
+    "pass": 91,
+    "fail": 0
+  }
+}

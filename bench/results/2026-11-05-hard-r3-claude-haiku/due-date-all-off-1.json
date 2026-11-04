@@ -1,0 +1,40 @@
+{
+  "task": "due-date-all",
+  "node": "todo-model",
+  "condition": "off",
+  "repeat": 1,
+  "agent": "claude-code",
+  "model": "haiku",
+  "ok": true,
+  "summary": "The model node now supports an optional due date, and the model tests pass (39/39, up from 31). I only changed files under `src/model/`, as this node's rules require.\n\n**What changed in `src/model/todo.ts`**\n- `Todo` has an optional `due?: string` (YYYY-MM-DD). Todos without a due date don't get the key at all, so existing output and data are unchanged.\n- `addTodo(state, title, due?)`: the new optional argument is backward compatible. A bad date throws `截止日期无效`, and numbering rules are unchanged.\n- New `parseDue(input)`: accepts only real calendar dates in `YYYY-MM-DD` form, including leap day",
+  "costUsd": 0.01391053,
+  "durationMs": 98241,
+  "outputTokens": 6284,
+  "files": [
+    {
+      "path": "src/model/todo.test.ts",
+      "added": 66,
+      "removed": 0,
+      "owner": "todo-model"
+    },
+    {
+      "path": "src/model/todo.ts",
+      "added": 33,
+      "removed": 5,
+      "owner": "todo-model"
+    }
+  ],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 0
+  },
+  "tests": {
+    "passed": true,
+    "pass": 99,
+    "fail": 0
+  }
+}

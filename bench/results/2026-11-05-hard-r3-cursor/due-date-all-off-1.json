@@ -1,0 +1,38 @@
+{
+  "task": "due-date-all",
+  "node": "todo-model",
+  "condition": "off",
+  "repeat": 1,
+  "agent": "cursor",
+  "ok": true,
+  "summary": "I'll read the model node constraints and inspect the existing `src/model` code so we can add optional `due` support there.Found the benchmark specs. I'll check how scoring expects the model `due` API to look.Implementing optional `due` in the model only, keeping the API backward-compatible for dependents.Model layer now supports optional due dates. All 105 tests pass. Only `src/model/**` was changed — the node rules forbid editing store/commands/cli.\n\n**In `src/model/`:**\n- `Todo` gains optional `due?: string` (YYYY-MM-DD); omitted when unset so existing data/tests stay valid\n- `addTodo(state,",
+  "durationMs": 665292,
+  "outputTokens": 7832,
+  "files": [
+    {
+      "path": "src/model/todo.test.ts",
+      "added": 52,
+      "removed": 0,
+      "owner": "todo-model"
+    },
+    {
+      "path": "src/model/todo.ts",
+      "added": 45,
+      "removed": 5,
+      "owner": "todo-model"
+    }
+  ],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 0
+  },
+  "tests": {
+    "passed": true,
+    "pass": 105,
+    "fail": 0
+  }
+}

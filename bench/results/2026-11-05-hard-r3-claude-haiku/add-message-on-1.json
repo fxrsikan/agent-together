@@ -1,0 +1,46 @@
+{
+  "task": "add-message",
+  "node": "cmd-add",
+  "condition": "on",
+  "repeat": 1,
+  "agent": "claude-code",
+  "model": "haiku",
+  "ok": true,
+  "summary": "The add message is changed, but the full test suite is not green yet. Three tests in `src/cli.test.ts` still expect the old wording, and I couldn't update them because of the scope fence.\n\n**What changed (within `src/commands/add.*`)**\n- `src/commands/add.ts`: the success message is now `已添加：<标题>（编号 N）`, for example `已添加：买 牛奶（编号 1）`.\n- `src/commands/add.test.ts`: the first test now asserts the exact new message instead of loose regex matches. `add.test.ts` passes 5/5.\n\n**What's still failing**\nFull run: 91 tests, 88 pass, 3 fail. All three are the old-wording expectations in `src/cli.test.ts`:",
+  "costUsd": 0.01447138,
+  "durationMs": 175599,
+  "outputTokens": 5154,
+  "files": [
+    {
+      "path": "src/commands/add.test.ts",
+      "added": 1,
+      "removed": 2,
+      "owner": "cmd-add"
+    },
+    {
+      "path": "src/commands/add.ts",
+      "added": 1,
+      "removed": 1,
+      "owner": "cmd-add"
+    }
+  ],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 0,
+    "ask": 3,
+    "block": 0,
+    "events": 30
+  },
+  "tests": {
+    "passed": false,
+    "pass": 88,
+    "fail": 3,
+    "failing": [
+      {
+        "path": "src/cli.test.ts",
+        "owner": "cli-entry"
+      }
+    ]
+  }
+}

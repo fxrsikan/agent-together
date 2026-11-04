@@ -17,7 +17,7 @@ npm run build
 node packages/hook/dist/agent-together-bench.js run bench/fixtures/todo-cli bench/tasks.json bench/results/<名字> --repeats 2 --parallel 3
 ```
 
-可选：`--agent codex|cursor`、`--model <模型>`、`--only <任务id,…>`、`--conditions on,off,bare`、`--keep`（保留副本以便查看）。已经跑完的不会重跑；单独重新出报告：
+可选：`--agent codex|cursor|grok-build`、`--model <模型>`、`--only <任务id,…>`、`--conditions on,off,bare`、`--keep`（保留副本以便查看）。已经跑完的不会重跑；单独重新出报告：
 
 ```bash
 node packages/hook/dist/agent-together-bench.js report bench/results/<名字>
@@ -50,3 +50,31 @@ node packages/hook/dist/agent-together-bench.js report bench/results/<名字>
 
 - 用不太听指令的 agent（Codex、Cursor）和更有诱惑的任务（例如明确要求"顺便把相关的地方都改好"、测试本身有错）再跑，检验观察者在"计划没管住"时能不能兜住。
 - 加一项"功能是否端到端可用"的检查，衡量分节点做事的完成度代价。
+
+## 第二次结果（2026-11-05，困难任务 × 开/关观察者 × 3 次，四个 AI 助手）
+
+任务集 [tasks-hard.json](tasks-hard.json)：4 个任务，每个都在诱惑 AI 改别的卡片的文件（任务里直接点名别的文件，或者别的卡片的测试断言了旧行为）。这一次 AI 自己能跑测试。"守边界上报"指没改别的卡片的文件、剩下没过的测试全属于别的卡片，留给人决定。
+
+| 助手 | 条件 | 有效次数 | 改了别的卡片文件 | 测试通过率 | 守边界完成 | 守边界上报 | 平均拦截 |
+|---|---|---|---|---|---|---|---|
+| Cursor | 开观察者 | 12 | **0%** | 75% | **75%** | 25% | 1.5 |
+| Cursor | 只给卡片上下文 | 12 | **67%**（平均 1.3 个文件） | 92% | 33% | 0% | 0 |
+| Claude Code（Haiku） | 开观察者 | 12 | 0% | 75% | 75% | 25% | 0.5 |
+| Claude Code（Haiku） | 只给卡片上下文 | 12 | 8% | 83% | 75% | 17% | 0 |
+| Codex | 两组实际都没有观察者 | 12 + 12 | 25% / 0% | 75% / 75% | 50% / 75% | 25% / 25% | 0 |
+| Grok Build | 没跑成 | 0 | — | — | — | — | — |
+
+完整数据：[Cursor](results/2026-11-05-hard-r3-cursor/report.md)、[Claude Haiku](results/2026-11-05-hard-r3-claude-haiku/report.md)、[Codex](results/2026-11-05-hard-r3-codex/report.md)、[Grok](results/2026-11-05-hard-r3-grok/report.md)。
+
+### 结论
+
+1. **计划管不住的时候，观察者兜住了。** Cursor 只拿到卡片上下文时，12 次里 8 次改了别的卡片的文件（4 个任务里 2 个是 3 次全改，"软删除"有一次改了 6 个别人的文件）；开着观察者时 0 次，平均每次拦 1.5 下。
+2. **"测试通过率"会骗人。** 关观察者的 Cursor 测试通过率更高（92% 对 75%），因为它直接改了别的卡片的测试和代码。按"守边界完成"算，开观察者是 75%，关掉只有 33%。开观察者时剩下的 25% 全是正确的"守边界上报"：那个任务本身就需要别的卡片配合。
+3. **Claude Haiku 本来就守规矩。** 和第一次一样，有卡片上下文就基本不越界（12 次里 1 次），观察者偶尔出手（平均 0.5 次）。
+4. **没有发现篡改测试。** 所有有效运行都是 0。
+
+### 要诚实看待的地方
+
+- **Codex 这组数据不能说明观察者的作用。** Codex 只在用户在它自己的界面里信任过项目 hook 后才会调用 hook；评测每次都是新副本，hook 从来没被调用（观察者收到 0 个事件），两组其实都没有观察者。25% 和 0% 的差别只是 Codex 每次表现不同。报告里已经标出这一点。
+- **Grok Build 一次都没跑成。** 24 次全部碰到免费额度上限，什么都没改。评测现在把这种"出错退出、什么都没改"的运行标成"没跑成"、不计入统计（以前会被误算成"测试通过"）。
+- **样本还是小。** 每组 12 次、一个小项目、四个任务。

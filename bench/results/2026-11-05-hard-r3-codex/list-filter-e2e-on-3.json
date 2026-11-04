@@ -1,0 +1,52 @@
+{
+  "task": "list-filter-e2e",
+  "node": "cmd-list",
+  "condition": "on",
+  "repeat": 3,
+  "agent": "codex",
+  "ok": true,
+  "summary": "Implemented end-to-end filtering:\n\n- `todo list --done` shows completed items.\n- `todo list --todo` shows unfinished items.\n- Plain `todo list` retains its existing behavior.\n- CLI help and argument validation are updated; data remains unchanged.\n\nAll 95 tests pass, including CLI filtering tests.",
+  "durationMs": 119666,
+  "outputTokens": 2000,
+  "files": [
+    {
+      "path": "src/cli.ts",
+      "added": 2,
+      "removed": 2,
+      "owner": "cli-entry"
+    },
+    {
+      "path": "src/commands/list.test.ts",
+      "added": 58,
+      "removed": 0,
+      "owner": "cmd-list"
+    },
+    {
+      "path": "src/commands/list.ts",
+      "added": 9,
+      "removed": 2,
+      "owner": "cmd-list"
+    }
+  ],
+  "outside": [
+    "src/cli.ts"
+  ],
+  "findings": [
+    {
+      "rule": "scope-fence",
+      "level": "ask",
+      "message": "src/cli.ts is outside node \"列表命令\" (owns: src/commands/list.*). Explain how this serves the node's goal, or stay within its files."
+    }
+  ],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 0
+  },
+  "tests": {
+    "passed": true,
+    "pass": 95,
+    "fail": 0
+  }
+}

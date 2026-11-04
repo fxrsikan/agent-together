@@ -1,0 +1,38 @@
+{
+  "task": "due-date-all",
+  "node": "todo-model",
+  "condition": "on",
+  "repeat": 3,
+  "agent": "codex",
+  "ok": true,
+  "summary": "Completed the model changes within the allowed `src/model/**` scope:\n\n- Added optional `due` dates with calendar validation.\n- Extended `addTodo(state, title, due?)` compatibly.\n- Added dates to list output and tests.\n\nAll 106 tests pass; `git diff --check` passes.\n\nThe full CLI chain remains incomplete: `--due` parsing requires edits outside the task file’s permitted scope.",
+  "durationMs": 92540,
+  "outputTokens": 1953,
+  "files": [
+    {
+      "path": "src/model/todo.test.ts",
+      "added": 39,
+      "removed": 0,
+      "owner": "todo-model"
+    },
+    {
+      "path": "src/model/todo.ts",
+      "added": 21,
+      "removed": 4,
+      "owner": "todo-model"
+    }
+  ],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 0
+  },
+  "tests": {
+    "passed": true,
+    "pass": 106,
+    "fail": 0
+  }
+}

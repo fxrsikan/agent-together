@@ -1,0 +1,40 @@
+{
+  "task": "list-filter-e2e",
+  "node": "cmd-list",
+  "condition": "on",
+  "repeat": 2,
+  "agent": "claude-code",
+  "model": "haiku",
+  "ok": true,
+  "summary": "`runList` now accepts `--done` and `--todo`, but `todo list --done` will not work from the command line yet. The CLI entry needs a one-line change that is outside this node's allowed files, so I left it alone.\n\n**What changed (in `src/commands/list.ts` and `src/commands/list.test.ts` only):**\n- `runList(dir, args = [])` parses the flags. Calling `runList(dir)` still behaves as before, so the existing `cli.ts` call keeps working.\n- `--done` lists only completed items. `--todo` lists only incomplete items.\n- If nothing matches, it returns `暂无已完成待办` or `暂无未完成待办`. If `todos.json` is missing or emp",
+  "costUsd": 0.015433470000000001,
+  "durationMs": 145931,
+  "outputTokens": 6454,
+  "files": [
+    {
+      "path": "src/commands/list.test.ts",
+      "added": 49,
+      "removed": 0,
+      "owner": "cmd-list"
+    },
+    {
+      "path": "src/commands/list.ts",
+      "added": 45,
+      "removed": 5,
+      "owner": "cmd-list"
+    }
+  ],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 20
+  },
+  "tests": {
+    "passed": true,
+    "pass": 97,
+    "fail": 0
+  }
+}

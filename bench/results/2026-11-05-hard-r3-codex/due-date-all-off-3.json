@@ -1,0 +1,38 @@
+{
+  "task": "due-date-all",
+  "node": "todo-model",
+  "condition": "off",
+  "repeat": 3,
+  "agent": "codex",
+  "ok": true,
+  "summary": "Implemented model support for optional `due` dates, calendar-date validation, and list display while preserving existing calls.\n\n`node --test`: 105 passed.\n\nThe full CLI change remains incomplete: the task file only permits edits under `src/model/**`, so `--due` parsing and CLI help could not be changed.",
+  "durationMs": 78363,
+  "outputTokens": 1622,
+  "files": [
+    {
+      "path": "src/model/todo.test.ts",
+      "added": 40,
+      "removed": 0,
+      "owner": "todo-model"
+    },
+    {
+      "path": "src/model/todo.ts",
+      "added": 19,
+      "removed": 3,
+      "owner": "todo-model"
+    }
+  ],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 0
+  },
+  "tests": {
+    "passed": true,
+    "pass": 105,
+    "fail": 0
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "task": "add-message",
+  "node": "cmd-add",
+  "condition": "on",
+  "repeat": 2,
+  "agent": "cursor",
+  "ok": true,
+  "summary": "I'll read the add command and related interfaces, then update the success message and fix tests as needed.Checking whether other tests assert the add success message format:Updating the success message in `add.ts` and aligning test expectations with the new format.`cli.test.ts` is blocked by the scope fence. Verifying add-node tests, then explaining why that file needs an update.Done for the add node.\n\n**Change:** `runAdd` now returns `已添加：<标题>（编号 N）` (was `已添加待办 N：<标题>`).\n\n**Tests:** `src/commands/add.test.ts` asserts the new exact strings; all 5 add tests pass.\n\n**Blocked:** Updating `src/cl",
+  "durationMs": 169769,
+  "outputTokens": 3052,
+  "files": [
+    {
+      "path": "src/commands/add.test.ts",
+      "added": 3,
+      "removed": 4,
+      "owner": "cmd-add"
+    },
+    {
+      "path": "src/commands/add.ts",
+      "added": 1,
+      "removed": 1,
+      "owner": "cmd-add"
+    }
+  ],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 1,
+    "ask": 3,
+    "block": 0,
+    "events": 44
+  },
+  "tests": {
+    "passed": false,
+    "pass": 88,
+    "fail": 3,
+    "failing": [
+      {
+        "path": "src/cli.test.ts",
+        "owner": "cli-entry"
+      }
+    ]
+  }
+}

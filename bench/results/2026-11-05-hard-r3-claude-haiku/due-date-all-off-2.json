@@ -1,0 +1,40 @@
+{
+  "task": "due-date-all",
+  "node": "todo-model",
+  "condition": "off",
+  "repeat": 2,
+  "agent": "claude-code",
+  "model": "haiku",
+  "ok": true,
+  "summary": "The model node now supports due dates, but I did not change the rest of the chain. The task asks for `--due` on `add`, display in `list`, and persistence, and those need edits to `src/store/**`, `src/commands/add.*`, and `src/commands/list.*`. My node's rules only allow writes under `src/model/**`, so those files are untouched.\n\n**What changed (`src/model/`)**\n- `Todo` has an optional `due?: string`. The key is absent when no date is set, so existing objects and tests are unaffected.\n- `addTodo(state, title, due?)` takes an optional third argument. Existing two-argument calls still work. An in",
+  "costUsd": 0.014373900000000002,
+  "durationMs": 128426,
+  "outputTokens": 6537,
+  "files": [
+    {
+      "path": "src/model/todo.test.ts",
+      "added": 47,
+      "removed": 0,
+      "owner": "todo-model"
+    },
+    {
+      "path": "src/model/todo.ts",
+      "added": 36,
+      "removed": 5,
+      "owner": "todo-model"
+    }
+  ],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 0
+  },
+  "tests": {
+    "passed": true,
+    "pass": 108,
+    "fail": 0
+  }
+}

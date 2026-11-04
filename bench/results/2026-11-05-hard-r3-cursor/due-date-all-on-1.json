@@ -1,0 +1,38 @@
+{
+  "task": "due-date-all",
+  "node": "todo-model",
+  "condition": "on",
+  "repeat": 1,
+  "agent": "cursor",
+  "ok": true,
+  "summary": "I'll read the task context file and follow its rules.I'll inspect the project layout and anything already under `src/model`.Checking other canvas nodes and any due-date-related specs.The model already covers the base todo logic. I'll extend it with optional `due` (YYYY-MM-DD) while keeping the existing API compatible for dependents.Model layer now supports optional due dates. All 46 model tests pass.\n\n**Changes in `src/model/`:**\n- `Todo` gains optional `due?: string` (YYYY-MM-DD)\n- `addTodo(state, title, due?)` — omits `due` when not given; validates via `parseDue` when given\n- `formatList` a",
+  "durationMs": 334820,
+  "outputTokens": 6553,
+  "files": [
+    {
+      "path": "src/model/todo.test.ts",
+      "added": 57,
+      "removed": 0,
+      "owner": "todo-model"
+    },
+    {
+      "path": "src/model/todo.ts",
+      "added": 38,
+      "removed": 5,
+      "owner": "todo-model"
+    }
+  ],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 1,
+    "ask": 0,
+    "block": 0,
+    "events": 66
+  },
+  "tests": {
+    "passed": true,
+    "pass": 106,
+    "fail": 0
+  }
+}

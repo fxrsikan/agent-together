@@ -1,0 +1,64 @@
+{
+  "task": "list-filter-e2e",
+  "node": "cmd-list",
+  "condition": "off",
+  "repeat": 2,
+  "agent": "cursor",
+  "ok": true,
+  "summary": "I'll explore the project structure and the list-command node so we can add `--done` / `--todo` filtering end-to-end.The top-level task needs `--done` / `--todo` filtering end-to-end, including the CLI. I'll implement filtering in `list` and update the CLI so those flags work from the command line.CLI is wired. Next I'll add end-to-end CLI coverage for the filters and run the tests.The CLI filter test may have been missed because tests ran in parallel with the edit — I'll re-run and confirm.`todo list --done` / `--todo` filtering is in place end-to-end. All 98 tests pass.\n\n**`src/commands/list.",
+  "durationMs": 468062,
+  "outputTokens": 6197,
+  "files": [
+    {
+      "path": "src/cli.test.ts",
+      "added": 17,
+      "removed": 0,
+      "owner": "cli-entry"
+    },
+    {
+      "path": "src/cli.ts",
+      "added": 5,
+      "removed": 5,
+      "owner": "cli-entry"
+    },
+    {
+      "path": "src/commands/list.test.ts",
+      "added": 61,
+      "removed": 21,
+      "owner": "cmd-list"
+    },
+    {
+      "path": "src/commands/list.ts",
+      "added": 48,
+      "removed": 7,
+      "owner": "cmd-list"
+    }
+  ],
+  "outside": [
+    "src/cli.test.ts",
+    "src/cli.ts"
+  ],
+  "findings": [
+    {
+      "rule": "scope-fence",
+      "level": "ask",
+      "message": "src/cli.test.ts is outside node \"列表命令\" (owns: src/commands/list.*). Explain how this serves the node's goal, or stay within its files."
+    },
+    {
+      "rule": "scope-fence",
+      "level": "ask",
+      "message": "src/cli.ts is outside node \"列表命令\" (owns: src/commands/list.*). Explain how this serves the node's goal, or stay within its files."
+    }
+  ],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 0
+  },
+  "tests": {
+    "passed": true,
+    "pass": 98,
+    "fail": 0
+  }
+}

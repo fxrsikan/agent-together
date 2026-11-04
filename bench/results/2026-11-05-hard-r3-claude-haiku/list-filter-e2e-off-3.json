@@ -1,0 +1,40 @@
+{
+  "task": "list-filter-e2e",
+  "node": "cmd-list",
+  "condition": "off",
+  "repeat": 3,
+  "agent": "claude-code",
+  "model": "haiku",
+  "ok": true,
+  "summary": "`runList` now takes an optional filter, and the list tests pass. The command-line flags `--done` and `--todo` still don't work end to end, because the parsing belongs to `src/cli.ts`, which is outside this node.\n\n## What changed\n\n**`src/commands/list.ts`**\n- `runList(dir, filter = 'all')` now accepts `'all' | 'done' | 'todo'`. Calling `runList(dir)` behaves as before.\n- With `'done'` it lists only completed items; with `'todo'` only incomplete ones.\n- The summary line (`共 N 项，已完成 M 项。`) is always computed over all todos, so filtered output still shows the overall totals.\n- When nothing matches",
+  "costUsd": 0.0143187,
+  "durationMs": 191071,
+  "outputTokens": 4847,
+  "files": [
+    {
+      "path": "src/commands/list.test.ts",
+      "added": 49,
+      "removed": 0,
+      "owner": "cmd-list"
+    },
+    {
+      "path": "src/commands/list.ts",
+      "added": 28,
+      "removed": 5,
+      "owner": "cmd-list"
+    }
+  ],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 0
+  },
+  "tests": {
+    "passed": true,
+    "pass": 98,
+    "fail": 0
+  }
+}

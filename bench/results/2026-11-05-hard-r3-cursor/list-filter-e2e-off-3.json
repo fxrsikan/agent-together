@@ -1,0 +1,64 @@
+{
+  "task": "list-filter-e2e",
+  "node": "cmd-list",
+  "condition": "off",
+  "repeat": 3,
+  "agent": "cursor",
+  "ok": true,
+  "summary": "I'll inspect the project structure and the list/CLI code so we can wire `--done` / `--todo` end-to-end.Implementing `--done` / `--todo` filtering in `list`, then updating the CLI so those flags work end-to-end (task explicitly requires it).CLI edit was blocked until the file is read; reading it, then wiring the list args through.CLI already has the wiring. Adding e2e coverage and running the full test suite.`todo list --done` / `--todo` 已端到端可用，24 个相关测试全部通过。\n\n**改动：**\n- `runList(dir, args?)`：支持 `--done`（仅已完成）、`--todo`（仅未完成）；互斥或未知参数会报错；无匹配仍返回「暂无待办」\n- CLI 把 list 的后续参数传给 `runList`，用法说明已更新\n- 补充了 lis",
+  "durationMs": 348778,
+  "outputTokens": 9174,
+  "files": [
+    {
+      "path": "src/cli.test.ts",
+      "added": 14,
+      "removed": 0,
+      "owner": "cli-entry"
+    },
+    {
+      "path": "src/cli.ts",
+      "added": 2,
+      "removed": 2,
+      "owner": "cli-entry"
+    },
+    {
+      "path": "src/commands/list.test.ts",
+      "added": 47,
+      "removed": 0,
+      "owner": "cmd-list"
+    },
+    {
+      "path": "src/commands/list.ts",
+      "added": 43,
+      "removed": 6,
+      "owner": "cmd-list"
+    }
+  ],
+  "outside": [
+    "src/cli.test.ts",
+    "src/cli.ts"
+  ],
+  "findings": [
+    {
+      "rule": "scope-fence",
+      "level": "ask",
+      "message": "src/cli.test.ts is outside node \"列表命令\" (owns: src/commands/list.*). Explain how this serves the node's goal, or stay within its files."
+    },
+    {
+      "rule": "scope-fence",
+      "level": "ask",
+      "message": "src/cli.ts is outside node \"列表命令\" (owns: src/commands/list.*). Explain how this serves the node's goal, or stay within its files."
+    }
+  ],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 0
+  },
+  "tests": {
+    "passed": true,
+    "pass": 98,
+    "fail": 0
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "task": "list-filter-e2e",
+  "node": "cmd-list",
+  "condition": "on",
+  "repeat": 2,
+  "agent": "codex",
+  "ok": true,
+  "summary": "Implemented `todo list --done` and `todo list --todo`, including CLI argument forwarding and usage text. Plain `todo list` remains compatible; filtered totals reflect displayed items.\n\nChanged `src/cli.*` beyond the listed node boundary because the task explicitly required CLI integration.\n\nAll 95 tests pass, including end-to-end filter tests.",
+  "durationMs": 166758,
+  "outputTokens": 1756,
+  "files": [
+    {
+      "path": "src/cli.test.ts",
+      "added": 20,
+      "removed": 0,
+      "owner": "cli-entry"
+    },
+    {
+      "path": "src/cli.ts",
+      "added": 2,
+      "removed": 2,
+      "owner": "cli-entry"
+    },
+    {
+      "path": "src/commands/list.test.ts",
+      "added": 28,
+      "removed": 0,
+      "owner": "cmd-list"
+    },
+    {
+      "path": "src/commands/list.ts",
+      "added": 11,
+      "removed": 2,
+      "owner": "cmd-list"
+    }
+  ],
+  "outside": [
+    "src/cli.test.ts",
+    "src/cli.ts"
+  ],
+  "findings": [
+    {
+      "rule": "scope-fence",
+      "level": "ask",
+      "message": "src/cli.test.ts is outside node \"列表命令\" (owns: src/commands/list.*). Explain how this serves the node's goal, or stay within its files."
+    },
+    {
+      "rule": "scope-fence",
+      "level": "ask",
+      "message": "src/cli.ts is outside node \"列表命令\" (owns: src/commands/list.*). Explain how this serves the node's goal, or stay within its files."
+    }
+  ],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 0
+  },
+  "tests": {
+    "passed": true,
+    "pass": 95,
+    "fail": 0
+  }
+}

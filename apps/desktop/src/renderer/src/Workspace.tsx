@@ -22,6 +22,7 @@ import { MemoryPanel } from "./MemoryPanel";
 import { NodeCard, type NodeCardType } from "./NodeCard";
 import { NodeEditor } from "./NodeEditor";
 import { ProjectSettings } from "./ProjectSettings";
+import { EvolutionPanel } from "./EvolutionPanel";
 import { RacePanel } from "./RacePanel";
 
 const nodeTypes = { card: NodeCard };
@@ -53,7 +54,8 @@ function EmptyCanvas({ onAdd, onChange }: { onAdd: () => void; onChange: (notice
     setError("");
     try {
       const { canvas, stack } = await window.agentTogether.planCanvas(description);
-      onChange(`AI 规划了 ${canvas.nodes.length} 个节点（${stack}）。逐个检查目标、验收标准和文件范围，改好再派发。`);
+      const { suggestions } = await window.agentTogether.evolutions();
+      onChange(`AI 规划了 ${canvas.nodes.length} 个节点（${stack}）。逐个检查目标、验收标准和文件范围，改好再派发。${suggestions.length ? ` 有 ${suggestions.length} 条在别的项目用过的经验，选中卡片后可在“进化”里查看，同意后才会加入记忆。` : ""}`);
     } catch (err) {
       setError(message(err));
     } finally {
@@ -169,7 +171,7 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
         type: "card",
         position: node.position ?? { x: (i % 4) * 300, y: Math.floor(i / 4) * 180 },
         selected: node.id === selectedId,
-        data: { node, active: node.id === activeId, signal: signals.get(node.id) ?? "off", tests: testRuns.byNode[node.id] },
+        data: { node, active: node.id === activeId, signal: signals.get(node.id) ?? "off", tests: testRuns.byNode[node.id], evolutionCandidate: (testRuns.consecutiveFailures?.[node.id] ?? 0) >= 2 },
       })),
     );
   }, [canvas, activeId, signals, selectedId, testRuns]);
@@ -381,6 +383,7 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
                   }}
                 />
               )}
+              {info.hasGit && <EvolutionPanel nodeId={selected.id} task={task} version={version} onChange={changed} />}
               {info.hasGit && <RacePanel nodeId={selected.id} task={task} context={context} version={version} onChange={changed} />}
               <MemoryPanel nodeId={selected.id} version={version} onChange={changed} />
             </>

@@ -65,6 +65,7 @@ input, select { font: inherit; padding: 4px 8px; border: 1px solid var(--line); 
 .card-title { font-weight: 600; font-size: 14px; margin: 4px 0; }
 .card-meta, .card-files { font-size: 11px; color: var(--muted); }
 .card-files { margin-top: 4px; font-family: ui-monospace, Consolas, monospace; }
+.card-hint { margin-top: 4px; font-size: 11px; color: var(--warn, #b45309); }
 
 .signal { width: 10px; height: 10px; border-radius: 50%; background: var(--good); }
 .signal-log { background: var(--good); }

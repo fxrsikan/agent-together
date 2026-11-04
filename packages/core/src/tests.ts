@@ -26,6 +26,8 @@ export interface TestRun {
 
 export interface TestHistory {
   last?: TestRun;
+  recent?: Record<string, TestRun[]>;
+  consecutiveFailures?: Record<string, number>;
   byNode: Record<string, TestRun>;
 }
 
@@ -113,7 +115,13 @@ export function runProjectTests(root: string, nodeId: string | null, timeoutMs =
       };
       const history = testHistory(root);
       history.last = run;
-      if (nodeId) history.byNode[nodeId] = run;
+      if (nodeId) {
+        history.consecutiveFailures ??= {};
+        history.consecutiveFailures[nodeId] = run.passed ? 0 : (history.consecutiveFailures[nodeId] ?? (history.byNode[nodeId]?.passed === false ? 1 : 0)) + 1;
+        history.recent ??= {};
+        history.recent[nodeId] = [...(history.recent[nodeId] ?? []), run].slice(-5);
+        history.byNode[nodeId] = run;
+      }
       fs.mkdirSync(path.dirname(historyFile(root)), { recursive: true });
       fs.writeFileSync(historyFile(root), JSON.stringify(history, null, 2));
       resolve(run);

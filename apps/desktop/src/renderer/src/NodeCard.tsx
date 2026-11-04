@@ -3,7 +3,7 @@ import type { CanvasNode, Level } from "@agent-together/schema";
 import type { TestRun } from "../../preload";
 import { TestBadge } from "./AgentRun";
 
-export type NodeCardData = { node: CanvasNode; active: boolean; signal: Level; tests?: TestRun };
+export type NodeCardData = { node: CanvasNode; active: boolean; signal: Level; tests?: TestRun; evolutionCandidate?: boolean };
 export type NodeCardType = Node<NodeCardData, "card">;
 
 const KIND: Record<CanvasNode["kind"], string> = { feature: "功能", module: "模块", decision: "决策", flow: "流程" };
@@ -27,6 +27,7 @@ export function NodeCard({ data }: NodeProps<NodeCardType>) {
         </span>
         <TestBadge run={tests} />
       </div>
+      {data.evolutionCandidate && <div className="card-hint" title="点开卡片，在“进化”里换个做法">连续两次测试失败，可以试试进化</div>}
       <div className="card-files">{node.files.join("  ") || "未绑定文件"}</div>
       <Handle type="source" position={Position.Right} />
     </div>

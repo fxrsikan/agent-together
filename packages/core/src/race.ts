@@ -1,13 +1,15 @@
 import { exec as execShell, execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
+import { randomUUID } from "node:crypto";
 import path from "node:path";
 import type { AgentRunner, Finding, AgentEvent, Memory, RunResult } from "@agent-together/schema";
 import { capabilityRules, CapabilityStore } from "./capabilities.js";
 import { Checkpoints } from "./checkpoints.js";
 import { buildNodeContext } from "./context.js";
 import { readProjectInfo } from "./project.js";
-import { testCommandFor } from "./tests.js";
+import { failingTestFiles, testCommandFor } from "./tests.js";
+import { ownerOf } from "./owners.js";
 import { Observer } from "./observer.js";
 import { builtinRules } from "./rules/index.js";
 import { ProjectStore } from "./store.js";
@@ -43,8 +45,20 @@ export interface ContestantResult {
   run: RunResult;
   files: { path: string; added: number; removed: number }[];
   findings: Finding[];
-  tests: { command: string; passed: boolean; output: string } | null;
+  tests: {
+    command: string;
+    passed: boolean;
+    output: string;
+    /** Test files still failing and the node that owns each (absent when tests pass). */
+    failing?: { path: string; owner: string | null }[];
+  } | null;
   score: { total: number; parts: ScorePart[] };
+}
+
+export interface RaceContestant {
+  id: string;
+  runner: AgentRunner;
+  extraContext?: string;
 }
 
 export interface RaceReport {
@@ -67,10 +81,11 @@ function git(cwd: string, args: string[], input?: string): string {
   return execFileSync("git", args, { cwd, encoding: "utf8", input, stdio: ["pipe", "pipe", "pipe"], maxBuffer: 64 * 1024 * 1024 }).trim();
 }
 
+/** Full output; callers keep only the tail they show. */
 function runShell(command: string, cwd: string, timeoutMs: number): Promise<{ passed: boolean; output: string }> {
   return new Promise((resolve) =>
     execShell(command, { cwd, timeout: timeoutMs, maxBuffer: 16 * 1024 * 1024 }, (err, stdout, stderr) =>
-      resolve({ passed: !err, output: `${stdout}${stderr}`.trim().slice(-2000) }),
+      resolve({ passed: !err, output: `${stdout}${stderr}`.trim() }),
     ),
   );
 }
@@ -144,7 +159,7 @@ export class Race {
   async run(
     nodeId: string,
     task: string,
-    runners: AgentRunner[],
+    runners: (AgentRunner | RaceContestant)[],
     memories: Memory[] = [],
     onProgress: (message: string) => void = () => {},
     /** The context file to hand out instead of the generated one (edited in the context inspector). */
@@ -154,28 +169,38 @@ export class Race {
     const testCommand = config.testCommand ?? testCommandFor(this.root);
     const canvas = this.store.loadCanvas();
     const startedAt = new Date().toISOString();
-    const id = `${startedAt.replace(/[-:.]/g, "").replace("T", "-").slice(0, 15)}-${nodeId}`.slice(0, 80);
+    const id = `${randomUUID().slice(0, 8)}-${startedAt.replace(/[-:.]/g, "").replace("T", "-").slice(0, 15)}-${nodeId}`.slice(0, 80);
     const base = new Checkpoints(this.root).snapshot(`赛马起点 ${id}`);
     git(this.top, ["update-ref", `refs/agent-together/races/${id}/base`, base]);
     const context = contextOverride ?? buildNodeContext(canvas, nodeId, task, memories, readProjectInfo(this.root));
 
     const contestants = await Promise.all(
-      runners.map(async (runner): Promise<ContestantResult> => {
-        const worktree = path.join(os.tmpdir(), `agent-together-race-${id}`, runner.id);
+      runners.map(async (entry): Promise<ContestantResult> => {
+        const runner = "runner" in entry ? entry.runner : entry;
+        const contestantId = entry.id;
+        if (!/^[a-zA-Z0-9_-]+$/.test(contestantId)) throw new Error("参赛名称不合法");
+        const extra = "runner" in entry ? entry.extraContext : undefined;
+        const worktree = path.join(os.tmpdir(), `agent-together-race-${id}`, contestantId);
         git(this.top, ["worktree", "add", "--detach", worktree, base]);
         const project = path.join(worktree, this.rel);
         fs.mkdirSync(path.join(project, ".agent-together", "context"), { recursive: true });
-        fs.writeFileSync(path.join(project, ".agent-together", "context", `${nodeId}.md`), context);
+        fs.writeFileSync(path.join(project, ".agent-together", "context", `${nodeId}.md`), context + (extra ? `\n\n## 这次尝试的做法\n${extra}` : ""));
         const deps = path.join(this.root, "node_modules");
         if (fs.existsSync(deps) && !fs.existsSync(path.join(project, "node_modules"))) {
           fs.symlinkSync(deps, path.join(project, "node_modules"), "junction");
         }
-        onProgress(`${runner.id} 开始`);
-        const run = await runner.run(project, dispatchPrompt(`.agent-together/context/${nodeId}.md`), config.timeoutMs ?? 15 * 60_000);
-        onProgress(`${runner.id} 结束（${Math.round(run.durationMs / 1000)}s）`);
+        onProgress(`${contestantId} 开始`);
+        const started = Date.now();
+        let run: RunResult;
+        try {
+          run = await runner.run(project, dispatchPrompt(`.agent-together/context/${nodeId}.md`), config.timeoutMs ?? 15 * 60_000);
+        } catch (error) {
+          run = { ok: false, summary: String(error), durationMs: Date.now() - started };
+        }
+        onProgress(`${contestantId} 结束（${Math.round(run.durationMs / 1000)}s）`);
 
-        const commit = new Checkpoints(project).snapshot(`赛马 ${id} ${runner.id}`);
-        git(this.top, ["update-ref", `refs/agent-together/races/${id}/${runner.id}`, commit]);
+        const commit = new Checkpoints(project).snapshot(`赛马 ${id} ${contestantId}`);
+        git(this.top, ["update-ref", `refs/agent-together/races/${id}/${contestantId}`, commit]);
         const files = git(this.top, ["diff-tree", "-r", "--numstat", base, commit])
           .split("\n")
           .filter(Boolean)
@@ -186,10 +211,13 @@ export class Race {
           .filter((f): f is { path: string; added: number; removed: number } => f.path !== null && !SKIP(f.path));
 
         const findings = this.replay(project, nodeId, base, files.map((f) => f.path), runner.id);
-        const tests = testCommand
-          ? { command: testCommand, ...(await runShell(testCommand, project, 5 * 60_000)) }
-          : null;
-        const result = { id: runner.id, commit, worktree, run, files, findings, tests };
+        let tests: ContestantResult["tests"] = null;
+        if (testCommand) {
+          const { passed, output } = await runShell(testCommand, project, 5 * 60_000);
+          tests = { command: testCommand, passed, output: output.slice(-2000) };
+          if (!passed) tests.failing = failingTestFiles(output, project).map((p) => ({ path: p, owner: ownerOf(canvas, p)?.id ?? null }));
+        }
+        const result = { id: contestantId, commit, worktree, run, files, findings, tests };
         return { ...result, score: scoreContestant(result) };
       }),
     );

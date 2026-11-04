@@ -33,13 +33,13 @@ AI 写代码很快，但做着做着容易跑偏：让它改购物车，它顺�
 - 记忆：AI 犯过的错整理成经验，你批准后，以后每次派发都会带上
 - 同一张卡片让几个 AI 比赛，按测试结果和越界情况打分，选最好的那个
 - 派发前可以看到、也可以修改要交给 AI 的全部内容
+- 进化（新加，还没用真 AI 实测）：卡片反复失败时，同一个助手在独立工作区试两到三种做法，和原来的方式比测试、越界和改动大小；你点"同意"才会记住，也可以一起采用代码。在两个不同项目里都有效的做法，新项目生成画布后会提示你。方法参考了 Google Research 的 [Harness²](https://github.com/google-research/harness2)
 
 用这一版从零做出了一个命令行待办工具：7 张卡片，91 个测试全部通过，模型花费约 0.08 美元。
 
 **正在做**
 
 - **AI 自己做 agent**：规划时按项目需要自动生成专职角色（界面设计员、测试员……）；你也可以用一句话让 AI 做一个新的 agent，拖进画布就成为工作流的一步。
-- **进化**：卡片反复失败时，AI 提出几种改进办法各试一次，用测试结果决定哪个有效，你点"同意"后它就学会了；在多个项目里都有效的经验会沉淀下来，下个项目直接用。方法参考了 Google Research 的 [Harness²](https://github.com/google-research/harness2)。
 - **更容易上手**：安装向导帮你装好、登录好一个 AI 助手；界面上的提示全部改成大白话。
 - **用数据说话**：同一组任务分别开、关观察者各跑一遍，比较越界次数、测试通过率和花费。
 
@@ -88,6 +88,7 @@ npm run dev
 | 记忆 | 拦截生成草稿，批准后进入派发上下文，并同步到 `CLAUDE.md` 的 Agent Together 区块 |
 | 能力单元 | `.agent-together/capabilities/<id>.md` 写一次，编译到各平台：skill → `.claude/skills/`、`.agents/skills/`、`.cursor/rules/*.mdc`；agent 角色 → `.claude/agents/`；observer 由 Agent Together 对所有 agent 执行 |
 | 多 agent 赛马 | 同一节点、同一起点，各 agent 在独立 git worktree 里并行跑；按测试、观察者回放、改动大小打分；采用前自动存检查点 |
+| 进化 | 卡片连续两次测试失败会提示，也能手动发起；含对照组、测试优先排名、分数明细和费用；同意后记住，报告保存在 `.agent-together/evolutions/`。跨项目经验保存在 `~/.agent-together/experience/`，可用 `AGENT_TOGETHER_EXPERIENCE_DIR` 改位置 |
 | 上下文检查器 | 派发前查看完整上下文、token 估算和每一节的占比，可以去掉某条记忆或直接改文字 |
 | Claude Code | hooks 写入 `.claude/settings.local.json` |
 | Codex | 解析 `apply_patch`，一个补丁里的每个文件分别检查；hooks 写入 git 根目录的 `.codex/hooks.json`，需在 Codex 的 `/hooks` 中信任 |
@@ -165,6 +166,18 @@ node packages/hook/dist/agent-together-race.js <项目目录> <节点id> "任务
 ```bash
 node packages/hook/dist/agent-together-race.js adopt <项目目录> <赛马id> <claude-code|codex|cursor>
 ```
+
+进化（需要可用的 L2 模型和 git 仓库，会运行多次助手）：
+
+```bash
+node packages/hook/dist/agent-together-evolve.js <项目目录> <节点id> "任务描述" codex
+node packages/hook/dist/agent-together-evolve.js list <项目目录>
+node packages/hook/dist/agent-together-evolve.js approve <项目目录> <进化id>
+# 同意并采用代码（先存检查点）：在上一条命令末尾加 --adopt
+node packages/hook/dist/agent-together-evolve.js discard <项目目录> <进化id>
+```
+
+桌面里选中一张卡片，在“进化”里选助手并开始。没有配置模型时会说明；没有测试命令时不会把做法算作有效。每次比较只跑一次，结果仍需你查看后同意。
 
 ### L2 模型
 

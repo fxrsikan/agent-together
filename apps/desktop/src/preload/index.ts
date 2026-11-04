@@ -1,3 +1,4 @@
+import type { EvolutionReport, Experience } from "@agent-together/core";
 import { contextBridge, ipcRenderer } from "electron";
 import type { CanvasPlan, Checkpoint, CompileReport, Judgment, ProjectInfo, RaceReport, TestHistory, TestRun } from "@agent-together/core";
 import type { AgentEvent, Canvas, CanvasEdge, CanvasNode, Memory, RunResult, Verdict } from "@agent-together/schema";
@@ -68,6 +69,11 @@ const api = {
   exportCapability: (nodeId: string) => invoke<CompileReport>("exportCapability", nodeId),
   compileCapabilities: () => invoke<CompileReport[]>("compileCapabilities"),
 
+  evolutions: () => invoke<{ reports: EvolutionReport[]; running: string | null; agents: string[]; candidate: Record<string, number>; suggestions: Experience[] }>("evolutions"),
+  evolve: (nodeId: string, task: string, agent: string) => invoke<EvolutionReport>("evolve", nodeId, task, agent),
+  approveEvolution: (id: string, adopt: boolean) => invoke<EvolutionReport>("approveEvolution", id, adopt),
+  discardEvolution: (id: string) => invoke<void>("discardEvolution", id),
+  approveExperience: (id: string, nodeId: string) => invoke<void>("approveExperience", id, nodeId),
   // Checkpoints and races
   checkpoints: () => invoke<Checkpoint[]>("checkpoints"),
   checkpoint: (label: string) => invoke<Checkpoint>("checkpoint", label),

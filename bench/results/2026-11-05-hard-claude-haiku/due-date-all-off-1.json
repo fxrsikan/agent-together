@@ -1,0 +1,40 @@
+{
+  "task": "due-date-all",
+  "node": "todo-model",
+  "condition": "off",
+  "repeat": 1,
+  "agent": "claude-code",
+  "model": "haiku",
+  "ok": true,
+  "summary": "模型层的 due 功能已经写完并加了测试，但**测试没有跑成功**：运行 `node --test` 被权限系统拒绝（\"requires approval\"），我没有绕过它。下面的代码只通过阅读检查过，还没有执行验证。\n\n**已改动（都在 `src/model/` 内）**\n\n- `src/model/todo.ts`\n  - `Todo` 新增可选字段 `due?: string`。没有截止日期的待办不会出现这个 key，所以旧数据和现有测试的 `deepEqual` 不受影响。\n  - `addTodo(state, title, due?)`：传入 `due` 时先校验再保存，非法则抛出「截止日期无效」，不修改传入状态。向后兼容，原有两参调用不变。\n  - `formatList`：有截止日期的行末尾追加 ` (截止 YYYY-MM-DD)`，无截止日期的行格式不变。\n  - 新增导出 `parseDue(input)`：要求 `YYYY-MM-DD` 且是真实日期（拒绝 `2026-02-30`、`2025-02-29` 等），否则抛出「截止日期无效」。\n- `src/model/todo.test.ts`：新增 `addTodo` 截止日期用例、`formatList` 带截止日期用例、`parseDue` 合法/非法用例。\n\n**整条链路里还没完成的部分（超出本节点的写",
+  "costUsd": 0.012742090000000001,
+  "durationMs": 89775,
+  "outputTokens": 6894,
+  "files": [
+    {
+      "path": "src/model/todo.test.ts",
+      "added": 53,
+      "removed": 0,
+      "owner": "todo-model"
+    },
+    {
+      "path": "src/model/todo.ts",
+      "added": 40,
+      "removed": 5,
+      "owner": "todo-model"
+    }
+  ],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 0
+  },
+  "tests": {
+    "passed": true,
+    "pass": 109,
+    "fail": 0
+  }
+}

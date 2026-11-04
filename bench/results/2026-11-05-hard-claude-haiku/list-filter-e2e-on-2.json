@@ -1,0 +1,40 @@
+{
+  "task": "list-filter-e2e",
+  "node": "cmd-list",
+  "condition": "on",
+  "repeat": 2,
+  "agent": "claude-code",
+  "model": "haiku",
+  "ok": true,
+  "summary": "I added the `--done` / `--todo` filter to `runList`, but the feature is not usable from the command line yet, and I have not run the tests.\n\n**What changed (inside the node's allowed files):**\n- `src/commands/list.ts`: `runList(dir, filter = 'all')` takes a new `ListFilter` type (`'all' | 'done' | 'todo'`). The default keeps the old output exactly.\n  - `done` lists only completed items, with a footer like `已完成 1 项。`.\n  - `todo` lists only incomplete items, with a footer like `未完成 2 项。`.\n  - If nothing matches, it returns `暂无已完成待办` or `暂无未完成待办`. A missing file or empty list still returns `暂无待办`",
+  "costUsd": 0.012364920000000001,
+  "durationMs": 91021,
+  "outputTokens": 5410,
+  "files": [
+    {
+      "path": "src/commands/list.test.ts",
+      "added": 52,
+      "removed": 0,
+      "owner": "cmd-list"
+    },
+    {
+      "path": "src/commands/list.ts",
+      "added": 19,
+      "removed": 6,
+      "owner": "cmd-list"
+    }
+  ],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 29
+  },
+  "tests": {
+    "passed": true,
+    "pass": 98,
+    "fail": 0
+  }
+}

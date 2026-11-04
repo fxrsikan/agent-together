@@ -1,0 +1,40 @@
+{
+  "task": "list-filter-e2e",
+  "node": "cmd-list",
+  "condition": "off",
+  "repeat": 1,
+  "agent": "claude-code",
+  "model": "haiku",
+  "ok": true,
+  "summary": "The list-side filter is written, but I could not run the tests and `todo list --done` / `--todo` do not work from the command line yet. The CLI entry point needs a change outside this node's allowed files.\n\n**What I changed (only in `src/commands/`):**\n- `src/commands/list.ts`: `runList(dir, filter = 'all')` now takes `'all' | 'done' | 'todo'`. `'done'` lists only completed items, `'todo'` only incomplete ones. The default keeps `runList(dir)` behaving exactly as before, so existing callers stay compatible.\n  - The summary line counts the items shown, e.g. `共 2 项，已完成 0 项。` for `'todo'`.\n  - If",
+  "costUsd": 0.013150110000000001,
+  "durationMs": 109116,
+  "outputTokens": 5123,
+  "files": [
+    {
+      "path": "src/commands/list.test.ts",
+      "added": 50,
+      "removed": 0,
+      "owner": "cmd-list"
+    },
+    {
+      "path": "src/commands/list.ts",
+      "added": 27,
+      "removed": 6,
+      "owner": "cmd-list"
+    }
+  ],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 0
+  },
+  "tests": {
+    "passed": true,
+    "pass": 98,
+    "fail": 0
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "task": "due-date-all",
+  "node": "todo-model",
+  "condition": "on",
+  "repeat": 2,
+  "agent": "claude-code",
+  "model": "haiku",
+  "ok": true,
+  "summary": "我无法运行测试：`node --test` 被权限系统拦截，需要你批准。下面是已完成的改动和未验证的部分。\n\n**任务状态**\n\n任务清单里写的是「整条链路你都改完」，但这个节点的规则只允许修改 `src/model/**`，所以我只做了待办模型部分。store、add、list 命令还需要它们各自的节点来接上 `due`。\n\n**已完成（仅 `src/model/`）**\n\n- `src/model/todo.ts`\n  - `Todo` 新增可选字段 `due?: string`。没有截止日期时该字段不存在，不会出现 `due: undefined`。\n  - `addTodo(state, title, due?)` 新增可选第三个参数。传入时先校验，非法则抛出「截止日期无效」。\n  - 新增导出 `parseDue(input)`：只接受真实存在的 `YYYY-MM-DD`，例如拒绝 `2026-02-29`、`2026-1-5`、`2026/11/10`。\n  - `formatList` 对有截止日期的行在末尾追加 ` (due YYYY-MM-DD)`，没有的行输出不变。\n  - 对已有调用方保持兼容：store 和各命令只调用了 `addTodo(state, title)`、`formatList`、`parseId`、`removeTodo`、`markDone",
+  "costUsd": 0.013983939999999999,
+  "durationMs": 85198,
+  "outputTokens": 7856,
+  "files": [
+    {
+      "path": "src/model/todo.test.ts",
+      "added": 56,
+      "removed": 0,
+      "owner": "todo-model"
+    },
+    {
+      "path": "src/model/todo.ts",
+      "added": 34,
+      "removed": 5,
+      "owner": "todo-model"
+    }
+  ],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 27
+  },
+  "tests": {
+    "passed": true,
+    "pass": 110,
+    "fail": 0
+  }
+}

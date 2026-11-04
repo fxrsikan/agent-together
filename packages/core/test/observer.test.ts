@@ -68,6 +68,27 @@ describe("test-tampering", () => {
     );
     expect(verdict.findings.map((f) => f.rule)).toContain("test-tampering");
   });
+
+  it("allows replacing loose assertions with one exact assertion", () => {
+    const before = "assert.match(message, /1/);\nassert.match(message, /买 牛奶/);";
+    const after = "assert.equal(message, '已添加：买 牛奶（编号 1）');";
+    const verdict = observer().evaluate(write(`${root}/src/auth/form.test.ts`, after, before));
+    expect(verdict.findings.map((f) => f.rule)).not.toContain("test-tampering");
+  });
+
+  it("still flags dropping an exact assertion for a loose one", () => {
+    const before = "assert.equal(a, 1);\nassert.equal(b, 2);";
+    const after = "assert.ok(a);";
+    const verdict = observer().evaluate(write(`${root}/src/auth/form.test.ts`, after, before));
+    expect(verdict.findings.map((f) => f.rule)).toContain("test-tampering");
+  });
+
+  it("still flags deleting loose assertions without adding an exact one", () => {
+    const before = "assert.match(m, /1/);\nassert.match(m, /x/);";
+    const after = "assert.match(m, /1/);";
+    const verdict = observer().evaluate(write(`${root}/src/auth/form.test.ts`, after, before));
+    expect(verdict.findings.map((f) => f.rule)).toContain("test-tampering");
+  });
 });
 
 describe("repeated-failure", () => {

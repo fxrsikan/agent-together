@@ -1,0 +1,40 @@
+{
+  "task": "due-date-all",
+  "node": "todo-model",
+  "condition": "on",
+  "repeat": 1,
+  "agent": "claude-code",
+  "model": "haiku",
+  "ok": true,
+  "summary": "I implemented the due-date model, but I couldn't run the tests. Both `node --test` and the shell variants were blocked by the permission system, so I stopped rather than work around it. The model changes are verified by reading only.\n\n**Scope:** The task asks for the change across the whole chain (add, list, CLI), but this node only allows writes under `src/model/**`, and the store and command nodes own the rest. I did not touch those files. The model now supports the due date, so those nodes can wire it up.\n\n**Changes in `src/model/todo.ts`:**\n- `Todo` gets an optional `due?: string` field. T",
+  "costUsd": 0.011236030000000001,
+  "durationMs": 77486,
+  "outputTokens": 6061,
+  "files": [
+    {
+      "path": "src/model/todo.test.ts",
+      "added": 47,
+      "removed": 0,
+      "owner": "todo-model"
+    },
+    {
+      "path": "src/model/todo.ts",
+      "added": 36,
+      "removed": 5,
+      "owner": "todo-model"
+    }
+  ],
+  "outside": [],
+  "findings": [],
+  "live": {
+    "warn": 0,
+    "ask": 0,
+    "block": 0,
+    "events": 22
+  },
+  "tests": {
+    "passed": true,
+    "pass": 106,
+    "fail": 0
+  }
+}

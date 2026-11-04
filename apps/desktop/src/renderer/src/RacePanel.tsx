@@ -14,11 +14,14 @@ function seconds(ms: number) {
 export function RacePanel({
   nodeId,
   task,
+  context,
   version,
   onChange,
 }: {
   nodeId: string;
   task: string;
+  /** The inspector's context text, when open; otherwise the generated one is used. */
+  context?: string;
   version: number;
   onChange: (notice: string) => void;
 }) {
@@ -42,7 +45,7 @@ export function RacePanel({
     setProgress([]);
     setRunning(nodeId);
     try {
-      const report = await window.loom.race(nodeId, task);
+      const report = await window.loom.race(nodeId, task, context);
       const best = [...report.contestants].sort((a, b) => b.score.total - a.score.total)[0];
       onChange(`赛马结束，${AGENT_NAMES[best.id] ?? best.id} 得分最高（${best.score.total}），确认后点"采用"`);
     } catch (err) {

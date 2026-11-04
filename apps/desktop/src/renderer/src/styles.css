@@ -90,3 +90,12 @@ button:disabled { opacity: 0.5; cursor: default; border-color: var(--line); }
 .file { font-family: ui-monospace, Consolas, monospace; font-size: 11px; word-break: break-all; }
 .summary { margin: 6px 0; color: var(--muted); font-size: 12px; white-space: pre-wrap; word-break: break-word; }
 .contestant button { margin-top: 4px; }
+
+.inspector { margin-top: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); display: flex; flex-direction: column; gap: 6px; }
+.sections { list-style: none; padding: 0 !important; margin: 0 !important; }
+.sections li { display: grid; grid-template-columns: 110px 1fr 36px; align-items: center; gap: 6px; font-size: 12px; }
+.section-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar { height: 6px; border-radius: 3px; background: var(--accent); opacity: 0.6; min-width: 2px; }
+.sections li .muted { text-align: right; }
+.check { display: flex; gap: 6px; align-items: flex-start; font-size: 12px; }
+.context-text { font-family: ui-monospace, Consolas, monospace; font-size: 11px; background: var(--panel); }

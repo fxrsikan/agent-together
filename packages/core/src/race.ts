@@ -143,6 +143,8 @@ export class Race {
     runners: AgentRunner[],
     memories: Memory[] = [],
     onProgress: (message: string) => void = () => {},
+    /** The context file to hand out instead of the generated one (edited in the context inspector). */
+    contextOverride?: string,
   ): Promise<RaceReport> {
     const config = loadRaceConfig(this.root);
     const canvas = this.store.loadCanvas();
@@ -150,7 +152,7 @@ export class Race {
     const id = `${startedAt.replace(/[-:.]/g, "").replace("T", "-").slice(0, 15)}-${nodeId}`.slice(0, 80);
     const base = new Checkpoints(this.root).snapshot(`赛马起点 ${id}`);
     git(this.top, ["update-ref", `refs/loom/races/${id}/base`, base]);
-    const context = buildNodeContext(canvas, nodeId, task, memories);
+    const context = contextOverride ?? buildNodeContext(canvas, nodeId, task, memories);
 
     const contestants = await Promise.all(
       runners.map(async (runner): Promise<ContestantResult> => {

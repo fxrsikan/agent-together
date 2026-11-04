@@ -4,6 +4,7 @@ import { strongest, type Canvas, type Level, type LoomEvent } from "@loom/schema
 import type { CompileReport } from "@loom/core";
 import type { EventRecord, Judgment } from "../../preload";
 import { CheckpointsPanel } from "./CheckpointsPanel";
+import { ContextInspector } from "./ContextInspector";
 import { MemoryPanel } from "./MemoryPanel";
 import { RacePanel } from "./RacePanel";
 import { NodeCard, type NodeCardType } from "./NodeCard";
@@ -30,6 +31,10 @@ export function App() {
   const [notice, setNotice] = useState("");
   const [task, setTask] = useState("");
   const [agent, setAgent] = useState<"claude-code" | "codex">("claude-code");
+  const [inspecting, setInspecting] = useState(false);
+  const [contextText, setContextText] = useState("");
+  // With the inspector open, its text (possibly edited) is what gets handed out.
+  const context = inspecting ? contextText : undefined;
 
   useEffect(() => {
     window.loom.info().then((i) => {
@@ -122,7 +127,7 @@ export function App() {
 
   const dispatch = async (nodeId: string) => {
     try {
-      const file = await window.loom.dispatch(nodeId, task, agent);
+      const file = await window.loom.dispatch(nodeId, task, agent, context);
       changed(`已存检查点并在新窗口启动 ${agent === "codex" ? "Codex" : "Claude Code"}，上下文：${file}`);
       setTask("");
     } catch (err) {
@@ -195,8 +200,10 @@ export function App() {
                   <button onClick={() => window.loom.setActive(selected.id)}>设为当前节点</button>
                 )}
                 <button onClick={() => exportCapability(selected.id)}>导出为能力单元</button>
+                <button onClick={() => setInspecting((v) => !v)}>{inspecting ? "收起上下文" : "检查上下文"}</button>
               </div>
-              {info?.hasGit && <RacePanel nodeId={selected.id} task={task} version={version} onChange={changed} />}
+              {inspecting && <ContextInspector nodeId={selected.id} task={task} version={version} onContext={setContextText} />}
+              {info?.hasGit && <RacePanel nodeId={selected.id} task={task} context={context} version={version} onChange={changed} />}
               <MemoryPanel nodeId={selected.id} version={version} onChange={changed} />
             </section>
           ) : (

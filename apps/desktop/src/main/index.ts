@@ -9,9 +9,11 @@ import {
   capabilityFromNode,
   Checkpoints,
   compileCapabilities,
+  contextSections,
   createLlm,
   Daemon,
   dispatchPrompt,
+  estimateTokens,
   loadLlmConfig,
   loadRaceConfig,
   openTerminal,
@@ -64,9 +66,17 @@ async function main() {
     return [installHooks(root, `node "${hook}"`), installCodexHooks(root, `node "${hook}" --platform codex`)];
   });
   // Dispatch: checkpoint first, make the node active, write its neighbourhood context, open the agent on it.
-  ipcMain.handle("loom:dispatch", (_e, nodeId: string, task: string, agent: "claude-code" | "codex") => {
+  // Context inspector: what the agent would get, with sizes; memories can be left out per dispatch.
+  const nodeMemories = (nodeId: string, without: string[] = []) => daemon.memory.forNode(nodeId).filter((m) => !without.includes(m.id));
+  ipcMain.handle("loom:previewContext", (_e, nodeId: string, task: string, without: string[]) => {
+    const markdown = buildNodeContext(daemon.canvas, nodeId, task, nodeMemories(nodeId, without));
+    return { markdown, memories: daemon.memory.forNode(nodeId) };
+  });
+  ipcMain.handle("loom:measureContext", (_e, markdown: string) => ({ tokens: estimateTokens(markdown), sections: contextSections(markdown) }));
+  // `context`, when given, is the inspector's (possibly edited) text and is handed out as is.
+  ipcMain.handle("loom:dispatch", (_e, nodeId: string, task: string, agent: "claude-code" | "codex", context?: string) => {
     if (hasGit) checkpoints.create(`派发前（${agent}）`, nodeId);
-    const context = buildNodeContext(daemon.canvas, nodeId, task, daemon.memory.forNode(nodeId));
+    context ??= buildNodeContext(daemon.canvas, nodeId, task, nodeMemories(nodeId));
     const file = daemon.store.writeContext(nodeId, context);
     daemon.setActiveNode(nodeId);
     const cli = agent === "codex" ? "codex" : "claude";
@@ -122,7 +132,7 @@ async function main() {
   const race = hasGit ? new Race(root) : null;
   let racing: string | null = null; // node id while a race runs; one at a time
   ipcMain.handle("loom:races", () => ({ running: racing, reports: race?.list() ?? [] }));
-  ipcMain.handle("loom:race", async (_e, nodeId: string, task: string) => {
+  ipcMain.handle("loom:race", async (_e, nodeId: string, task: string, context?: string) => {
     if (!race) throw new Error("项目不在 git 仓库中，无法赛马");
     if (racing) throw new Error(`已有一场赛马在进行（${racing}）`);
     racing = nodeId;
@@ -134,6 +144,7 @@ async function main() {
         [claudeCodeRunner(models["claude-code"]), codexRunner(models.codex)],
         daemon.memory.forNode(nodeId),
         (message) => win.webContents.send("loom:raceProgress", message),
+        context,
       );
     } finally {
       racing = null;

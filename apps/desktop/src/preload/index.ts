@@ -34,7 +34,12 @@ const api = {
     return () => void ipcRenderer.off("loom:memoryDrafts", listener);
   },
   races: (): Promise<{ running: string | null; reports: RaceReport[] }> => ipcRenderer.invoke("loom:races"),
-  race: (nodeId: string, task: string): Promise<RaceReport> => ipcRenderer.invoke("loom:race", nodeId, task),
+  race: (nodeId: string, task: string, context?: string): Promise<RaceReport> =>
+    ipcRenderer.invoke("loom:race", nodeId, task, context),
+  previewContext: (nodeId: string, task: string, without: string[]): Promise<{ markdown: string; memories: Memory[] }> =>
+    ipcRenderer.invoke("loom:previewContext", nodeId, task, without),
+  measureContext: (markdown: string): Promise<{ tokens: number; sections: { title: string; tokens: number }[] }> =>
+    ipcRenderer.invoke("loom:measureContext", markdown),
   adoptRace: (id: string, contestantId: string): Promise<boolean> => ipcRenderer.invoke("loom:adoptRace", id, contestantId),
   discardRace: (id: string): Promise<void> => ipcRenderer.invoke("loom:discardRace", id),
   onRaceProgress(cb: (message: string) => void) {
@@ -45,8 +50,8 @@ const api = {
   canvas: (): Promise<Canvas> => ipcRenderer.invoke("loom:canvas"),
   setActive: (nodeId: string | null): Promise<void> => ipcRenderer.invoke("loom:setActive", nodeId),
   installHooks: (): Promise<string[]> => ipcRenderer.invoke("loom:installHooks"),
-  dispatch: (nodeId: string, task: string, agent: "claude-code" | "codex"): Promise<string> =>
-    ipcRenderer.invoke("loom:dispatch", nodeId, task, agent),
+  dispatch: (nodeId: string, task: string, agent: "claude-code" | "codex", context?: string): Promise<string> =>
+    ipcRenderer.invoke("loom:dispatch", nodeId, task, agent, context),
   onEvent(cb: (record: EventRecord) => void) {
     const listener = (_e: unknown, record: EventRecord) => cb(record);
     ipcRenderer.on("loom:event", listener);

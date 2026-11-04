@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Canvas } from "@loom/schema";
-import { buildNodeContext } from "@loom/core";
+import { buildNodeContext, contextSections, estimateTokens } from "@loom/core";
 
 const canvas = Canvas.parse({
   version: 1,
@@ -41,5 +41,25 @@ describe("buildNodeContext", () => {
 
   it("rejects an unknown node", () => {
     expect(() => buildNodeContext(canvas, "nope", "")).toThrow("unknown node");
+  });
+});
+
+describe("estimateTokens / contextSections", () => {
+  it("counts CJK characters as one token and other text at four characters per token", () => {
+    expect(estimateTokens("登录表单")).toBe(4);
+    expect(estimateTokens("abcdefgh")).toBe(2);
+  });
+
+  it("lists every heading of a context file with its size", () => {
+    const sections = contextSections(buildNodeContext(canvas, "login-form", "Add a digit rule"));
+    expect(sections.map((s) => s.title)).toEqual([
+      "任务",
+      "节点：Login form",
+      "可以依赖的节点",
+      "依赖本节点的节点",
+      "已审批的记忆",
+      "Loom 会检查的规则",
+    ]);
+    expect(sections.every((s) => s.tokens > 0)).toBe(true);
   });
 });

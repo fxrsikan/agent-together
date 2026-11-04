@@ -57,3 +57,20 @@ export function buildNodeContext(canvas: Canvas, nodeId: string, task: string, m
   const guide = buildNodeGuide(canvas, nodeId, memories);
   return `# 任务\n\n${task.trim() || "（未填写，请按节点的任务清单推进）"}\n\n${guide}`;
 }
+
+/**
+ * Rough token count without a tokenizer: CJK characters count about one token
+ * each, other text about four characters per token. Good enough to compare.
+ */
+export function estimateTokens(text: string): number {
+  const cjk = text.match(/[　-鿿＀-￯]/g)?.length ?? 0;
+  return Math.ceil(cjk + (text.length - cjk) / 4);
+}
+
+/** Splits a context file at its headings, with a token estimate per section. */
+export function contextSections(markdown: string): { title: string; tokens: number }[] {
+  return markdown
+    .split(/^(?=#{1,2} )/m)
+    .filter((part) => part.trim())
+    .map((part) => ({ title: part.split("\n")[0].replace(/^#+\s*/, ""), tokens: estimateTokens(part) }));
+}

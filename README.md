@@ -20,6 +20,7 @@ AI 编码 agent 的画布控制台：人在画布上表达意图，agent 按节�
 | 能力单元（v0.2） | `.loom/capabilities/<id>.md` 写一次，编译到各平台：skill → `.claude/skills/`、`.agents/skills/`（Codex、Grok Build 等开放标准）、`.cursor/rules/*.mdc`；agent 角色 → `.claude/agents/`；observer（范围 + 禁止出现的正则）由 Loom 观察者对所有 agent 执行。编译前校验，节点可"导出为能力单元"，内容变化时自动升版本 |
 | 多 agent 赛马（v0.3） | 同一节点、同一任务、同一起点，Claude Code 与 Codex 在各自的 git worktree 里并行跑；按测试、观察者回放（越界、依赖、篡改测试等）、改动大小打分并列出每一项；花费与耗时只展示。采用胜者前自动存检查点，之后清理 worktree。桌面应用里在节点详情点"Claude Code vs Codex"发起，结果并排对比后一键采用或放弃；`.loom/race.json` 的 `models` 可按 agent 指定模型 |
 | 派发任务 | 选中节点 → 填任务 → 生成节点邻域上下文 `.loom/context/<节点>.md`，在新终端窗口启动 Claude Code（v0.1 仅 Windows） |
+| 上下文检查器（v0.3） | 派发或赛马前点"检查上下文"：看到要交给 agent 的完整上下文、总 token 估算和每一节的占比；可以这一次不带某条记忆，也可以直接改文字，改过的版本原样交给 agent |
 | 干预 | `ask` 让 Claude Code 询问用户，`block` 拒绝，`warn` 注入提醒 |
 | Claude Code 适配器 | hook 载荷 ↔ 统一事件，写入 `.claude/settings.local.json` |
 | Codex 适配器（v0.2） | 解析 `apply_patch`（一个补丁多个文件各自检查），`ask` 转为拒绝并要求 agent 询问用户，退出码从会话记录读取；hooks 写入 git 仓库根目录的 `.codex/hooks.json`，需在 Codex 的 `/hooks` 中信任 |

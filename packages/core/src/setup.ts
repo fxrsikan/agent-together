@@ -187,7 +187,8 @@ function looksMissing(r: ProbeResult): boolean {
  * Cheap login heuristics that never send a model prompt.
  * - Claude: `claude auth status` (or stdout mentioning logged in / missing auth).
  * - Codex: `codex login status` when available.
- * - Cursor / Grok: usually cannot tell without a paid call → unknown.
+ * - Cursor: `cursor-agent status` ("Logged in as …" / "Not logged in").
+ * - Grok: cannot tell without a paid call → unknown.
  */
 function interpretLogin(id: RequirementId, r: ProbeResult | null): { login: LoginState; note: string } {
   if (!r) return { login: "unknown", note: UNKNOWN_LOGIN };
@@ -202,7 +203,7 @@ function interpretLogin(id: RequirementId, r: ProbeResult | null): { login: Logi
     }
     return { login: "unknown", note: UNKNOWN_LOGIN };
   }
-  if (id === "codex") {
+  if (id === "codex" || id === "cursor") {
     if (r.code === 0 && /logged[\s-]?in|authenticated|email|api key/i.test(text) && !/not logged|unauthor/i.test(lower)) {
       return { login: "ok", note: "" };
     }
@@ -293,8 +294,8 @@ export async function checkSetup(options: SetupOptions = {}): Promise<SetupRepor
       name: "Cursor",
       command: cursorCmd,
       explain: "Cursor 的命令行助手（cursor-agent）。装好后，就可以把画布上的卡片交给它做。",
-      loginArgs: null,
-      loginCommand: `"${cursorCmd}"`,
+      loginArgs: ["status"],
+      loginCommand: `"${cursorCmd}" login`,
     },
     {
       id: "grok-build",

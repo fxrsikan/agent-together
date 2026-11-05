@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { errorText } from "./errors";
 
 /**
  * No project open: reopen a recent one, open any folder (set up on first open),
@@ -22,7 +23,7 @@ export function StartScreen({ onOpenSetup }: { onOpenSetup: () => void }) {
     try {
       await work();
     } catch (err) {
-      setError(err instanceof Error ? err.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, "") : String(err));
+      setError(errorText(err));
     } finally {
       setBusy(false);
     }

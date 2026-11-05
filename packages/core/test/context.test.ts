@@ -59,6 +59,7 @@ describe("estimateTokens / contextSections", () => {
       "依赖本节点的节点",
       "已审批的记忆",
       "Agent Together 会检查的规则",
+      "怎么汇报",
     ]);
     expect(sections.every((s) => s.tokens > 0)).toBe(true);
   });

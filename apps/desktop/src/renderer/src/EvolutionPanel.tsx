@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
 import type { EvolutionReport, Experience } from "@agent-together/core";
+import { when } from "./time";
+
+const AGENT_NAMES: Record<string, string> = { "claude-code": "Claude Code", codex: "Codex", cursor: "Cursor", "grok-build": "Grok Build" };
 
 const OUTCOME: Record<string, string> = {
   clean: "守边界完成",
@@ -77,7 +80,7 @@ export function EvolutionPanel({
       </p>
       <select value={agent} onChange={(e) => setAgent(e.target.value)}>
         {agents.map((a) => (
-          <option key={a}>{a}</option>
+          <option key={a} value={a}>{AGENT_NAMES[a] ?? a}</option>
         ))}
       </select>
       <button
@@ -96,7 +99,7 @@ export function EvolutionPanel({
         <select value={latest?.id ?? ""} onChange={(e) => setReportId(e.target.value)}>
           {reports.map((r) => (
             <option value={r.id} key={r.id}>
-              {r.startedAt} · {r.approved ? "已同意" : "未同意"}
+              {when(r.startedAt)} · {r.approved ? "已同意" : "未同意"}
             </option>
           ))}
         </select>
@@ -178,7 +181,7 @@ export function EvolutionPanel({
               <summary>以前的进化记录</summary>
               {reports.slice(1).map((r) => (
                 <p key={r.id}>
-                  {r.startedAt} · {r.message} · {r.approved ? "已同意" : "未同意"}
+                  {when(r.startedAt)} · {r.message} · {r.approved ? "已同意" : "未同意"}
                 </p>
               ))}
             </details>

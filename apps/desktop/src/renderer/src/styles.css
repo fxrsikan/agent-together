@@ -43,6 +43,9 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .row h4 { margin: 16px 0 6px; }
 .actions { flex-wrap: wrap; }
 .grow { flex: 1; min-width: 0; }
+.bar > * { white-space: nowrap; flex-shrink: 0; }
+.bar > .one-line { flex: 1 1 0; min-width: 40px; overflow: hidden; text-overflow: ellipsis; word-break: normal; }
+.bar > .spacer { flex: 0 0 0; }
 input, select { font: inherit; padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--text); }
 .draft { padding: 6px 8px; border-left: 3px solid var(--warn); background: var(--bg); word-break: break-all; }
 
@@ -76,6 +79,8 @@ input, select { font: inherit; padding: 4px 8px; border: 1px solid var(--line); 
 .feed li { padding: 6px 0; border-bottom: 1px solid var(--line); }
 .feed-line { word-break: break-all; }
 .finding { margin-top: 4px; font-size: 12px; }
+.role-chip { display: flex; flex-direction: column; gap: 2px; margin: 6px 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); cursor: grab; font-size: 12px; }
+.role-chip span { color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .finding-warn { color: var(--warn); }
 .finding-ask, .finding-block { color: var(--bad); }
 

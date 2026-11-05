@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Checkpoint } from "@agent-together/core";
+import { clock } from "./time";
 
 const SHOWN = 8;
 
@@ -17,7 +18,7 @@ export function CheckpointsPanel({ version, onChange }: { version: number; onCha
   };
 
   const rollback = async (cp: Checkpoint) => {
-    if (await window.agentTogether.rollback(cp.id)) onChange(`已回滚到"${cp.label}"（${cp.at.slice(11, 19)}），回滚前的状态也存成了检查点`);
+    if (await window.agentTogether.rollback(cp.id)) onChange(`已回滚到"${cp.label}"（${clock(cp.at)}），回滚前的状态也存成了检查点`);
   };
 
   return (
@@ -31,7 +32,7 @@ export function CheckpointsPanel({ version, onChange }: { version: number; onCha
         {list.slice(0, SHOWN).map((cp) => (
           <li key={cp.id} className="row">
             <span>
-              <span className="muted">{new Date(cp.at).toLocaleTimeString()}</span> {cp.label}
+              <span className="muted">{clock(cp.at)}</span> {cp.label}
               {cp.nodeId ? <span className="muted"> · {cp.nodeId}</span> : null}
             </span>
             <button onClick={() => rollback(cp)}>回滚到这里</button>

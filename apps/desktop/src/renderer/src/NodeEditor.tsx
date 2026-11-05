@@ -86,7 +86,7 @@ export function NodeEditor({ node, onChange }: { node: CanvasNode; onChange: (no
         <select value={form.role} onChange={set("role")}>
           <option value="">不指定角色</option>
           {roles.map((r) => (
-            <option key={r.id} value={r.id}>{r.description}</option>
+            <option key={r.id} value={r.id} title={r.description}>{r.id}</option>
           ))}
         </select>
       </label>

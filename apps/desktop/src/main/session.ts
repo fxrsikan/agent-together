@@ -3,7 +3,7 @@ import type { BrowserWindow } from "electron";
 import { installHooks } from "@agent-together/adapter-claude-code";
 import { installCodexHooks } from "@agent-together/adapter-codex";
 import { installCursorHooks } from "@agent-together/adapter-cursor";
-import { auditChanges, Checkpoints, createLlm, Daemon, loadLlmConfig, Race, readProjectInfo, writtenPaths, type AuditResult, type Llm } from "@agent-together/core";
+import { allowTestCommands, auditChanges, Checkpoints, createLlm, Daemon, loadLlmConfig, Race, readProjectInfo, writtenPaths, type AuditResult, type Llm } from "@agent-together/core";
 import type { AgentEvent } from "@agent-together/schema";
 
 /** Everything that belongs to one open project; closing it stops its daemon. */
@@ -72,8 +72,15 @@ export class Session {
     ].map((f) => path.relative(this.root, f) || f);
   }
 
-  /** Saves the pre-dispatch checkpoint and starts remembering what the observer sees for this node. */
+  /**
+   * Lets the agent run the project's tests (headless runs refuse commands that need
+   * approval), saves the pre-dispatch checkpoint and starts remembering what the
+   * observer sees for this node.
+   */
   startDispatch(nodeId: string, agent: string) {
+    try {
+      allowTestCommands(this.root);
+    } catch {} // an unreadable settings file: the agent just can't run tests itself
     if (!this.hasGit) return;
     const checkpoint = this.checkpoints.create(`交给 AI 之前（${agent}）`, nodeId);
     this.watches.set(nodeId, { base: checkpoint.commit, events: [] });

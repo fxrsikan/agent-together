@@ -8,8 +8,8 @@ export function RoleDraft({ draft, onEdit, onSave, onDiscard }: {
   onDiscard: () => void;
 }) {
   return (
-    <section>
-      <strong>角色草稿</strong>
+    <section className="editor">
+      <h4>角色草稿</h4>
       <label>
         角色编号（小写英文、数字和短横线）
         <input value={draft.id} onChange={(e) => onEdit({ ...draft, id: e.target.value })} />
@@ -36,8 +36,10 @@ export function RoleDraft({ draft, onEdit, onSave, onDiscard }: {
         使用的模型（可留空）
         <input value={draft.model ?? ""} onChange={(e) => onEdit({ ...draft, model: e.target.value || undefined })} />
       </label>
-      <button onClick={onSave}>同意并保存</button>
-      <button onClick={onDiscard}>不要这个角色</button>
+      <div className="actions">
+        <button className="primary" onClick={onSave}>同意并保存</button>
+        <button onClick={onDiscard}>不要这个角色</button>
+      </div>
     </section>
   );
 }

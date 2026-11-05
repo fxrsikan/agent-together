@@ -39,7 +39,7 @@ ${description.trim()}
 
 要求：
 - 3 到 8 个节点，按"能独立实现、独立测试"来切分；最先能跑起来的核心放在被依赖的一侧。
-- 每个节点：id（小写英文短横线，如 todo-store）、kind（module 代码模块 / feature 用户可见的功能）、title（中文短名）、goal（一句话）、acceptance（2 到 4 条可以用测试验证的验收标准）、tasks（2 到 4 条任务）、files（这个节点拥有的文件 glob，如 "src/store/**"，节点之间不要重叠，测试文件放在各自节点的目录里）。
+- 每个节点：id（小写英文短横线，如 todo-store）、kind（module 代码模块 / feature 用户可见的功能）、title（中文短名）、goal（一句话）、acceptance（2 到 4 条可以用测试验证的验收标准）、tasks（2 到 4 条任务）、files（这个节点拥有的文件 glob，如 "src/store/**"，节点之间不要重叠，测试文件放在各自节点的目录里）。package.json 这类全项目共用的配置文件，交给没有依赖、最先做的那个节点，因为别的节点的测试要靠它才能跑。
 - roles：按项目实际需要提出 0 到 4 个专职角色，小项目可以为空。每个角色包含 id（小写英文短横线）、description（中文说明用于什么情况）、body（完整工作说明），可选 tools 和 model。节点可用 role 填角色 id，不要硬凑角色。
 - edges：from 依赖 to，label 用两三个字说明关系（如"调用""读取"）。不要有环。
 - 描述里没指定技术栈时，选最简单够用的（例如 Node.js + TypeScript，测试用 node:test），不要引入数据库或框架，除非描述需要。

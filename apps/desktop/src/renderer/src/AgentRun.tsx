@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { AgentRunOutcome, TestRun } from "../../preload";
+import { clock } from "./time";
 
 export type RunView = {
   nodeId: string;
@@ -14,7 +15,7 @@ export function TestBadge({ run }: { run: TestRun | null | undefined }) {
   if (!run) return null;
   const counts = run.pass !== undefined ? ` ${run.pass}/${run.pass + (run.fail ?? 0)}` : "";
   return (
-    <span className={`badge ${run.passed ? "badge-good" : "badge-bad"}`} title={`${run.command} · ${new Date(run.at).toLocaleTimeString()}`}>
+    <span className={`badge ${run.passed ? "badge-good" : "badge-bad"}`} title={`${run.command} · ${clock(run.at)}`}>
       {run.passed ? "测试通过" : "测试失败"}
       {counts}
     </span>

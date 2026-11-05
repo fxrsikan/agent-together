@@ -131,6 +131,30 @@ describe("checkSetup", () => {
     expect(report.ready).toBe(true);
   });
 
+  it("reads Cursor's login from cursor-agent status", async () => {
+    const check = (status: { code: number; stdout: string; stderr: string }) =>
+      checkSetup({
+        platform: "linux",
+        env: {},
+        fileExists: () => false,
+        run: fakeRunner({
+          "node --version": ok("v22.1.0"),
+          "git --version": ok("git version 2.40.0"),
+          "claude --version": missing(),
+          "codex --version": missing(),
+          "cursor-agent --version": ok("2026.10.0"),
+          "cursor-agent status": status,
+          "grok --version": missing(),
+        }),
+      }).then((r) => r.requirements.find((x) => x.id === "cursor")!);
+    expect(await check(ok("✓ Logged in as a@b.c"))).toMatchObject({ login: "ok", ready: true, loginCommand: null });
+    expect(await check({ code: 1, stdout: "Not logged in", stderr: "" })).toMatchObject({
+      login: "needed",
+      ready: false,
+      loginCommand: '"cursor-agent" login',
+    });
+  });
+
   it("gives a Windows install command when git is missing", async () => {
     const report = await checkSetup({
       platform: "win32",

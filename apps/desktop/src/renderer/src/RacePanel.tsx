@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { RaceReport } from "../../preload";
+import { when } from "./time";
 
 const AGENT_NAMES: Record<string, string> = { "claude-code": "Claude Code", codex: "Codex", cursor: "Cursor", "grok-build": "Grok Build" };
 
@@ -91,7 +92,7 @@ export function RacePanel({
       {latest && (
         <>
           <p className="muted">
-            {latest.startedAt.slice(11, 19)} · {latest.task || "按任务清单推进"}
+            {when(latest.startedAt)} · {latest.task || "按任务清单推进"}
             {latest.adopted ? ` · 已采用 ${AGENT_NAMES[latest.adopted] ?? latest.adopted}` : latest.discarded ? " · 已放弃" : ""}
           </p>
           <div className="race">

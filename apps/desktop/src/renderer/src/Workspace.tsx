@@ -25,20 +25,29 @@ import { ProjectSettings } from "./ProjectSettings";
 import { EvolutionPanel } from "./EvolutionPanel";
 import { RoleDraft } from "./RoleDraft";
 import { RacePanel } from "./RacePanel";
+import { clock } from "./time";
+import { errorText } from "./errors";
 
 const nodeTypes = { card: NodeCard };
 const FEED_LIMIT = 100;
 const AGENT_NAMES: Record<Agent, string> = { "claude-code": "Claude Code", codex: "Codex", cursor: "Cursor", "grok-build": "Grok Build" };
 
-function describe(event: AgentEvent): string {
+/** A path as the user knows it: relative to the project when it is inside it. */
+function shortPath(file: string, root: string): string {
+  const f = file.replace(/\\/g, "/");
+  const r = root.replace(/\\/g, "/").replace(/\/$/, "");
+  return f.toLowerCase().startsWith(r.toLowerCase() + "/") ? f.slice(r.length + 1) : file;
+}
+
+function describe(event: AgentEvent, root: string): string {
   if (event.kind === "turn.end") return "一轮结束";
   const a = event.action;
-  const what = a.type === "write" ? `写 ${a.path}` : a.type === "read" ? `读 ${a.path}` : a.type === "shell" ? `$ ${a.command}` : a.tool;
+  const what = a.type === "write" ? `写 ${shortPath(a.path, root)}` : a.type === "read" ? `读 ${shortPath(a.path, root)}` : a.type === "shell" ? `$ ${a.command}` : a.tool;
   if (event.kind === "tool.after") return `${event.ok ? "完成" : "失败"} ${what}`;
   return what;
 }
 
-const message = (err: unknown) => (err instanceof Error ? err.message : String(err)).replace(/^Error invoking remote method '[^']+': (Error: )?/, "");
+const message = errorText;
 
 /** An empty canvas: plan it from the product description with AI, or start drawing by hand. */
 function EmptyCanvas({ onAdd, onChange, onRoles }: { onRoles: (roles: Capability[], canvas: Canvas) => void; onAdd: () => void; onChange: (notice: string) => void }) {
@@ -235,7 +244,7 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
     }
     plannedIds.current.splice(index, 1);
     setDrafts((items) => items.filter((_, i) => i !== index));
-    changed(saved.description);
+    changed(`已保存角色「${saved.id}」，把它拖到画布上就能用`);
   });
 
   const install = async () =>
@@ -307,18 +316,18 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
         <button onClick={onClose} title="关闭项目，回到项目列表">
           ← 项目
         </button>
-        <strong>{info.name}</strong>
-        <span className="muted path">{info.root}</span>
+        <strong title={info.root}>{info.name}</strong>
+        <span className="muted path one-line" title={info.root}>{info.root}</span>
         <span className="spacer" />
         <TestBadge run={testRuns.last} />
         <button onClick={runTests} disabled={testing || runView?.state === "running"}>
           {testing ? "测试中…" : "运行测试"}
         </button>
-        <span className="muted">事后判断：{info.l2 ?? "关闭"}</span>
+        <span className="muted" title={`AI 做完后，另用一个模型复查改动有没有偏离卡片${info.l2 ? `（${info.l2}）` : ""}`}>复查：{info.l2 ? "开" : "关"}</span>
         <span className="muted">当前卡片：{canvas?.nodes.find((n) => n.id === activeId)?.title ?? "无"}</span>
         <button onClick={addNode}>＋ 卡片</button>
-        <button onClick={compileAll}>编译技能说明</button>
-        <button onClick={install}>安装观察者对接</button>
+        <button onClick={compileAll} title="把角色和技能说明写成各家 AI 助手认识的格式">更新 AI 说明</button>
+        <button onClick={install} title="重新给各家 AI 助手装上观察者，让它们的动作被看到">重新接上观察者</button>
       </header>
       {notice && (
         <div className="notice row">
@@ -337,9 +346,12 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
           attempt(async () => {
             const existing = canvas?.nodes.find((n) => n.id === target);
             const position = flow.current?.screenToFlowPosition({ x: e.clientX, y: e.clientY }) ?? { x: 0, y: 0 };
-            const node = existing ?? await window.agentTogether.addNode(role.description, "flow", position);
-            await window.agentTogether.saveNode({ ...node, role: role.id });
-            changed("已分配角色，请检查这一步的目标和文件范围");
+            // A new step is named after the role (a short id); its goal starts as the role's description.
+            const node = existing ?? await window.agentTogether.addNode(role.id, "flow", position);
+            await window.agentTogether.saveNode({ ...node, role: role.id, ...(existing ? {} : { intent: { ...node.intent, goal: role.description } }) });
+            changed(existing
+              ? `「${existing.title}」交给角色「${role.id}」来做`
+              : `已添加一步「${role.id}」，请填好它的目标和文件范围`);
           });
         }}>
           {canvas && canvas.nodes.length === 0 ? (
@@ -378,9 +390,11 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
                 key={role.id}
                 draggable
                 onDragStart={(e) => e.dataTransfer.setData("application/agent-together-role", role.id)}
-                className="finding"
+                className="role-chip"
+                title="拖到画布空白处添加一步，拖到卡片上交给它来做"
               >
-                {role.description}
+                <strong>{role.id}</strong>
+                <span>{role.description}</span>
               </div>
             ))}
             <textarea className="task" value={sentence} onChange={(e) => setSentence(e.target.value)} placeholder="例如：做一个只写测试、不改业务代码的测试员" />
@@ -390,6 +404,7 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
                 const draft = await window.agentTogether.draftRole(sentence);
                 plannedIds.current.push("");
                 setDrafts((items) => [...items, draft]);
+                setSentence("");
               } finally {
                 setRoleBusy(false);
               }
@@ -489,7 +504,7 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
               <ol className="feed">
                 {judgments.slice(0, 5).map((j) => (
                   <li key={j.at + j.nodeId}>
-                    <span className="muted">{j.at.slice(11, 19)}</span>{" "}
+                    <span className="muted">{clock(j.at)}</span>{" "}
                     <span className={j.onTrack ? "" : "finding-warn"}>{j.onTrack ? "没有偏离" : "可能偏离"}</span>：{j.reason}
                   </li>
                 ))}
@@ -502,7 +517,7 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
             {feed.map(({ event, verdict }, i) => (
               <li key={feed.length - i}>
                 <div className="feed-line">
-                  <span className="muted">{event.at.slice(11, 19)}</span> {describe(event)}
+                  <span className="muted">{clock(event.at)}</span> {describe(event, info.root)}
                 </div>
                 {verdict.findings.map((f) => (
                   <div key={f.rule} className={`finding finding-${f.level}`}>

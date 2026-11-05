@@ -36,8 +36,15 @@ const compilers = [claudeCodeCompiler, agentSkillsCompiler, cursorRulesCompiler]
 const runners: Record<string, (model?: string) => AgentRunner> = { "claude-code": claudeCodeRunner, codex: codexRunner, cursor: cursorRunner, "grok-build": grokRunner };
 type Agent = "claude-code" | "codex" | "cursor" | "grok-build";
 
-/** Dev layout: the hook program is built in the sibling workspace package. */
-const hookProgram = () => path.resolve(app.getAppPath(), "../../packages/hook/dist/agent-together-hook.js");
+/**
+ * The observer hook program the agents run with the system's Node.js. Installed app:
+ * the single-file bundle unpacked next to app.asar (Node cannot read inside asar).
+ * Dev without a bundle: the build of the sibling workspace package.
+ */
+const hookProgram = () => {
+  const bundled = path.join(app.getAppPath().replace(/app\.asar$/, "app.asar.unpacked"), "out/hook/agent-together-hook.mjs");
+  return fs.existsSync(bundled) ? bundled : path.resolve(app.getAppPath(), "../../packages/hook/dist/agent-together-hook.js");
+};
 
 /** Interactive command line that starts each agent on a prompt in a new terminal window. */
 function agentCommandLine(agent: Agent, prompt: string): string {

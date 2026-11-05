@@ -51,11 +51,17 @@ AI 写代码很快，但做着做着容易跑偏：让它改购物车，它顺�
 
 ## 开始
 
+**Windows**：下载 `AgentTogether-Setup-<版本>.exe`，双击安装。安装包还没有签名，Windows 可能提示"已保护你的电脑"，点"更多信息"→"仍要运行"。macOS 和 Linux 的安装包还没有做，请先用下面的方式从源码运行。
+
+**从源码运行**（开发者）：
+
 ```bash
 npm install
 npm run build
 npm run dev
 ```
+
+自己打 Windows 安装包：`npm run build && npm run dist -w @agent-together/desktop`，生成在 `apps/desktop/release/`。
 
 第一次打开应用会进入**安装向导**：检查 [Node.js 22+](https://nodejs.org)、[git](https://git-scm.com)，以及至少一个 AI 编程助手（[Claude Code](https://claude.com/claude-code)、Codex、Cursor 或 Grok Build 的命令行）是否装好、登录好。之后也可以在启动页再打开向导。
 

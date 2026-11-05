@@ -9,3 +9,4 @@ out/
 **/.codex/hooks.json
 **/.cursor/hooks.json
 **/.agent-together/races/
+release/

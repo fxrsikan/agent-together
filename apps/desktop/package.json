@@ -7,26 +7,61 @@
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
-    "build": "electron-vite build",
-    "start": "electron-vite preview"
-  },
-  "dependencies": {
-    "@agent-together/adapter-claude-code": "0.0.1",
-    "@agent-together/core": "0.0.1",
-    "@agent-together/schema": "0.0.1",
-    "@agent-together/adapter-codex": "0.0.1",
-    "@agent-together/adapter-cursor": "0.0.1",
-    "@agent-together/adapter-grok": "0.0.1"
+    "build": "electron-vite build && node scripts/bundle-hook.mjs",
+    "start": "electron-vite preview",
+    "dist": "npm run build && electron-builder --win"
   },
   "devDependencies": {
+    "@agent-together/adapter-claude-code": "0.0.1",
+    "@agent-together/adapter-codex": "0.0.1",
+    "@agent-together/adapter-cursor": "0.0.1",
+    "@agent-together/adapter-grok": "0.0.1",
+    "@agent-together/core": "0.0.1",
+    "@agent-together/schema": "0.0.1",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.2.1",
     "@xyflow/react": "^12.12.1",
     "electron": "^45.2.1",
+    "electron-builder": "^26.18.0",
     "electron-vite": "^6.0.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "vite": "^8.3.5"
+  },
+  "productName": "Agent Together",
+  "author": "fxrsikan",
+  "build": {
+    "electronVersion": "45.2.1",
+    "electronDist": "../../node_modules/electron/dist",
+    "appId": "dev.agent-together.desktop",
+    "productName": "Agent Together",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "out/hook/**"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "AgentTogether-Setup-${version}.exe",
+      "shortcutName": "Agent Together"
+    }
   }
 }

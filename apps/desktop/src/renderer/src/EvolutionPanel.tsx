@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { EvolutionReport, Experience } from "@agent-together/core";
 import { when } from "./time";
+import { verifierKey, verifierLabel } from "./verifier";
 
 const AGENT_NAMES: Record<string, string> = { "claude-code": "Claude Code", codex: "Codex", cursor: "Cursor", "grok-build": "Grok Build" };
 
@@ -44,8 +45,17 @@ export function EvolutionPanel({
   const [agent, setAgent] = useState("");
   const [busy, setBusy] = useState(false);
   const [candidate, setCandidate] = useState(false);
+  /** This card's evolution memories and the project's model per assistant, to warn when they no longer match. */
+  const [proven, setProven] = useState<string[]>([]);
+  const [models, setModels] = useState<Record<string, string>>({});
   const refresh = async () => {
-    const data = await window.agentTogether.evolutions();
+    const [data, memories, chosen] = await Promise.all([
+      window.agentTogether.evolutions(),
+      window.agentTogether.memories(),
+      window.agentTogether.projectModels(),
+    ]);
+    setProven(memories.filter((m) => m.nodeId === nodeId && m.status === "active" && m.verifiedWith).map((m) => m.verifiedWith!));
+    setModels(chosen);
     setReports(data.reports.filter((r) => r.nodeId === nodeId));
     setSuggestions(data.suggestions);
     setAgents(data.agents);
@@ -75,6 +85,17 @@ export function EvolutionPanel({
     <section>
       <h4>进化</h4>
       {candidate && <p>这张卡片已经连续两次没通过测试，可以试试换个做法。</p>}
+      {(() => {
+        const now = agent ? verifierKey(agent, models[agent]) : "";
+        const stale = proven.filter((k) => k !== now);
+        if (!now || !stale.length) return null;
+        return (
+          <p className="finding finding-warn">
+            这张卡片有 {stale.length} 条经验是用 {[...new Set(stale)].map(verifierLabel).join("、")} 验证的，现在用的是{" "}
+            {verifierLabel(now)}，交给 AI 时默认不带上。可以用现在的模型再进化一次，确认它们还有效。
+          </p>
+        );
+      })()}
       <p className="muted">
         同一个助手分别试两到三种做法，再和原来的方式比。会运行多次，可能产生费用。
       </p>
@@ -107,6 +128,7 @@ export function EvolutionPanel({
       {latest && (
         <>
           <p>{latest.message}</p>
+          {latest.verifiedWith && <p className="muted">这次用的是 {verifierLabel(latest.verifiedWith)}</p>}
           {[...(latest.race?.contestants ?? [])]
             .sort((a, b) => rank(a.id) - rank(b.id))
             .map((c) => {
@@ -191,7 +213,8 @@ export function EvolutionPanel({
       {suggestions.map((s) => (
         <div key={s.id}>
           <p>
-            别的项目用过的做法：{s.title}（在 {s.projects.length} 个项目有效）
+            别的项目用过的做法：{s.title}（在 {s.projects.length} 个项目有效
+            {s.verifiedWith?.length ? `，用 ${s.verifiedWith.map(verifierLabel).join("、")} 验证` : ""}）
           </p>
           <p>{s.text}</p>
           <button

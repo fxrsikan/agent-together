@@ -8,6 +8,20 @@ export type { Judgment, RaceReport, RunResult, TestHistory, TestRun };
 export type { AuditResult };
 export type AgentRunOutcome = { run: RunResult; tests: TestRun | null; checkpoint: Checkpoint | null; audit: AuditResult | null };
 export type Agent = "claude-code" | "codex" | "cursor" | "grok-build";
+/** What the context inspector shows: the text, which memories go in, and what they cost. */
+export type ContextPreview = {
+  markdown: string;
+  memories: Memory[];
+  /** Ids left out this time (by default: proven with another assistant or model). */
+  without: string[];
+  /** The assistant and model this dispatch uses, for people ("Claude Code · haiku"). */
+  verifier: string;
+  /** Per memory id, what it was proven with, when it says. */
+  labels: Record<string, string>;
+  memoryTokens: number;
+  /** Project-wide memories also mirrored into CLAUDE.md / AGENTS.md. */
+  mirroredTokens: number;
+};
 export type SessionInfo = { root: string; name: string; port: number; hasGit: boolean; l2: string | null; activeNodeId: string | null };
 
 const invoke = <T>(channel: string, ...args: unknown[]): Promise<T> => ipcRenderer.invoke(`agent-together:${channel}`, ...args);
@@ -68,8 +82,9 @@ const api = {
   testHistory: () => invoke<TestHistory>("testHistory"),
   testCommand: () => invoke<string | null>("testCommand"),
   onTests: (cb: (run: TestRun | null) => void) => on("tests", cb),
-  previewContext: (nodeId: string, task: string, without: string[]) =>
-    invoke<{ markdown: string; memories: Memory[] }>("previewContext", nodeId, task, without),
+  /** `without` null: leave out the memories proven with another assistant or model than `agent` uses. */
+  previewContext: (nodeId: string, task: string, without: string[] | null, agent: string) =>
+    invoke<ContextPreview>("previewContext", nodeId, task, without, agent),
   measureContext: (markdown: string) => invoke<{ tokens: number; sections: { title: string; tokens: number }[] }>("measureContext", markdown),
   onEvent: (cb: (record: EventRecord) => void) => on("event", cb),
   onActive: (cb: (nodeId: string | null) => void) => on("active", cb),

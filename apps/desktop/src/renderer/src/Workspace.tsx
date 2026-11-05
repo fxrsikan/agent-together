@@ -478,7 +478,7 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
                   <button onClick={() => setInspecting((v) => !v)}>{inspecting ? "收起上下文" : "检查上下文"}</button>
                   <button onClick={() => exportCapability(selected.id)}>导出为可复用技能说明</button>
                 </div>
-                {inspecting && <ContextInspector nodeId={selected.id} task={task} version={version} onContext={setContextText} />}
+                {inspecting && <ContextInspector nodeId={selected.id} task={task} agent={agent} version={version} onContext={setContextText} />}
               </section>
               {runView && runView.nodeId === selected.id && (
                 <AgentRun

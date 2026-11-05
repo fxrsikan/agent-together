@@ -16,6 +16,9 @@ import {
   contextSections,
   createProject,
   listModels,
+  splitByVerifier,
+  verifierKey,
+  verifierLabel,
   projectModels,
   saveProjectModels,
   dispatchPrompt,
@@ -139,6 +142,9 @@ async function main() {
     await session?.close();
     session = null;
     session = await Session.open(root, win);
+    try {
+      session.daemon.memory.refreshAgentFiles(); // older versions mirrored every card's memories
+    } catch {}
     remember(root);
     win.setTitle(`${session.name} - Agent Together`);
     win.webContents.send("agent-together:project", session.info());
@@ -292,12 +298,29 @@ async function main() {
   ipcMain.handle("agent-together:installHooks", () => need().installHooks(hookProgram()));
 
   // Context inspector: what the agent would get, with sizes; memories can be left out per dispatch.
-  const nodeMemories = (s: Session, nodeId: string, without: string[] = []) => s.daemon.memory.forNode(nodeId).filter((m) => !without.includes(m.id));
-  const contextFor = (s: Session, nodeId: string, task: string, without: string[] = []) =>
+  // By default a memory proven with another assistant or model is left out (see splitByVerifier).
+  const verifierFor = (s: Session, agent: string) => verifierKey(agent, loadRaceConfig(s.root).models?.[agent]);
+  const defaultWithout = (s: Session, nodeId: string, agent: string) =>
+    splitByVerifier(s.daemon.memory.forNode(nodeId), verifierFor(s, agent)).other.map((m) => m.id);
+  const nodeMemories = (s: Session, nodeId: string, without: string[]) => s.daemon.memory.forNode(nodeId).filter((m) => !without.includes(m.id));
+  const contextFor = (s: Session, nodeId: string, task: string, agent: string, without = defaultWithout(s, nodeId, agent)) =>
     buildNodeContext(s.daemon.canvas, nodeId, task, nodeMemories(s, nodeId, without), readProjectInfo(s.root), s.daemon.capabilities.list());
-  ipcMain.handle("agent-together:previewContext", (_e, nodeId: string, task: string, without: string[]) => {
+  ipcMain.handle("agent-together:previewContext", (_e, nodeId: string, task: string, without: string[] | null, agent: string) => {
     const s = need();
-    return { markdown: contextFor(s, nodeId, task, without), memories: s.daemon.memory.forNode(nodeId) };
+    const effective = without ?? defaultWithout(s, nodeId, agent);
+    const memories = s.daemon.memory.forNode(nodeId);
+    const line = (m: Memory) => estimateTokens(`- （决策）${m.content}\n`);
+    return {
+      markdown: contextFor(s, nodeId, task, agent, effective),
+      memories,
+      without: effective,
+      verifier: verifierLabel(verifierFor(s, agent)),
+      labels: Object.fromEntries(memories.filter((m) => m.verifiedWith).map((m) => [m.id, verifierLabel(m.verifiedWith!)])),
+      // What memories cost: the ones in this context, plus the project-wide ones that are
+      // also in CLAUDE.md / AGENTS.md, which every agent reads when it starts.
+      memoryTokens: memories.filter((m) => !effective.includes(m.id)).reduce((sum, m) => sum + line(m), 0),
+      mirroredTokens: s.daemon.memory.list().filter((m) => m.status === "active" && m.nodeId === null).reduce((sum, m) => sum + line(m), 0),
+    };
   });
   ipcMain.handle("agent-together:measureContext", (_e, markdown: string) => ({ tokens: estimateTokens(markdown), sections: contextSections(markdown) }));
   // Dispatch: checkpoint first, make the node active, write its context, open the agent on it.
@@ -305,7 +328,7 @@ async function main() {
   ipcMain.handle("agent-together:dispatch", (_e, nodeId: string, task: string, agent: Agent, context?: string) => {
     const s = need();
     s.startDispatch(nodeId, agent);
-    const file = s.daemon.store.writeContext(nodeId, context ?? contextFor(s, nodeId, task));
+    const file = s.daemon.store.writeContext(nodeId, context ?? contextFor(s, nodeId, task, agent));
     s.daemon.setActiveNode(nodeId);
     const node = s.daemon.canvas.nodes.find((n) => n.id === nodeId);
     if (node && node.status === "todo") {
@@ -339,7 +362,7 @@ async function main() {
     const s = need();
     if (s.running) throw new Error(`已有 AI 助手在运行（${s.running.nodeId}）`);
     s.startDispatch(nodeId, agent);
-    const file = s.daemon.store.writeContext(nodeId, context ?? contextFor(s, nodeId, task));
+    const file = s.daemon.store.writeContext(nodeId, context ?? contextFor(s, nodeId, task, agent));
     s.daemon.setActiveNode(nodeId);
     const node = s.daemon.canvas.nodes.find((n) => n.id === nodeId);
     if (node && node.status === "todo") s.daemon.store.saveNode({ ...node, status: "in_progress", executor: agent });
@@ -439,6 +462,7 @@ async function main() {
         task,
         runners[agent](loadRaceConfig(s.root).models?.[agent]),
         (message) => win.webContents.send("agent-together:raceProgress", message),
+        loadRaceConfig(s.root).models?.[agent],
       );
     } finally {
       s.racing = null;

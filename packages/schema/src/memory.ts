@@ -17,5 +17,11 @@ export const Memory = z.object({
   createdAt: z.string(),
   /** The raw observation a refined memory was written from, kept for review. */
   evidence: z.string().optional(),
+  /**
+   * The assistant and model a memory was proven with ("claude-code/haiku", or just
+   * "claude-code" for its default model), e.g. by evolution. Unset: applies to any.
+   * Kept out of the text so it costs no tokens; dispatches with another model leave it out.
+   */
+  verifiedWith: z.string().optional(),
 });
 export type Memory = z.infer<typeof Memory>;

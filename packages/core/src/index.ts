@@ -7,7 +7,7 @@ export { ProjectStore } from "./store.js";
 export { relativeToRoot } from "./paths.js";
 export { mayDepend, ownerOf } from "./owners.js";
 export { buildNodeContext, buildNodeGuide, contextSections, estimateTokens } from "./context.js";
-export { draftsFromFindings, MemoryStore } from "./memory.js";
+export { draftsFromFindings, MemoryStore, splitByVerifier, verifierKey, verifierLabel } from "./memory.js";
 export { generateCanvas, initProject, layoutCanvas, listFiles } from "./init.js";
 export { createProject, newNodeId, openProject, readProjectInfo, writeProjectInfo, type ProjectInfo } from "./project.js";
 export { canvasFromDraft, planCanvas, planPrompt, type CanvasPlan } from "./planner.js";

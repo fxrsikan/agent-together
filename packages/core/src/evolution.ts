@@ -5,7 +5,7 @@ import path from "node:path";
 import type { AgentRunner } from "@agent-together/schema";
 import { parseJsonObject } from "./judge.js";
 import { createLlm, loadLlmConfig, type Llm } from "./llm.js";
-import { MemoryStore } from "./memory.js";
+import { MemoryStore, splitByVerifier, verifierKey } from "./memory.js";
 import { Race, type RaceReport, type ContestantResult } from "./race.js";
 import { ProjectStore } from "./store.js";
 import { testHistory } from "./tests.js";
@@ -32,6 +32,8 @@ export interface EvolutionReport {
   /** Contestant ids best first, and how each ended (see evolutionOutcome). */
   ranking?: string[];
   outcomes?: Record<string, EvolutionOutcome>;
+  /** The assistant and model every contestant used (see verifierKey); older reports lack it. */
+  verifiedWith?: string;
 }
 
 /** Normalize strategy text for duplicate detection and experience keys. */
@@ -93,10 +95,10 @@ export function evolutionOutcome(c: ContestantResult, nodeId: string): Evolution
   return "failed";
 }
 
-/** Outcome first, then warnings, then a smaller change, then the race score. */
 const warnings = (c: ContestantResult) => c.findings.filter((f) => f.level === "warn").length;
 const size = (c: ContestantResult) => c.files.reduce((sum, f) => sum + f.added + f.removed, 0);
 
+/** Outcome first, then warnings, then a smaller change, then the race score. */
 export function compareEvolution(a: ContestantResult, b: ContestantResult, nodeId: string): number {
   return (
     OUTCOME_RANK[evolutionOutcome(a, nodeId)] - OUTCOME_RANK[evolutionOutcome(b, nodeId)] ||
@@ -141,6 +143,8 @@ export interface Experience {
   text: string;
   projects: string[];
   reports: string[];
+  /** Assistants and models it was proven with (see verifierKey). */
+  verifiedWith?: string[];
 }
 
 function canonicalProject(project: string): string {
@@ -163,7 +167,7 @@ export class ExperienceStore {
       .map((f) => JSON.parse(fs.readFileSync(path.join(this.dir, f), "utf8")));
   }
 
-  record(strategy: Strategy, project: string, report: string): void {
+  record(strategy: Strategy, project: string, report: string, verifiedWith?: string): void {
     const id = createHash("sha256").update(normalizeStrategy(strategy.text)).digest("hex");
     const current = this.list().find((e) => e.id === id);
     const canonical = canonicalProject(project);
@@ -173,14 +177,19 @@ export class ExperienceStore {
       text: strategy.text,
       projects: [...new Set([...(current?.projects ?? []), canonical])],
       reports: [...new Set([...(current?.reports ?? []), report])],
+      verifiedWith: [...new Set([...(current?.verifiedWith ?? []), ...(verifiedWith ? [verifiedWith] : [])])],
     };
     fs.mkdirSync(this.dir, { recursive: true });
     fs.writeFileSync(path.join(this.dir, `${id}.json`), JSON.stringify(entry, null, 2));
   }
 
-  suggestions(project: string): Experience[] {
+  /** Strategies proven in two other projects; those proven with `prefer` (a verifierKey) first. */
+  suggestions(project: string, prefer?: string): Experience[] {
     const canonical = canonicalProject(project);
-    return this.list().filter((e) => e.projects.length >= 2 && !e.projects.includes(canonical));
+    const fits = (e: Experience) => (prefer && e.verifiedWith?.includes(prefer) ? 0 : 1);
+    return this.list()
+      .filter((e) => e.projects.length >= 2 && !e.projects.includes(canonical))
+      .sort((a, b) => fits(a) - fits(b));
   }
 }
 
@@ -224,6 +233,7 @@ export class Evolution {
     task: string,
     runner: AgentRunner,
     progress: (message: string) => void = () => {},
+    model?: string,
   ): Promise<EvolutionReport> {
     const store = new ProjectStore(this.root);
     const node = store.loadCanvas().nodes.find((n) => n.id === nodeId);
@@ -234,6 +244,7 @@ export class Evolution {
       task,
       startedAt: new Date().toISOString(),
       strategies: [],
+      verifiedWith: verifierKey(runner.id, model),
     };
     this.save(report);
     if (!this.llm) {
@@ -242,7 +253,8 @@ export class Evolution {
       this.save(report);
       return report;
     }
-    const memories = new MemoryStore(this.root).forNode(nodeId);
+    // Memories proven with another assistant or model are left out, as in a dispatch.
+    const memories = splitByVerifier(new MemoryStore(this.root).forNode(nodeId), report.verifiedWith!).fit;
     const history = testHistory(this.root);
     const findings = store
       .recentLog()
@@ -320,7 +332,7 @@ export class Evolution {
       .list()
       .find((m) => m.nodeId === report.nodeId && m.content === strategy.text.trim());
     if (existing) {
-      memory.update(existing.id, { status: "active", evidence });
+      memory.update(existing.id, { status: "active", evidence, verifiedWith: report.verifiedWith });
     } else {
       memory.add({
         nodeId: report.nodeId,
@@ -329,9 +341,10 @@ export class Evolution {
         content: strategy.text,
         source: `evolution:${report.id}`,
         evidence,
+        verifiedWith: report.verifiedWith,
       });
     }
-    this.experience.record(strategy, this.root, path.join(this.root, evidence));
+    this.experience.record(strategy, this.root, path.join(this.root, evidence), report.verifiedWith);
     memory.syncAgentFiles(new ProjectStore(this.root).loadCanvas());
     report.approved = true;
     this.save(report);

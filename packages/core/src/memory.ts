@@ -5,11 +5,35 @@ import { Memory, type Canvas, type Finding } from "@agent-together/schema";
 import { formatFrontmatter, parseFrontmatter } from "./frontmatter.js";
 import { ruleLabel } from "./setup.js";
 
-const FIELDS = ["id", "nodeId", "kind", "status", "source", "createdAt", "evidence"] as const;
+const FIELDS = ["id", "nodeId", "kind", "status", "source", "createdAt", "evidence", "verifiedWith"] as const;
 const BLOCK_START = "<!-- agent-together:memory:start -->";
 const BLOCK_END = "<!-- agent-together:memory:end -->";
 
 const KIND_LABEL: Record<Memory["kind"], string> = { decision: "决策", constraint: "约束", pitfall: "踩过的坑", preference: "偏好" };
+
+/** How a memory records what it was proven with: "claude-code/haiku", or "claude-code" for its default model. */
+export function verifierKey(agent: string, model?: string): string {
+  return model?.trim() ? `${agent}/${model.trim()}` : agent;
+}
+
+const AGENT_NAMES: Record<string, string> = { "claude-code": "Claude Code", codex: "Codex", cursor: "Cursor", "grok-build": "Grok Build" };
+
+/** "claude-code/haiku" → "Claude Code · haiku"; "codex" → "Codex · 默认模型". */
+export function verifierLabel(key: string): string {
+  const [agent, ...model] = key.split("/");
+  return `${AGENT_NAMES[agent] ?? agent} · ${model.length ? model.join("/") : "默认模型"}`;
+}
+
+/**
+ * Splits memories into the ones to hand an assistant using `key` and the ones proven
+ * with another assistant or model. Memories that name no verifier apply to any.
+ */
+export function splitByVerifier(memories: Memory[], key: string): { fit: Memory[]; other: Memory[] } {
+  const fit: Memory[] = [];
+  const other: Memory[] = [];
+  for (const m of memories) (!m.verifiedWith || m.verifiedWith === key ? fit : other).push(m);
+  return { fit, other };
+}
 
 const serialize = (m: Memory) => formatFrontmatter(FIELDS.map((k) => [k, m[k]]), m.content);
 
@@ -49,7 +73,7 @@ export class MemoryStore {
     return memory;
   }
 
-  update(id: string, patch: Partial<Pick<Memory, "status" | "content" | "kind" | "nodeId" | "evidence">>): Memory {
+  update(id: string, patch: Partial<Pick<Memory, "status" | "content" | "kind" | "nodeId" | "evidence" | "verifiedWith">>): Memory {
     const current = this.list().find((m) => m.id === id);
     if (!current) throw new Error(`unknown memory: ${id}`);
     const next = Memory.parse({ ...current, ...patch });
@@ -63,20 +87,21 @@ export class MemoryStore {
   }
 
   /**
-   * Mirrors active memories into a Agent Together-managed block of the project's agent
-   * instruction files — CLAUDE.md (Claude Code) and AGENTS.md (Codex, Cursor,
-   * Grok Build) — so agents started without Agent Together still see them. Text outside
-   * the block is kept. Returns the files written.
+   * Mirrors active project-wide memories into a Agent Together-managed block of the
+   * project's agent instruction files — CLAUDE.md (Claude Code) and AGENTS.md (Codex,
+   * Cursor, Grok Build) — so agents started without Agent Together still see them. Text
+   * outside the block is kept. Returns the files written.
+   *
+   * A card's own memories stay out: agents read these files on every start, so they
+   * would carry every card's memories into every dispatch, and the card being worked
+   * on gets its memories in its context file anyway. `canvas` is no longer needed.
    */
-  syncAgentFiles(canvas: Canvas): string[] {
-    const active = this.list().filter((m) => m.status === "active");
-    const title = (id: string | null) => (id ? canvas.nodes.find((n) => n.id === id)?.title ?? id : "全项目");
-    const groups = new Map<string, Memory[]>();
-    for (const m of active) groups.set(title(m.nodeId), [...(groups.get(title(m.nodeId)) ?? []), m]);
-    const body = [...groups]
-      .map(([t, ms]) => `### ${t}\n\n${ms.map((m) => `- （${KIND_LABEL[m.kind]}）${m.content}`).join("\n")}`)
-      .join("\n\n");
-    const block = `${BLOCK_START}\n## Agent Together 记忆（由 Agent Together 维护，请在 Agent Together 中修改）\n\n${body || "（暂无）"}\n${BLOCK_END}`;
+  syncAgentFiles(_canvas?: Canvas): string[] {
+    const active = this.list().filter((m) => m.status === "active" && m.nodeId === null);
+    const body = active.map((m) => `- （${KIND_LABEL[m.kind]}）${m.content}`).join("\n");
+    const block =
+      `${BLOCK_START}\n## Agent Together 全项目记忆（由 Agent Together 维护，请在 Agent Together 中修改）\n\n` +
+      `${body || "（暂无）"}\n\n每张卡片自己的记忆，在交给 AI 时随任务说明一起给出。\n${BLOCK_END}`;
 
     return ["CLAUDE.md", "AGENTS.md"].map((name) => {
       const file = path.join(this.root, name);
@@ -90,6 +115,18 @@ export class MemoryStore {
       fs.writeFileSync(file, next);
       return file;
     });
+  }
+
+  /**
+   * Rewrites the managed block where one already exists, so a project opened after an
+   * update matches what syncAgentFiles writes now. Creates no files. Returns the files written.
+   */
+  refreshAgentFiles(): string[] {
+    const has = (name: string) => {
+      const file = path.join(this.root, name);
+      return fs.existsSync(file) && fs.readFileSync(file, "utf8").includes(BLOCK_START);
+    };
+    return has("CLAUDE.md") || has("AGENTS.md") ? this.syncAgentFiles() : [];
   }
 
   private write(m: Memory) {

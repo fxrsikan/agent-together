@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Memory } from "@agent-together/schema";
+import { verifierLabel } from "./verifier";
 
 const KIND_LABEL: Record<Memory["kind"], string> = { decision: "决策", constraint: "约束", pitfall: "踩过的坑", preference: "偏好" };
 
@@ -37,7 +38,7 @@ export function MemoryPanel({
     if (!text.trim()) return;
     await window.agentTogether.addMemory(nodeId, kind, text);
     setText("");
-    onChange("已添加记忆，CLAUDE.md 已同步");
+    onChange(nodeId ? "已添加记忆，下次把这张卡片交给 AI 时会带上" : "已添加全项目记忆，CLAUDE.md 和 AGENTS.md 已同步");
   };
 
   return (
@@ -59,6 +60,7 @@ export function MemoryPanel({
             <span>
               <span className="muted">（{KIND_LABEL[m.kind]}）</span>
               {m.content}
+              {m.verifiedWith && <span className="muted"> · 用 {verifierLabel(m.verifiedWith)} 验证</span>}
             </span>
             <button onClick={() => setStatus(m, "expired", "已停用")}>停用</button>
           </li>

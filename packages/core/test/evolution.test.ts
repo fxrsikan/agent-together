@@ -193,7 +193,8 @@ describe("approval and experience", () => {
       adopt: vi.fn(),
     };
     const evolution = new Evolution(root, llm, () => fake as unknown as Race, experiences);
-    const result = await evolution.run("task", "任务", runner);
+    const result = await evolution.run("task", "任务", runner, () => {}, "haiku");
+    expect(result.verifiedWith).toBe("fake/haiku");
     expect(fake.run.mock.calls).toHaveLength(1);
     expect(new MemoryStore(root).list()).toEqual([]);
     expect(experiences.list()).toEqual([]);
@@ -204,7 +205,10 @@ describe("approval and experience", () => {
     expect(memories[0].content).toBe("先读旧测试再改");
     expect(memories[0].source).toContain(result.id);
     expect(memories[0].evidence).toContain(result.id);
+    expect(memories[0].verifiedWith).toBe("fake/haiku");
+    expect(memories[0].content).not.toContain("haiku"); // kept out of the text the agent reads
     expect(experiences.list()[0].projects).toHaveLength(1);
+    expect(experiences.list()[0].verifiedWith).toEqual(["fake/haiku"]);
     expect(fake.adopt).not.toHaveBeenCalled();
   });
   it("counts distinct canonical projects, normalizes strategy keys and uses the env override", () => {
@@ -223,6 +227,10 @@ describe("approval and experience", () => {
     expect(store.list()).toHaveLength(1);
     expect(store.suggestions(c)).toHaveLength(1);
     expect(store.suggestions(a)).toEqual([]);
+    const other = { id: "o", title: "缩小改动", text: "only touch the failing path" };
+    store.record(other, a, "four", "claude-code/opus");
+    store.record(other, b, "five", "claude-code/haiku");
+    expect(store.suggestions(c, "claude-code/haiku").map((e) => e.title)).toEqual(["缩小改动", "先看测试"]);
   });
   it("refuses approval when no strategy beats the baseline", async () => {
     const root = project();

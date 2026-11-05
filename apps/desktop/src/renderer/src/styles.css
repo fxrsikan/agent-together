@@ -148,6 +148,16 @@ input, select { font: inherit; padding: 4px 8px; border: 1px solid var(--line); 
 .chip-blocked { border-color: color-mix(in srgb, var(--bad) 55%, var(--line)); color: var(--bad); }
 .chip-in_progress { border-style: dashed; color: var(--text); }
 .chip-active { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.chip-stale { border-color: color-mix(in srgb, var(--warn) 55%, var(--line)); color: var(--warn); }
+/* Citations in an AI proposal: where each statement comes from, checked against the files */
+.src-list { display: inline-flex; flex-wrap: wrap; gap: 4px; margin-left: 6px; vertical-align: middle; }
+.src-chip { display: inline-flex; align-items: center; gap: 3px; padding: 0 6px; border: 1px solid var(--line); border-radius: 999px; font: 400 10.5px/18px var(--mono); color: var(--muted); cursor: help; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.src-ok { border-color: color-mix(in srgb, var(--good) 45%, var(--line)); color: var(--good); }
+.src-bad { border-color: color-mix(in srgb, var(--bad) 45%, var(--line)); color: var(--bad); }
+.src-problem { font-family: system-ui, "Microsoft YaHei", sans-serif; }
+.proposal-body { margin: 4px 0 8px 22px; display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+.unknowns { margin-top: 2px; padding: 6px 8px; border-left: 3px solid var(--warn); background: var(--bg); font-size: 12px; }
+.unknowns ul { margin: 4px 0 0; }
 /* Selected: the one glow on the canvas. */
 .react-flow__node.selected .card { border-color: var(--kind); box-shadow: 0 0 0 1px var(--kind), 0 0 16px color-mix(in srgb, var(--kind) 40%, transparent); }
 /* Following links: the chain stays strong, the rest recedes. */

@@ -24,6 +24,7 @@ import { CanvasToolbar, FocusPanel } from "./CanvasChrome";
 import { edgeId, reachFrom, type ReachDirection } from "./reach";
 import { ThemeToggle } from "./theme";
 import { NodeEditor } from "./NodeEditor";
+import { CardEvidence } from "./CardEvidence";
 import { ProjectSettings } from "./ProjectSettings";
 import { ModelSettings } from "./ModelSettings";
 import { ImportChecklist } from "./ImportChecklist";
@@ -141,6 +142,8 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
   const [task, setTask] = useState("");
   const [agent, setAgent] = useState<Agent>("claude-code");
   const [models, setModels] = useState<Record<string, string>>({});
+  /** Cards whose description was written from code that changed since: id -> changed files. */
+  const [stale, setStale] = useState<Record<string, string[]>>({});
   const [mode, setMode] = useState<"app" | "terminal">("app");
   const [runView, setRunView] = useState<RunView | null>(null);
   const [testRuns, setTestRuns] = useState<TestHistory>({ byNode: {} });
@@ -182,6 +185,7 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
     window.agentTogether.canvas().then(setCanvas);
     window.agentTogether.roles().then(setRoles);
     window.agentTogether.testHistory().then(setTestRuns);
+    window.agentTogether.staleCards().then(setStale);
     window.agentTogether.projectModels().then(setModels);
   }, [version]);
 
@@ -221,12 +225,13 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
           signal: signals.get(node.id) ?? "off",
           tests: testRuns.byNode[node.id],
           evolutionCandidate: (testRuns.consecutiveFailures?.[node.id] ?? 0) >= 2,
+          stale: !!stale[node.id],
           reach: shownReach?.nodes.has(node.id) ? reachDir! : undefined,
           dim: !!shownReach && node.id !== selectedId && !shownReach.nodes.has(node.id),
         },
       })),
     );
-  }, [canvas, activeId, signals, selectedId, testRuns, shownReach, reachDir]);
+  }, [canvas, activeId, signals, selectedId, testRuns, shownReach, reachDir, stale]);
 
   // Edges too: React Flow keeps selection here, so a clicked edge can be deleted with the Delete key.
   const [edges, setEdges] = useState<Edge[]>([]);
@@ -493,6 +498,7 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
           {selected ? (
             <>
               <NodeEditor node={selected} onChange={changed} />
+              <CardEvidence node={selected} stale={stale[selected.id] ?? []} onChange={changed} />
               <section>
                 <h4>交给 AI 去做</h4>
                 <textarea

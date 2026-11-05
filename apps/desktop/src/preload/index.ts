@@ -1,4 +1,4 @@
-import type { EvolutionReport, Experience, ImportProposal, ModelChoice, SetupReport } from "@agent-together/core";
+import type { CheckedSource, EvolutionReport, Experience, ImportProposal, ModelChoice, ProposedCard, ProposedItem, SetupReport } from "@agent-together/core";
 import { contextBridge, ipcRenderer } from "electron";
 import type { AuditResult, CanvasPlan, Checkpoint, CompileReport, Judgment, ProjectInfo, RaceReport, TestHistory, TestRun } from "@agent-together/core";
 import type { AgentEvent, Capability, Canvas, CanvasEdge, CanvasNode, Memory, RunResult, Verdict } from "@agent-together/schema";
@@ -21,7 +21,7 @@ export type ImportStatus = {
   guessedTest: string;
   helper: string | null;
 };
-export type { ImportProposal };
+export type { CheckedSource, ImportProposal, ProposedCard, ProposedItem };
 /** The helper model (canvas plans, roles, evolution strategies, review); `name` is what runs now, null when none. */
 export type LlmSettings = { provider: "auto" | "off" | "anthropic" | "claude-cli" | "openai-compatible"; model: string; baseUrl: string; name: string | null };
 /** What the context inspector shows: the text, which memories go in, and what they cost. */
@@ -70,7 +70,9 @@ const api = {
   llmSettings: () => invoke<LlmSettings>("llmSettings"),
   importStatus: () => invoke<ImportStatus>("importStatus"),
   /** The helper model reads the code and proposes card descriptions; nothing is saved. */
-  understandProject: () => invoke<ImportProposal>("understandProject"),
+  understandProject: (only?: string) => invoke<ImportProposal>("understandProject", only),
+  /** Cards whose description was written from code that changed since: id -> changed files. */
+  staleCards: () => invoke<Record<string, string[]>>("staleCards"),
   applyImportProposal: (proposal: ImportProposal, chosen: string[]) => invoke<void>("applyImportProposal", proposal, chosen),
   /** git init (no commit), then the project reopens with checkpoints on. */
   initGit: () => invoke<SessionInfo>("initGit"),

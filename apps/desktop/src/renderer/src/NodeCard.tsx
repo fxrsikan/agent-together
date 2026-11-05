@@ -13,6 +13,8 @@ export type NodeCardData = {
   /** While following links from a selected card: on the chain (which way), or faded out. */
   reach?: ReachDirection;
   dim?: boolean;
+  /** The code its description was written from has changed since. */
+  stale?: boolean;
 };
 export type NodeCardType = Node<NodeCardData, "card">;
 
@@ -41,6 +43,7 @@ export function NodeCard({ data }: NodeProps<NodeCardType>) {
         {active && <span className="chip chip-active" title="观察者正按这张卡片的范围检查 AI 助手">当前</span>}
         {node.executor && <span className="chip">{node.executor}</span>}
         <TestBadge run={tests} />
+        {data.stale && <span className="chip chip-stale" title="写说明时引用的代码改过了，点开卡片可以让 AI 重新读">说明可能过时</span>}
       </div>
       {data.evolutionCandidate && <div className="card-hint" title="点开卡片，在“进化”里换个做法">连续两次测试失败，可以试试进化</div>}
       <div className="card-files">{node.files.join("  ") || "未绑定文件"}</div>

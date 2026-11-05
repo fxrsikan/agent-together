@@ -21,7 +21,11 @@ import {
   initGit,
   listFiles,
   understandProject,
+  checkSource,
+  evidenceFor,
+  staleSources,
   type ImportProposal,
+  type ProposedItem,
   splitByVerifier,
   verifierKey,
   verifierLabel,
@@ -309,16 +313,30 @@ async function main() {
       helper: s.llm?.name ?? null,
     };
   });
-  ipcMain.handle("agent-together:understandProject", async () => {
+  ipcMain.handle("agent-together:understandProject", async (_e, only?: string) => {
     const s = need();
     if (!s.llm) throw new Error("没有可用的帮手模型：请在右边「帮手模型」里选一个，或先登录 claude 命令行");
-    return understandProject(s.llm, s.root, s.daemon.canvas, listFiles(s.root));
+    return understandProject(s.llm, s.root, s.daemon.canvas, listFiles(s.root), only);
   });
+  // The page sends back what the user kept; citations are checked again here, never taken on trust.
   ipcMain.handle("agent-together:applyImportProposal", (_e, proposal: ImportProposal, chosen: string[]) => {
     const s = need();
+    const canvas = s.daemon.canvas;
+    const files = new Set(listFiles(s.root));
     for (const p of proposal.nodes.filter((n) => chosen.includes(n.id))) {
-      const node = s.daemon.canvas.nodes.find((n) => n.id === p.id);
-      if (node) s.daemon.store.saveNode({ ...node, title: p.title || node.title, intent: { ...node.intent, goal: p.goal, acceptance: p.acceptance, tasks: p.tasks } });
+      const node = canvas.nodes.find((n) => n.id === p.id);
+      if (!node) continue;
+      const recheck = (i: ProposedItem): ProposedItem => {
+        const sources = i.sources.map((src) => checkSource(s.root, canvas, node.id, src, files));
+        return { text: i.text, sources, verified: sources.length > 0 && sources.every((x) => x.ok) };
+      };
+      const card = { goal: recheck(p.goal), acceptance: p.acceptance.map(recheck), unknowns: p.unknowns };
+      s.daemon.store.saveNode({
+        ...node,
+        title: p.title || node.title,
+        intent: { ...node.intent, goal: card.goal.text, acceptance: card.acceptance.map((a) => a.text), tasks: p.tasks },
+        evidence: evidenceFor(s.root, card),
+      });
     }
     const info = readProjectInfo(s.root);
     writeProjectInfo(s.root, {
@@ -327,6 +345,13 @@ async function main() {
       ...(proposal.testCommand && !info.testCommand ? { testCommand: proposal.testCommand } : {}),
     });
     s.canvasChanged();
+  });
+  // Cards whose description was written from code that has changed since: id -> changed files.
+  ipcMain.handle("agent-together:staleCards", () => {
+    const s = need();
+    return Object.fromEntries(
+      s.daemon.canvas.nodes.filter((n) => n.evidence).map((n) => [n.id, staleSources(s.root, n)] as const).filter(([, changed]) => changed.length),
+    );
   });
   ipcMain.handle("agent-together:initGit", () => {
     const s = need();

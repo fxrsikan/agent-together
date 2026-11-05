@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ImportProposal, ImportStatus } from "../../preload";
 import { errorText } from "./errors";
+import { ProposalView } from "./ProposalView";
 
 /**
  * Shown after opening existing code: the canvas was drawn from the folders, so the
@@ -11,7 +12,6 @@ import { errorText } from "./errors";
 export function ImportChecklist({ version, onChange }: { version: number; onChange: (notice: string) => void }) {
   const [status, setStatus] = useState<ImportStatus | null>(null);
   const [proposal, setProposal] = useState<ImportProposal | null>(null);
-  const [chosen, setChosen] = useState<string[]>([]);
   const [busy, setBusy] = useState("");
 
   useEffect(() => {
@@ -29,7 +29,6 @@ export function ImportChecklist({ version, onChange }: { version: number; onChan
       setBusy("");
     }
   };
-  const toggle = (id: string) => setChosen((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c, id]));
   const suggestedTest = proposal?.testCommand || status.guessedTest;
 
   return (
@@ -65,7 +64,7 @@ export function ImportChecklist({ version, onChange }: { version: number; onChan
         <strong>2. 卡片说明</strong>{" "}
         <span className="muted">
           {status.emptyCards
-            ? `${status.cards} 张卡片里有 ${status.emptyCards} 张还没写目标。可以让帮手模型读一遍代码，写好名字、目标和验收标准，你看过再采用。`
+            ? `${status.cards} 张卡片里有 ${status.emptyCards} 张还没写目标。可以让帮手模型读一遍代码，写好名字、目标和验收标准，每条都附上代码出处，你看过再采用。`
             : "每张卡片都写了目标。"}
         </span>
       </p>
@@ -79,7 +78,6 @@ export function ImportChecklist({ version, onChange }: { version: number; onChan
               act("read", async () => {
                 const p = await window.agentTogether.understandProject();
                 setProposal(p);
-                setChosen(p.nodes.map((n) => n.id));
               })
             }
           >
@@ -89,47 +87,18 @@ export function ImportChecklist({ version, onChange }: { version: number; onChan
         </div>
       )}
       {proposal && (
-        <div className="proposal">
-          {proposal.description && <p>项目：{proposal.description}</p>}
-          {proposal.stack && <p className="muted">技术栈：{proposal.stack}</p>}
-          {proposal.nodes.map((n) => (
-            <label key={n.id} className="check proposal-card">
-              <input type="checkbox" checked={chosen.includes(n.id)} onChange={() => toggle(n.id)} />
-              <span>
-                <strong>{n.title}</strong>
-                <span className="muted">（{n.id}）</span>
-                <br />
-                {n.goal}
-                {n.acceptance.length > 0 && (
-                  <ul>
-                    {n.acceptance.map((a, i) => (
-                      <li key={i}>{a}</li>
-                    ))}
-                  </ul>
-                )}
-                {n.tasks.length > 0 && <span className="muted">还可以做：{n.tasks.join("；")}</span>}
-              </span>
-            </label>
-          ))}
-          <div className="actions">
-            <button
-              className="primary"
-              disabled={!!busy || !chosen.length}
-              onClick={() =>
-                act("apply", async () => {
-                  await window.agentTogether.applyImportProposal(proposal, chosen);
-                  setProposal(null);
-                  onChange(`已更新 ${chosen.length} 张卡片的说明；已有的项目描述、技术栈和测试命令没有覆盖`);
-                })
-              }
-            >
-              采用勾选的 {chosen.length} 张
-            </button>
-            <button disabled={!!busy} onClick={() => setProposal(null)}>
-              不要
-            </button>
-          </div>
-        </div>
+        <ProposalView
+          proposal={proposal}
+          busy={!!busy}
+          onCancel={() => setProposal(null)}
+          onApply={(kept, chosen) =>
+            act("apply", async () => {
+              await window.agentTogether.applyImportProposal(kept, chosen);
+              setProposal(null);
+              onChange(`已更新 ${chosen.length} 张卡片的说明，出处已存下；已有的项目描述、技术栈和测试命令没有覆盖`);
+            })
+          }
+        />
       )}
 
       <p>

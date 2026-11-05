@@ -5,7 +5,9 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { Canvas } from "@agent-together/schema";
 import {
+  checkSource,
   ensureGitignore,
+  evidenceFor,
   generateCanvas,
   guessTestCommand,
   initGit,
@@ -15,6 +17,7 @@ import {
   parseImportProposal,
   projectDigest,
   readProjectInfo,
+  staleSources,
   understandProject,
 } from "@agent-together/core";
 import { importCandidates, importSpecifiers } from "../src/imports.js";
@@ -148,6 +151,77 @@ describe("import proposals", () => {
     const p = await understandProject(llm, root, canvas, files);
     expect(prompt).toContain("不要改卡片 id");
     expect(p.testCommand).toBe("node --test");
+  });
+});
+
+describe("citations", () => {
+  const cited = () => {
+    const root = folder({
+      "src/store/index.js": "export function load() {\n  return [];\n}\n",
+      "src/cli/main.js": "load();\n",
+    });
+    return { root, files: listFiles(root) };
+  };
+
+  it("checks each cited range: the card's own file, lines inside it", () => {
+    const { root, files } = cited();
+    const set = new Set(files);
+    const ok = checkSource(root, canvas, "store", { path: "./src/store/index.js", line: 1, end_line: 3 }, set);
+    expect(ok).toMatchObject({ ok: true, path: "src/store/index.js" });
+    expect(ok.excerpt).toBe("1| export function load() {\n2|   return [];\n3| }");
+    expect(checkSource(root, canvas, "store", { path: "src/store/index.js", line: 2, end_line: 9 }, set)).toMatchObject({ ok: false, problem: "行号不对（这个文件共 3 行）" });
+    expect(checkSource(root, canvas, "store", { path: "src/cli/main.js", line: 1 }, set).problem).toBe("这是「cli」的文件");
+    expect(checkSource(root, canvas, "store", { path: "src/store/made-up.js", line: 1 }, set).problem).toBe("项目里没有这个文件");
+    expect(checkSource(root, canvas, "store", { path: "../outside.js", line: 1 }, set).ok).toBe(false);
+  });
+
+  it("marks a statement verified only when it cites something and every citation checks out", () => {
+    const { root, files } = cited();
+    const reply = JSON.stringify({
+      nodes: [
+        {
+          id: "store",
+          goal: { text: "读写账本", sources: [{ path: "src/store/index.js", line: 1, end_line: 3 }] },
+          acceptance: [
+            { text: "load 返回数组", sources: [{ path: "src/store/index.js", line: 2 }] },
+            { text: "编出来的", sources: [{ path: "src/store/index.js", line: 40 }] },
+            { text: "没有出处", sources: [] },
+          ],
+          unknowns: ["看不出账本存在哪"],
+        },
+      ],
+    });
+    const card = parseImportProposal(reply, canvas, root, files)!.nodes[0];
+    expect(card.goal.verified).toBe(true);
+    expect(card.acceptance.map((a) => a.verified)).toEqual([true, false, false]);
+    expect(card.unknowns).toEqual(["看不出账本存在哪"]);
+  });
+
+  it("numbers the digest's lines so the model can cite them", () => {
+    const { root, files } = cited();
+    expect(projectDigest(root, canvas, files)).toContain("2|   return [];");
+    expect(projectDigest(root, canvas, files, 40_000, "cli")).not.toContain("src/store/index.js");
+  });
+
+  it("keeps verified citations with file hashes and notices when the code changes", () => {
+    const { root, files } = cited();
+    const card = parseImportProposal(
+      JSON.stringify({ nodes: [{ id: "store", goal: { text: "g", sources: [{ path: "src/store/index.js", line: 1 }] }, acceptance: [{ text: "bad", sources: [{ path: "x.js", line: 1 }] }], unknowns: ["u"] }] }),
+      canvas,
+      root,
+      files,
+    )!.nodes[0];
+    const evidence = evidenceFor(root, card);
+    expect(evidence.sources).toEqual([{ path: "src/store/index.js", line: 1 }]); // the unverified one is not kept
+    expect(Object.keys(evidence.files)).toEqual(["src/store/index.js"]);
+    expect(evidence.unknowns).toEqual(["u"]);
+    expect(evidence.commit).toBeUndefined(); // no git here
+    const node = { ...canvas.nodes[0], evidence };
+    expect(staleSources(root, node)).toEqual([]);
+    fs.writeFileSync(path.join(root, "src/store/index.js"), "export function load() {\r\n  return [];\r\n}\r\n");
+    expect(staleSources(root, node)).toEqual([]); // line endings alone are no change
+    fs.appendFileSync(path.join(root, "src/store/index.js"), "export const x = 1;\n");
+    expect(staleSources(root, node)).toEqual(["src/store/index.js"]);
   });
 });
 

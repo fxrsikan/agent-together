@@ -24,6 +24,21 @@ export const CanvasNode = z.object({
   executor: z.string().optional(),
   /** Saved agent capability used for this step. */
   role: CapabilityId.optional(),
+  /**
+   * Where the card's description came from when the helper model wrote it from code:
+   * the cited line ranges (checked against the files), each cited file's content hash
+   * at that moment (to notice when the code moved on), the git commit if there was one,
+   * and what the model could not tell from the code.
+   */
+  evidence: z
+    .object({
+      at: z.string(),
+      commit: z.string().optional(),
+      sources: z.array(z.object({ path: z.string(), line: z.number().int().positive(), end_line: z.number().int().positive().optional() })).default([]),
+      files: z.record(z.string(), z.string()).default({}),
+      unknowns: z.array(z.string()).default([]),
+    })
+    .optional(),
   position: z.object({ x: z.number(), y: z.number() }).optional(),
 });
 export type CanvasNode = z.infer<typeof CanvasNode>;

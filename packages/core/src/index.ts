@@ -9,7 +9,7 @@ export { mayDepend, ownerOf } from "./owners.js";
 export { buildNodeContext, buildNodeGuide, contextSections, estimateTokens } from "./context.js";
 export { draftsFromFindings, MemoryStore, splitByVerifier, verifierKey, verifierLabel } from "./memory.js";
 export { generateCanvas, initProject, layoutCanvas, listFiles } from "./init.js";
-export { createProject, newNodeId, openProject, readProjectInfo, writeProjectInfo, type ProjectInfo } from "./project.js";
+export { createProject, ensureGitignore, initGit, newNodeId, openProject, readProjectInfo, writeProjectInfo, type ProjectInfo } from "./project.js";
 export { canvasFromDraft, planCanvas, planPrompt, type CanvasPlan } from "./planner.js";
 export { Checkpoints, type Checkpoint } from "./checkpoints.js";
 export { cleanEnv, dispatchPrompt, openTerminal } from "./terminal.js";
@@ -49,3 +49,4 @@ export * from "./audit.js";
 
 export { draftRole, roleFromDraft, rolesFromDraft } from "./roles.js";
 export { listModels, parseCursorModels, parseGrokModels, projectModels, readCodexModels, saveProjectModels, saveRaceAgents, type ModelAgent, type ModelChoice } from "./models.js";
+export { guessTestCommand, parseImportProposal, projectDigest, understandProject, understandPrompt, type ImportProposal } from "./understand.js";

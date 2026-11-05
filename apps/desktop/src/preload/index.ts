@@ -1,4 +1,4 @@
-import type { EvolutionReport, Experience, ModelChoice, SetupReport } from "@agent-together/core";
+import type { EvolutionReport, Experience, ImportProposal, ModelChoice, SetupReport } from "@agent-together/core";
 import { contextBridge, ipcRenderer } from "electron";
 import type { AuditResult, CanvasPlan, Checkpoint, CompileReport, Judgment, ProjectInfo, RaceReport, TestHistory, TestRun } from "@agent-together/core";
 import type { AgentEvent, Capability, Canvas, CanvasEdge, CanvasNode, Memory, RunResult, Verdict } from "@agent-together/schema";
@@ -8,6 +8,20 @@ export type { Judgment, RaceReport, RunResult, TestHistory, TestRun };
 export type { AuditResult };
 export type AgentRunOutcome = { run: RunResult; tests: TestRun | null; checkpoint: Checkpoint | null; audit: AuditResult | null };
 export type Agent = "claude-code" | "codex" | "cursor" | "grok-build";
+/** Where an imported project stands: what the checklist still has to offer. */
+export type ImportStatus = {
+  imported: boolean;
+  reviewed: boolean;
+  hasGit: boolean;
+  cards: number;
+  /** Cards without a goal yet. */
+  emptyCards: number;
+  testCommand: string | null;
+  /** A test command guessed from the files, "" when none fits. */
+  guessedTest: string;
+  helper: string | null;
+};
+export type { ImportProposal };
 /** The helper model (canvas plans, roles, evolution strategies, review); `name` is what runs now, null when none. */
 export type LlmSettings = { provider: "auto" | "off" | "anthropic" | "claude-cli" | "openai-compatible"; model: string; baseUrl: string; name: string | null };
 /** What the context inspector shows: the text, which memories go in, and what they cost. */
@@ -54,6 +68,13 @@ const api = {
   listModels: (refresh?: boolean) => invoke<Record<string, ModelChoice[]>>("listModels", refresh),
   projectModels: () => invoke<Record<string, string>>("projectModels"),
   llmSettings: () => invoke<LlmSettings>("llmSettings"),
+  importStatus: () => invoke<ImportStatus>("importStatus"),
+  /** The helper model reads the code and proposes card descriptions; nothing is saved. */
+  understandProject: () => invoke<ImportProposal>("understandProject"),
+  applyImportProposal: (proposal: ImportProposal, chosen: string[]) => invoke<void>("applyImportProposal", proposal, chosen),
+  /** git init (no commit), then the project reopens with checkpoints on. */
+  initGit: () => invoke<SessionInfo>("initGit"),
+  reviewImport: () => invoke<unknown>("reviewImport"),
   /** Saves the helper model and reopens the project with it; resolves to the new session. */
   saveLlmSettings: (settings: Omit<LlmSettings, "name">) => invoke<SessionInfo>("saveLlmSettings", settings),
   saveProjectModels: (models: Record<string, string>) => invoke<Record<string, string>>("saveProjectModels", models),

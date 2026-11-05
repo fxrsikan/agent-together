@@ -17,6 +17,11 @@ import {
   contextSections,
   createProject,
   listModels,
+  guessTestCommand,
+  initGit,
+  listFiles,
+  understandProject,
+  type ImportProposal,
   splitByVerifier,
   verifierKey,
   verifierLabel,
@@ -225,6 +230,12 @@ async function main() {
   });
   ipcMain.handle("agent-together:openProject", async (_e, dir: string) => {
     const { root, created } = openProject(dir);
+    if (created) {
+      // Like a new project: start with the models last chosen (before the session reads them).
+      saveProjectModels(root, defaultModels());
+      const llm = defaultLlm();
+      if (llm) saveLlmConfig(root, llm);
+    }
     const info = await switchTo(root);
     if (created) need().installHooks(hookProgram());
     return info;
@@ -282,6 +293,47 @@ async function main() {
     s.canvasChanged();
     return plan;
   });
+  // Importing existing code: a checklist to finish the first-pass canvas drawn from the folders.
+  ipcMain.handle("agent-together:importStatus", () => {
+    const s = need();
+    const info = readProjectInfo(s.root);
+    const nodes = s.daemon.canvas.nodes;
+    return {
+      imported: !!info.imported,
+      reviewed: !!info.importReviewed,
+      hasGit: s.hasGit,
+      cards: nodes.length,
+      emptyCards: nodes.filter((n) => !n.intent.goal.trim()).length,
+      testCommand: testCommandFor(s.root),
+      guessedTest: guessTestCommand(s.root, listFiles(s.root)),
+      helper: s.llm?.name ?? null,
+    };
+  });
+  ipcMain.handle("agent-together:understandProject", async () => {
+    const s = need();
+    if (!s.llm) throw new Error("没有可用的帮手模型：请在右边「帮手模型」里选一个，或先登录 claude 命令行");
+    return understandProject(s.llm, s.root, s.daemon.canvas, listFiles(s.root));
+  });
+  ipcMain.handle("agent-together:applyImportProposal", (_e, proposal: ImportProposal, chosen: string[]) => {
+    const s = need();
+    for (const p of proposal.nodes.filter((n) => chosen.includes(n.id))) {
+      const node = s.daemon.canvas.nodes.find((n) => n.id === p.id);
+      if (node) s.daemon.store.saveNode({ ...node, title: p.title || node.title, intent: { ...node.intent, goal: p.goal, acceptance: p.acceptance, tasks: p.tasks } });
+    }
+    const info = readProjectInfo(s.root);
+    writeProjectInfo(s.root, {
+      ...(proposal.description && !info.description ? { description: proposal.description } : {}),
+      ...(proposal.stack && !info.stack ? { stack: proposal.stack } : {}),
+      ...(proposal.testCommand && !info.testCommand ? { testCommand: proposal.testCommand } : {}),
+    });
+    s.canvasChanged();
+  });
+  ipcMain.handle("agent-together:initGit", () => {
+    const s = need();
+    initGit(s.root);
+    return switchTo(s.root); // checkpoints, races and evolution switch on
+  });
+  ipcMain.handle("agent-together:reviewImport", () => writeProjectInfo(need().root, { importReviewed: true }));
   ipcMain.handle("agent-together:roles", () => need().daemon.capabilities.list().filter((c) => c.kind === "agent"));
   ipcMain.handle("agent-together:draftRole", (_e, sentence: string) => draftRole(need().llm, sentence));
   ipcMain.handle("agent-together:saveRole", (_e, input: unknown) => {

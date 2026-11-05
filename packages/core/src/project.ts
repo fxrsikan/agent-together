@@ -18,6 +18,10 @@ export interface ProjectInfo {
   stack?: string;
   /** Run from the project root after each in-app dispatch, e.g. "node --test". */
   testCommand?: string;
+  /** Opened from existing code (its canvas was drawn from the folders), not created empty. */
+  imported?: boolean;
+  /** The user has gone through (or dismissed) the import checklist. */
+  importReviewed?: boolean;
 }
 
 const infoFile = (root: string) => path.join(root, ".agent-together", "project.json");
@@ -76,8 +80,36 @@ export function openProject(dir: string): { root: string; created: boolean; git:
   const root = path.resolve(dir);
   if (!fs.existsSync(root) || !fs.statSync(root).isDirectory()) throw new Error(`不是文件夹：${root}`);
   const created = !fs.existsSync(path.join(root, ".agent-together", "canvas"));
-  if (created) setUp(root, path.basename(root));
+  if (created) {
+    setUp(root, path.basename(root));
+    writeProjectInfo(root, { imported: true });
+    ensureGitignore(root);
+  }
   return { root, created, git: isGitRepo(root) };
+}
+
+/**
+ * Adds the hook configs (absolute paths to this machine's hook program) to the
+ * folder's .gitignore, keeping what is there; creates it when missing. Returns the
+ * lines it added.
+ */
+export function ensureGitignore(root: string): string[] {
+  const file = path.join(root, ".gitignore");
+  const existing = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
+  const have = new Set(existing.split(/\r?\n/).map((l) => l.trim()));
+  const missing = PROJECT_GITIGNORE.split("\n").filter((l) => l && !have.has(l));
+  if (!missing.length) return [];
+  const sep = existing && !existing.endsWith("\n") ? "\n" : "";
+  const header = "# Agent Together: this machine's AI assistant settings";
+  fs.writeFileSync(file, [existing + sep + (existing ? "\n" : "") + header, ...missing, ""].join("\n"));
+  return missing;
+}
+
+/** Makes the folder a git repository (checkpoints, rollback, races and evolution need one). Commits nothing. */
+export function initGit(root: string): void {
+  if (isGitRepo(root)) return;
+  execFileSync("git", ["init", "-q"], { cwd: root });
+  ensureGitignore(root);
 }
 
 /**

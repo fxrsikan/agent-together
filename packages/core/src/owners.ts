@@ -1,9 +1,30 @@
 import picomatch from "picomatch";
 import type { Canvas, CanvasNode } from "@agent-together/schema";
 
-/** The first node whose file globs match a project-relative path. */
+/** How specific a glob is: an exact path beats any pattern; otherwise the longer fixed start wins. */
+function specificity(glob: string): number {
+  const wild = glob.search(/[*?[{]/);
+  return wild === -1 ? Number.MAX_SAFE_INTEGER : wild;
+}
+
+/**
+ * The node that owns a project-relative path: of the nodes whose globs match it, the
+ * one with the most specific matching glob (so a card can own tests/test_store.py
+ * while another owns tests/**); the first such node on a tie.
+ */
 export function ownerOf(canvas: Canvas, rel: string): CanvasNode | null {
-  return canvas.nodes.find((n) => n.files.length > 0 && picomatch(n.files)(rel)) ?? null;
+  let best: CanvasNode | null = null;
+  let bestScore = -1;
+  for (const n of canvas.nodes) {
+    for (const glob of n.files) {
+      const score = specificity(glob);
+      if (score > bestScore && picomatch(glob)(rel)) {
+        best = n;
+        bestScore = score;
+      }
+    }
+  }
+  return best;
 }
 
 /** True when the canvas has an edge saying `from` may depend on `to`. */

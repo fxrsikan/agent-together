@@ -5,7 +5,7 @@ import { Canvas, type CanvasEdge, type CanvasNode } from "@agent-together/schema
 import { importCandidates, importSpecifiers, SOURCE_FILE } from "./imports.js";
 import { ownerOf } from "./owners.js";
 
-const SKIP_DIRS = new Set(["node_modules", ".git", ".agent-together", ".claude", "dist", "out", "build", "coverage"]);
+const SKIP_DIRS = new Set(["node_modules", ".git", ".agent-together", ".claude", ".codex", ".cursor", "dist", "out", "build", "coverage", "__pycache__", ".venv", "venv", ".tox", ".mypy_cache", ".pytest_cache", "target", ".gradle"]);
 const MAX_SOURCE_BYTES = 512 * 1024;
 
 /** Project files as posix paths: git's view (tracked + untracked, minus ignored) when available. */
@@ -53,43 +53,117 @@ function findPackages(root: string, files: string[]): { dir: string; name: strin
 interface Group {
   key: string;
   title: string;
-  glob: string;
+  globs: string[];
   pkg?: string;
+}
+
+const TEST_DIRS = new Set(["test", "tests", "__tests__", "spec"]);
+/** Package entry files: they belong with their package, not on a card of their own. */
+const ENTRY_FILE = /^(__init__\.py|index\.[cm]?[jt]sx?)$/;
+/** Below this many source files directly in it, a lone source folder stays one card. */
+const SPLIT_AT = 3;
+
+/** The module a test file is about: "tests/test_job_queue.py" → "job_queue", "store.test.ts" → "store"; null when not one. */
+function testedName(file: string): string | null {
+  const name = file.split("/").pop()!;
+  const m = /^test_(.+)\.py$/.exec(name) ?? /^(.+)_test\.(py|go)$/.exec(name) ?? /^(.+)\.(test|spec)\.[cm]?[jt]sx?$/.exec(name);
+  return m ? m[1] : null;
+}
+const isTest = (file: string) => testedName(file) !== null || file.split("/").some((p) => TEST_DIRS.has(p));
+const stem = (file: string) => file.split("/").pop()!.replace(/\.[^.]+$/, "");
+
+/** Whether a glob of the forms this generator writes ("a/**", "a/*", "*", "a/b.py") covers a file. */
+function covers(glob: string, file: string): boolean {
+  if (glob.endsWith("/**")) return file.startsWith(glob.slice(0, -2));
+  if (glob === "*") return !file.includes("/");
+  if (glob.endsWith("/*")) return file.startsWith(glob.slice(0, -1)) && !file.slice(glob.length - 1).includes("/");
+  return glob === file;
 }
 
 /**
  * First-pass canvas from code. In a monorepo each workspace package is a node;
  * otherwise each top-level directory of the source root (src/ when most code
- * lives there) is. Edges come from relative imports and imports of workspace
- * packages by name. Naming nodes as features and regrouping them is left to the
- * user (and later an LLM).
+ * lives there) is, and other top-level folders with code (scripts/…) get their
+ * own. A lone source folder with several modules (a flat Python package) is split
+ * into one card per module. Test files go to the card of the module they test
+ * (tests/test_store.py → store), else to one tests card. Edges come from imports
+ * between cards (JS/TS relative and workspace imports, Python imports).
+ * Naming the cards and writing their goals is left to the user or the helper model.
  */
 export function generateCanvas(root: string, files: string[]): Canvas {
   const sources = files.filter((f) => SOURCE_FILE.test(f) && !f.split("/").some((p) => SKIP_DIRS.has(p)));
   const pool = sources.length ? sources : files;
   const packages = findPackages(root, files);
   const loose = pool.filter((f) => !packages.some((p) => f.startsWith(`${p.dir}/`)));
-  const base = loose.filter((f) => f.startsWith("src/")).length * 2 >= loose.length && loose.length ? "src/" : "";
+  const code = loose.filter((f) => !isTest(f));
+  const base = code.filter((f) => f.startsWith("src/")).length * 2 >= code.length && code.length ? "src/" : "";
 
   const groups = new Map<string, Group>();
+  const add = (key: string, title: string, glob: string, pkg?: string) => {
+    const g = groups.get(key) ?? { key, title, globs: [], pkg };
+    if (!g.globs.includes(glob)) g.globs.push(glob);
+    groups.set(key, g);
+  };
   for (const f of pool) {
     const pkg = packages.find((p) => f.startsWith(`${p.dir}/`));
-    if (pkg) {
-      groups.set(pkg.dir, { key: pkg.dir, title: pkg.name, glob: `${pkg.dir}/**`, pkg: pkg.name });
-      continue;
+    if (pkg) add(pkg.dir, pkg.name, `${pkg.dir}/**`, pkg.name);
+  }
+  for (const f of sources.length ? code : loose) {
+    if (f.startsWith(base)) {
+      const rest = f.slice(base.length);
+      const slash = rest.indexOf("/");
+      const dir = slash === -1 ? "" : rest.slice(0, slash);
+      add(dir, dir || (base ? `${base}（根目录文件）` : "根目录文件"), dir ? `${base}${dir}/**` : `${base}*`);
+    } else {
+      // Outside src/: scripts/, tools/… each a card; loose root files (setup.py…) one card.
+      const slash = f.indexOf("/");
+      const dir = slash === -1 ? "" : f.slice(0, slash);
+      add(`outside:${dir}`, dir || "根目录文件", dir ? `${dir}/**` : "*");
     }
-    if (!f.startsWith(base)) continue;
-    const rest = f.slice(base.length);
-    const slash = rest.indexOf("/");
-    const dir = slash === -1 ? "" : rest.slice(0, slash);
-    const title = dir || (base ? `${base}（根目录文件）` : "根目录文件");
-    groups.set(dir, { key: dir, title, glob: dir ? `${base}${dir}/**` : `${base}*` });
+  }
+
+  // A flat package (src/pdfedit/*.py) would be one card for the whole program: one per module instead.
+  const inBase = [...groups.values()].filter((g) => !g.pkg && !g.key.startsWith("outside:") && g.key);
+  if (inBase.length === 1) {
+    const dir = inBase[0].key;
+    const prefix = `${base}${dir}/`;
+    const direct = code.filter((f) => f.startsWith(prefix) && !f.slice(prefix.length).includes("/"));
+    if (direct.filter((f) => !ENTRY_FILE.test(f.split("/").pop()!)).length >= SPLIT_AT) {
+      groups.delete(dir);
+      for (const f of code.filter((f) => f.startsWith(prefix))) {
+        const rest = f.slice(prefix.length);
+        const sub = rest.includes("/") ? rest.slice(0, rest.indexOf("/")) : null;
+        if (sub) add(`${dir}/${sub}`, `${dir}/${sub}`, `${prefix}${sub}/**`);
+        else if (ENTRY_FILE.test(rest)) add(dir, `${dir}（入口）`, f);
+        else add(`${dir}/${stem(f)}`, stem(f), f);
+      }
+    }
+  }
+
+  // Tests: with the module they test when that is clear, else on one tests card.
+  if (sources.length) {
+    const nameOf = (g: Group) => g.key.split("/").pop()!.replace(/^outside:/, "");
+    const cards = [...groups.values()];
+    const rest: string[] = [];
+    for (const f of loose.filter(isTest)) {
+      if (cards.some((g) => g.globs.some((glob) => covers(glob, f)))) continue; // already beside its code
+      const target = cards.find((g) => !g.pkg && nameOf(g) === testedName(f));
+      if (target) target.globs.push(f); // an exact path: more specific than the tests card's folder
+      else rest.push(f);
+    }
+    // Everything else under a tests folder, including tests added later, goes to one card per folder.
+    for (const f of rest) {
+      const top = f.includes("/") ? f.slice(0, f.indexOf("/")) : "";
+      add(`tests:${top}`, top ? `测试（${top}）` : "测试", top ? `${top}/**` : f);
+    }
   }
 
   const used = new Set<string>();
   const byPackage = new Map<string, string>(); // package name → node id
   const nodes: CanvasNode[] = [...groups.values()].sort((a, b) => a.key.localeCompare(b.key)).map((g) => {
-    let id = slug(g.pkg ? g.pkg.replace(/^@[^/]+\//, "") : g.key || base.replace(/\/$/, "") || "root");
+    const key = g.key.replace(/^(outside|tests):/, "");
+    const fallback = g.key.startsWith("tests:") ? "tests" : base.replace(/\/$/, "") || "root";
+    let id = slug(g.pkg ? g.pkg.replace(/^@[^/]+\//, "") : key.split("/").pop() || fallback);
     while (used.has(id)) id += "-x";
     used.add(id);
     if (g.pkg) byPackage.set(g.pkg, id);
@@ -98,7 +172,7 @@ export function generateCanvas(root: string, files: string[]): Canvas {
       kind: "module",
       title: g.title,
       intent: { goal: "", acceptance: [], tasks: [] },
-      files: [g.glob],
+      files: g.globs,
       status: "todo",
     };
   });
@@ -113,7 +187,7 @@ export function generateCanvas(root: string, files: string[]): Canvas {
     const from = ownerOf(draft, f);
     const full = path.join(root, f);
     if (!from || !fs.existsSync(full) || fs.statSync(full).size > MAX_SOURCE_BYTES) continue;
-    for (const spec of importSpecifiers(fs.readFileSync(full, "utf8"))) {
+    for (const spec of importSpecifiers(fs.readFileSync(full, "utf8"), f)) {
       const to = packageTarget(spec) ?? importCandidates(f, spec, exists).map((c) => ownerOf(draft, c)).find(Boolean)?.id;
       const key = to && to !== from.id ? `${from.id}\u0000${to}` : null;
       if (key) counts.set(key, (counts.get(key) ?? 0) + 1);

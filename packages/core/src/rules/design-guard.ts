@@ -7,7 +7,7 @@ import type { Rule } from "./types.js";
 
 /**
  * 设计守护: an import may only cross node boundaries along a canvas edge.
- * v0.1 reads relative imports in JS/TS with a regex; tree-sitter and path aliases come later.
+ * Reads relative JS/TS imports and Python imports with regexes; tree-sitter and path aliases come later.
  */
 export const designGuard: Rule = {
   id: "design-guard",
@@ -20,10 +20,10 @@ export const designGuard: Rule = {
     const from = ownerOf(canvas, rel);
     if (!from) return null;
 
-    const old = importSpecifiers(before);
+    const old = importSpecifiers(before, rel);
     const exists = (p: string) => fs.existsSync(path.join(root, p));
     const violations: string[] = [];
-    for (const spec of importSpecifiers(after)) {
+    for (const spec of importSpecifiers(after, rel)) {
       if (old.has(spec)) continue;
       const to = importCandidates(rel, spec, exists).map((c) => ownerOf(canvas, c)).find(Boolean);
       if (to && !mayDepend(canvas, from.id, to.id)) violations.push(`"${spec}" (${to.title})`);

@@ -153,3 +153,7 @@ button.link { border: none; background: none; padding: 0 4px; color: var(--muted
 .setup-cmd { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
 .setup-cmd code { flex: 1; padding: 6px 8px; background: var(--bg); border-radius: 6px; }
 .setup-actions { margin-top: 20px; align-items: center; }
+.import-checklist { border: 1px solid var(--accent); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; }
+.import-checklist p { margin: 6px 0; }
+.proposal-card { align-items: flex-start; margin: 6px 0; }
+.proposal-card ul { margin: 4px 0 4px 18px; padding: 0; }

@@ -23,6 +23,7 @@ import { NodeCard, type NodeCardType } from "./NodeCard";
 import { NodeEditor } from "./NodeEditor";
 import { ProjectSettings } from "./ProjectSettings";
 import { ModelSettings } from "./ModelSettings";
+import { ImportChecklist } from "./ImportChecklist";
 import { HelperModelSettings } from "./HelperModelSettings";
 import { EvolutionPanel } from "./EvolutionPanel";
 import { RoleDraft } from "./RoleDraft";
@@ -395,6 +396,7 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
           )}
         </div>
         <aside className="side">
+          <ImportChecklist version={version} onChange={changed} />
           <section>
             <h4>专职角色</h4>
             <p className="muted">把角色拖到空白处添加一步，拖到卡片上交给它来做。草稿同意后才会保存。</p>

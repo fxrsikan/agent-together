@@ -33,7 +33,7 @@ AI 写代码很快，但做着做着容易跑偏：让它改购物车，它顺�
 - 记忆：AI 犯过的错整理成经验，你批准后，以后每次交给 AI 都会带上。卡片的记忆只在交给这张卡片时带上，CLAUDE.md / AGENTS.md 里只放全项目的；"检查上下文"会显示记忆占多少 token，太多时提醒你清理
 - 同一张卡片让几个 AI 比赛（勾选谁参赛，至少两个），按测试结果和越界情况打分，选最好的那个
 - 开工前可以看到、也可以修改要交给 AI 的全部内容
-- 进化（用 Claude Haiku 实测过一次）：卡片反复失败时，同一个助手在独立工作区试两到三种做法，和原来的方式比测试、越界和改动大小；你点"同意"才会记住，也可以一起采用代码。只比改动多几行少几行的不算更好。记下的经验会注明是用哪个助手和模型验证的，换了模型默认不带上，并提示你再进化一次确认。在两个不同项目里都有效的做法，新项目生成画布后会提示你。方法参考了 Google Research 的 [Harness²](https://github.com/google-research/harness2)
+- 进化（用 Claude Haiku 实测过两次：命令行一次、应用里一次）：卡片反复失败时，同一个助手在独立工作区试两到三种做法，和原来的方式比测试、越界和改动大小；你点"同意"才会记住，也可以一起采用代码。只比改动多几行少几行的不算更好。记下的经验会注明是用哪个助手和模型验证的，换了模型默认不带上，并提示你再进化一次确认。在两个不同项目里都有效的做法，新项目生成画布后会提示你。方法参考了 Google Research 的 [Harness²](https://github.com/google-research/harness2)
 - 专职角色：规划时按需提出角色草稿（界面设计员、测试员……），也可以用一句话让 AI 写一个；你看过、改过、同意后才保存。把角色拖到画布空白处就多一步，拖到卡片上就交给它做，交给 AI 时会带上角色的工作说明
 - 安装向导：第一次打开（以后在启动页也能打开）会检查 Node.js 22+、git 和四个 AI 助手的命令行装好没有、登录没有；缺什么就给出你电脑上的安装命令，装好后点"再检查一次"
 - 选模型：每个 AI 助手用哪个模型，在项目设置的"用哪个模型"里选；可选的模型是从各家命令行读出来的（不花钱），模型很多时可以输入几个字筛选，新项目默认沿用上次的选择。生成画布、写角色、想进化做法和复查用的"帮手模型"也在这里选（Claude 命令行、Anthropic API、OpenAI 兼容的服务，或关闭）
@@ -86,7 +86,7 @@ npm run dev
   capabilities/  能力单元
   project.json   产品描述、技术栈、测试命令
   race.json      赛马设置
-  llm.json       L2 判断用的模型
+  llm.json       帮手模型（画布、角色、进化做法、复查）
   events/        事件日志（不提交）
 ```
 
@@ -100,7 +100,7 @@ npm run dev
 | 应用内运行 | Claude Code、Cursor 用 `--output-format stream-json`，Codex 用 JSONL，输出实时显示；结束后跑项目测试，并从测试输出找出失败文件属于哪个节点 |
 | 事后检查 | hook 只能看到 AI 用改文件工具做的修改。每次跑完、跑测试之前，把派发前检查点以来的所有改动再过一遍观察者规则，用命令行或脚本改的也算；观察者当场没看到的会标出来 |
 | 检查点与回滚 | 派发前和测试通过时自动保存，存为 `refs/agent-together/checkpoints/*`，不碰分支和暂存区，回滚本身可撤销 |
-| 记忆 | 拦截生成草稿，批准后进入派发上下文，并同步到 `CLAUDE.md` 的 Agent Together 区块 |
+| 记忆 | 拦截生成草稿，批准后进入派发上下文；全项目记忆同步到 `CLAUDE.md` / `AGENTS.md` 的 Agent Together 区块，卡片记忆只随这张卡片的上下文发出；进化得来的记忆记下验证用的助手和模型，换了模型默认不带 |
 | 能力单元 | `.agent-together/capabilities/<id>.md` 写一次，编译到各平台：skill → `.claude/skills/`、`.agents/skills/`、`.cursor/rules/*.mdc`；agent 角色 → `.claude/agents/`；observer 由 Agent Together 对所有 agent 执行 |
 | 多 agent 赛马 | 同一节点、同一起点，各 agent 在独立 git worktree 里并行跑；按测试、观察者回放、改动大小打分；采用前自动存检查点 |
 | 进化 | 卡片连续两次测试失败会提示，也能手动发起；含对照组、测试优先排名、分数明细和费用；同意后记住，报告保存在 `.agent-together/evolutions/`。跨项目经验保存在 `~/.agent-together/experience/`，可用 `AGENT_TOGETHER_EXPERIENCE_DIR` 改位置 |
@@ -196,7 +196,9 @@ node packages/hook/dist/agent-together-evolve.js discard <项目目录> <进化i
 
 ### L2 模型
 
-默认 `auto`：设置了 `ANTHROPIC_API_KEY` 时用 Claude API（`claude-haiku-5-5`），否则用已登录的 `claude` 命令行（Haiku），都没有则只跑 L0 规则。也可以在 `.agent-together/llm.json` 中指定（不要在里面写密钥）：
+生成画布、写角色、想进化做法和事后复查都用这个模型，应用里叫"帮手模型"，在项目设置里直接选就行，选好后新项目默认沿用。
+
+默认 `auto`：设置了 `ANTHROPIC_API_KEY` 时用 Claude API（`claude-haiku-5-5`），否则用已登录的 `claude` 命令行（Haiku），都没有则只跑 L0 规则。应用里的选择保存在 `.agent-together/llm.json`，也可以直接编辑它（不要在里面写密钥）：
 
 ```json
 { "provider": "claude-cli", "maxCallsPerSession": 20 }

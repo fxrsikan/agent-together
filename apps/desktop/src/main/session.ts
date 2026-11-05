@@ -26,7 +26,11 @@ export class Session {
     private readonly win: BrowserWindow,
   ) {
     const llmConfig = loadLlmConfig(root);
-    this.llm = createLlm(llmConfig);
+    let llm: Llm | null = null;
+    try {
+      llm = createLlm(llmConfig);
+    } catch {} // an incomplete llm.json: run without the helper model rather than not open the project
+    this.llm = llm;
     this.daemon = new Daemon(root, { llm: this.llm, maxL2CallsPerSession: llmConfig.maxCallsPerSession });
     this.checkpoints = new Checkpoints(root);
     this.hasGit = this.checkpoints.available();

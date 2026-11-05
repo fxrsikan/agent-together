@@ -23,6 +23,7 @@ import { NodeCard, type NodeCardType } from "./NodeCard";
 import { NodeEditor } from "./NodeEditor";
 import { ProjectSettings } from "./ProjectSettings";
 import { ModelSettings } from "./ModelSettings";
+import { HelperModelSettings } from "./HelperModelSettings";
 import { EvolutionPanel } from "./EvolutionPanel";
 import { RoleDraft } from "./RoleDraft";
 import { RacePanel } from "./RacePanel";
@@ -508,6 +509,7 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
               )}
               <ProjectSettings version={version} onChange={changed} />
               <ModelSettings version={version} onChange={changed} />
+              <HelperModelSettings onChange={changed} />
               <MemoryPanel nodeId={null} version={version} onChange={changed} />
             </>
           )}

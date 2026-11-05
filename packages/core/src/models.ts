@@ -95,3 +95,13 @@ export function saveProjectModels(root: string, models: Record<string, string>):
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, JSON.stringify(config, null, 2) + "\n");
 }
+
+/** Saves who races (.agent-together/race.json `agents`), in the given order, keeping its other settings. */
+export function saveRaceAgents(root: string, agents: string[]): string[] {
+  const file = path.join(root, ".agent-together", "race.json");
+  const config = loadRaceConfig(root);
+  config.agents = [...new Set(agents)];
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, JSON.stringify(config, null, 2) + "\n");
+  return config.agents;
+}

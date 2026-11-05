@@ -7,6 +7,8 @@ const AGENTS: { id: string; name: string }[] = [
   { id: "grok-build", name: "Grok Build" },
 ];
 const OTHER = "__other__";
+/** Above this many models, a type-to-filter box replaces the dropdown. */
+const LONG_LIST = 15;
 
 type Choice = { id: string; label: string };
 
@@ -47,6 +49,30 @@ export function ModelSettings({ version, onChange }: { version: number; onChange
         const value = form[a.id] ?? "";
         const listed = lists?.[a.id] ?? [];
         const custom = typing[a.id] || (value !== "" && !listed.some((m) => m.id === value));
+        if (listed.length > LONG_LIST) {
+          // Hundreds of models (Cursor): type to filter instead of scrolling a dropdown.
+          const match = listed.find((m) => m.id === value);
+          return (
+            <label key={a.id}>
+              {a.name}（{listed.length} 个可选，输入几个字筛选；留空用它自己的默认设置）
+              <input
+                className="mono"
+                list={`models-${a.id}`}
+                value={value}
+                placeholder="例如 sonnet、gpt、composer"
+                onChange={(e) => setForm((f) => ({ ...f, [a.id]: e.target.value }))}
+              />
+              <datalist id={`models-${a.id}`}>
+                {listed.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.label}
+                  </option>
+                ))}
+              </datalist>
+              {value && <span className="muted">{match ? match.label : "列表里没有这个名字，会原样交给它"}</span>}
+            </label>
+          );
+        }
         return (
           <label key={a.id}>
             {a.name}

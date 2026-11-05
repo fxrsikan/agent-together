@@ -60,6 +60,8 @@ export interface RaceContestant {
   id: string;
   runner: AgentRunner;
   extraContext?: string;
+  /** This contestant's memories, when they differ by assistant or model; default: the race's. */
+  memories?: Memory[];
 }
 
 export interface RaceReport {
@@ -176,7 +178,9 @@ export class Race {
     const id = `${randomUUID().slice(0, 8)}-${startedAt.replace(/[-:.]/g, "").replace("T", "-").slice(0, 15)}-${nodeId}`.slice(0, 80);
     const base = new Checkpoints(this.root).snapshot(`赛马起点 ${id}`);
     git(this.top, ["update-ref", `refs/agent-together/races/${id}/base`, base]);
-    const context = contextOverride ?? buildNodeContext(canvas, nodeId, task, memories, readProjectInfo(this.root), new CapabilityStore(this.root).list());
+    const capabilities = new CapabilityStore(this.root).list();
+    const contextWith = (own: Memory[]) => contextOverride ?? buildNodeContext(canvas, nodeId, task, own, readProjectInfo(this.root), capabilities);
+    const shared = contextWith(memories);
 
     const contestants = await Promise.all(
       runners.map(async (entry): Promise<ContestantResult> => {
@@ -184,6 +188,7 @@ export class Race {
         const contestantId = entry.id;
         if (!/^[a-zA-Z0-9_-]+$/.test(contestantId)) throw new Error("参赛名称不合法");
         const extra = "runner" in entry ? entry.extraContext : undefined;
+        const context = "runner" in entry && entry.memories ? contextWith(entry.memories) : shared;
         const worktree = path.join(os.tmpdir(), `agent-together-race-${id}`, contestantId);
         git(this.top, ["worktree", "add", "--detach", worktree, base]);
         const project = path.join(worktree, this.rel);

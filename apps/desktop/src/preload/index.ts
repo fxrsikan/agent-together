@@ -8,6 +8,8 @@ export type { Judgment, RaceReport, RunResult, TestHistory, TestRun };
 export type { AuditResult };
 export type AgentRunOutcome = { run: RunResult; tests: TestRun | null; checkpoint: Checkpoint | null; audit: AuditResult | null };
 export type Agent = "claude-code" | "codex" | "cursor" | "grok-build";
+/** The helper model (canvas plans, roles, evolution strategies, review); `name` is what runs now, null when none. */
+export type LlmSettings = { provider: "auto" | "off" | "anthropic" | "claude-cli" | "openai-compatible"; model: string; baseUrl: string; name: string | null };
 /** What the context inspector shows: the text, which memories go in, and what they cost. */
 export type ContextPreview = {
   markdown: string;
@@ -51,6 +53,9 @@ const api = {
   projectInfo: () => invoke<ProjectInfo>("projectInfo"),
   listModels: (refresh?: boolean) => invoke<Record<string, ModelChoice[]>>("listModels", refresh),
   projectModels: () => invoke<Record<string, string>>("projectModels"),
+  llmSettings: () => invoke<LlmSettings>("llmSettings"),
+  /** Saves the helper model and reopens the project with it; resolves to the new session. */
+  saveLlmSettings: (settings: Omit<LlmSettings, "name">) => invoke<SessionInfo>("saveLlmSettings", settings),
   saveProjectModels: (models: Record<string, string>) => invoke<Record<string, string>>("saveProjectModels", models),
   saveProjectInfo: (patch: { description?: string; stack?: string; testCommand?: string }) => invoke<ProjectInfo>("saveProjectInfo", patch),
   onProject: (cb: (info: SessionInfo) => void) => on("project", cb),
@@ -99,7 +104,8 @@ const api = {
   exportCapability: (nodeId: string) => invoke<CompileReport>("exportCapability", nodeId),
   compileCapabilities: () => invoke<CompileReport[]>("compileCapabilities"),
 
-  evolutions: () => invoke<{ reports: EvolutionReport[]; running: string | null; agents: string[]; candidate: Record<string, number>; suggestions: Experience[] }>("evolutions"),
+  /** `agent`: list the experiences proven with its current model first. */
+  evolutions: (agent?: string) => invoke<{ reports: EvolutionReport[]; running: string | null; agents: string[]; candidate: Record<string, number>; suggestions: Experience[] }>("evolutions", agent),
   evolve: (nodeId: string, task: string, agent: string) => invoke<EvolutionReport>("evolve", nodeId, task, agent),
   approveEvolution: (id: string, adopt: boolean) => invoke<EvolutionReport>("approveEvolution", id, adopt),
   discardEvolution: (id: string) => invoke<void>("discardEvolution", id),
@@ -108,7 +114,9 @@ const api = {
   checkpoints: () => invoke<Checkpoint[]>("checkpoints"),
   checkpoint: (label: string) => invoke<Checkpoint>("checkpoint", label),
   rollback: (id: string) => invoke<boolean>("rollback", id),
-  races: () => invoke<{ running: string | null; reports: RaceReport[]; agents: string[] }>("races"),
+  /** `agents`: who races now; `all`: every assistant that can. */
+  races: () => invoke<{ running: string | null; reports: RaceReport[]; agents: string[]; all: string[] }>("races"),
+  saveRaceAgents: (agents: string[]) => invoke<string[]>("saveRaceAgents", agents),
   race: (nodeId: string, task: string, context?: string) => invoke<RaceReport>("race", nodeId, task, context),
   adoptRace: (id: string, contestantId: string) => invoke<boolean>("adoptRace", id, contestantId),
   discardRace: (id: string) => invoke<void>("discardRace", id),

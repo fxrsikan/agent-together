@@ -1,7 +1,7 @@
 {
   "name": "@agent-together/desktop",
   "version": "0.0.1",
-  "description": "Agent Together desktop app: the canvas",
+  "description": "Agent Together: plan on a canvas, let AI coding assistants build it, with an observer keeping them in bounds",
   "license": "Apache-2.0",
   "private": true,
   "main": "out/main/index.js",
@@ -9,7 +9,9 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build && node scripts/bundle-hook.mjs",
     "start": "electron-vite preview",
-    "dist": "npm run build && electron-builder --win"
+    "dist": "npm run build && electron-builder --win -c.electronDist=../../node_modules/electron/dist",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:linux": "npm run build && electron-builder --linux"
   },
   "devDependencies": {
     "@agent-together/adapter-claude-code": "0.0.1",
@@ -33,7 +35,6 @@
   "author": "fxrsikan",
   "build": {
     "electronVersion": "45.2.1",
-    "electronDist": "../../node_modules/electron/dist",
     "appId": "dev.agent-together.desktop",
     "productName": "Agent Together",
     "directories": {
@@ -64,6 +65,41 @@
       "allowToChangeInstallationDirectory": true,
       "artifactName": "AgentTogether-Setup-${version}.exe",
       "shortcutName": "Agent Together"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "category": "public.app-category.developer-tools",
+      "artifactName": "AgentTogether-${version}-${arch}.${ext}"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "category": "Development",
+      "maintainer": "fxrsikan",
+      "artifactName": "AgentTogether-${version}-${arch}.${ext}",
+      "executableName": "agent-together"
     }
   }
 }

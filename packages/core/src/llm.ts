@@ -41,6 +41,24 @@ export function loadLlmConfig(root: string): LlmConfig {
   return fromEnv ? { ...config, provider: fromEnv } : config;
 }
 
+/**
+ * Writes .agent-together/llm.json, keeping settings the app does not edit (maxCallsPerSession).
+ * Empty fields are left out, so "auto" with no model stays the plain default.
+ */
+export function saveLlmConfig(root: string, patch: Pick<LlmConfig, "provider" | "model" | "baseUrl">): LlmConfig {
+  const file = path.join(root, ".agent-together", "llm.json");
+  const current: LlmConfig = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : {};
+  const next: LlmConfig = { ...current };
+  for (const key of ["provider", "model", "baseUrl"] as const) {
+    const value = patch[key]?.trim();
+    if (value) (next as Record<string, unknown>)[key] = value;
+    else delete next[key];
+  }
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, JSON.stringify(next, null, 2) + "\n");
+  return next;
+}
+
 /** Claude through the official SDK; credentials resolve from the environment (API key, auth token or `ant` profile). */
 class AnthropicLlm implements Llm {
   readonly name: string;
@@ -155,7 +173,7 @@ export function createLlm(config: LlmConfig): Llm | null {
       return new OpenAiCompatibleLlm(config.baseUrl, config.model);
     case "auto":
       if (process.env.ANTHROPIC_API_KEY) return new AnthropicLlm(config.model);
-      if (onPath("claude")) return new ClaudeCliLlm();
+      if (onPath("claude")) return new ClaudeCliLlm(config.model);
       return null;
   }
 }

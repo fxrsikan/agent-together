@@ -69,6 +69,33 @@ describe("Race", () => {
     expect(race.load(report.id).adopted).toBe("careful");
     expect(race.list().map((r) => r.id)).toEqual([report.id]);
   }, 60_000); // several git worktrees: slow on Windows
+
+  it("hands each contestant its own memories when given", async () => {
+    const { app } = repo();
+    const race = new Race(app);
+    const seen: Record<string, string> = {};
+    const reader = (id: string): AgentRunner => ({
+      id,
+      async run(cwd) {
+        seen[id] = fs.readFileSync(path.join(cwd, ".agent-together/context/login-form.md"), "utf8");
+        return { ok: true, summary: "", durationMs: 1 };
+      },
+    });
+    const memory = (content: string) => ({ id: content, nodeId: "login-form", kind: "decision" as const, status: "active" as const, content, source: "test", createdAt: "" });
+    const report = await race.run(
+      "login-form",
+      "add a digit rule",
+      [
+        { id: "haiku", runner: reader("haiku"), memories: [memory("only for haiku")] },
+        { id: "plain", runner: reader("plain") },
+      ],
+      [memory("shared one")],
+    );
+    expect(seen.haiku).toContain("only for haiku");
+    expect(seen.haiku).not.toContain("shared one");
+    expect(seen.plain).toContain("shared one");
+    race.discard(report.id);
+  }, 60_000);
 });
 
 describe("scoreContestant", () => {

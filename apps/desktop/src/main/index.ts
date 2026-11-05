@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { app, BrowserWindow, clipboard, dialog, ipcMain } from "electron";
@@ -21,9 +22,13 @@ import {
   verifierLabel,
   projectModels,
   saveProjectModels,
+  saveRaceAgents,
   dispatchPrompt,
   estimateTokens,
   loadRaceConfig,
+  loadLlmConfig,
+  saveLlmConfig,
+  type LlmConfig,
   newNodeId,
   openProject,
   openTerminal,
@@ -71,7 +76,8 @@ function agentCommandLine(agent: Agent, prompt: string, model?: string): string 
 const recentFile = () => path.join(app.getPath("userData"), "recent-projects.json");
 const setupDoneFile = () => path.join(app.getPath("userData"), "setup-done.json");
 const modelsFile = () => path.join(app.getPath("userData"), "models.json");
-const APP_FILES = ["recent-projects.json", "setup-done.json", "models.json"];
+const llmFile = () => path.join(app.getPath("userData"), "llm.json");
+const APP_FILES = ["recent-projects.json", "setup-done.json", "models.json", "llm.json"];
 
 /**
  * Before the app was named "Agent Together" its folder was named after the package
@@ -86,6 +92,31 @@ function carryOverOldAppData() {
       fs.mkdirSync(path.dirname(to), { recursive: true });
       fs.copyFileSync(from, to);
     }
+  }
+}
+
+/**
+ * On macOS and Linux an app started from the Dock or a launcher gets a bare PATH
+ * (/usr/bin:/bin…), so node, git and the assistants' command lines installed with
+ * Homebrew, nvm or npm are not found. Takes the PATH the user's login shell sets up.
+ */
+function useLoginShellPath() {
+  if (process.platform === "win32") return;
+  try {
+    const shell = process.env.SHELL || "/bin/zsh";
+    const marker = "__AGENT_TOGETHER_PATH__";
+    const out = execFileSync(shell, ["-ilc", `printf '${marker}%s${marker}' "$PATH"`], { encoding: "utf8", timeout: 5000, stdio: ["ignore", "pipe", "ignore"] });
+    const found = out.split(marker)[1];
+    if (found) process.env.PATH = [...new Set([...found.split(":"), ...(process.env.PATH ?? "").split(":")])].filter(Boolean).join(":");
+  } catch {} // keep the PATH we have; the setup wizard will say what is missing
+}
+
+/** The helper model last chosen in any project (provider, model, baseUrl); a new project starts with it. */
+function defaultLlm(): Pick<LlmConfig, "provider" | "model" | "baseUrl"> | null {
+  try {
+    return JSON.parse(fs.readFileSync(llmFile(), "utf8"));
+  } catch {
+    return null;
   }
 }
 
@@ -122,6 +153,7 @@ function markSetupCompleted() {
 }
 
 async function main() {
+  useLoginShellPath();
   await app.whenReady();
   carryOverOldAppData();
   const win = new BrowserWindow({
@@ -185,6 +217,8 @@ async function main() {
     const root = createProject(path.join(parent, folder), name.trim());
     if (description.trim()) writeProjectInfo(root, { description: description.trim() });
     saveProjectModels(root, defaultModels());
+    const llm = defaultLlm();
+    if (llm) saveLlmConfig(root, llm);
     const info = await switchTo(root);
     need().installHooks(hookProgram());
     return info;
@@ -211,6 +245,23 @@ async function main() {
     return modelList;
   });
   ipcMain.handle("agent-together:projectModels", () => projectModels(need().root));
+  // The helper model: plans canvases, drafts roles, proposes evolution strategies, reviews each turn.
+  ipcMain.handle("agent-together:llmSettings", () => {
+    const s = need();
+    const { provider, model, baseUrl } = loadLlmConfig(s.root);
+    return { provider: provider ?? "auto", model: model ?? "", baseUrl: baseUrl ?? "", name: s.llm?.name ?? null };
+  });
+  ipcMain.handle("agent-together:saveLlmSettings", async (_e, patch: Pick<LlmConfig, "provider" | "model" | "baseUrl">) => {
+    const s = need();
+    if (s.running || s.racing) throw new Error("AI 助手正在工作，等它做完再换");
+    if (patch.provider === "openai-compatible" && (!patch.baseUrl?.trim() || !patch.model?.trim())) {
+      throw new Error("请填好服务地址和模型名");
+    }
+    const saved = saveLlmConfig(s.root, patch);
+    fs.mkdirSync(path.dirname(llmFile()), { recursive: true });
+    fs.writeFileSync(llmFile(), JSON.stringify({ provider: saved.provider, model: saved.model, baseUrl: saved.baseUrl }, null, 2));
+    return switchTo(s.root); // the observer and helper start again with the new model
+  });
   ipcMain.handle("agent-together:saveProjectModels", (_e, models: Record<string, string>) => {
     saveProjectModels(need().root, models);
     fs.mkdirSync(path.dirname(modelsFile()), { recursive: true });
@@ -224,7 +275,7 @@ async function main() {
   // Canvas: AI plan, then edit by hand. Every change is validated and written to .agent-together/canvas/.
   ipcMain.handle("agent-together:planCanvas", async (_e, description: string) => {
     const s = need();
-    if (!s.llm) throw new Error("没有可用的模型：请先登录 claude 命令行，或设置 ANTHROPIC_API_KEY，或在项目的 .agent-together/llm.json 里配置");
+    if (!s.llm) throw new Error("没有可用的帮手模型：请在右边「帮手模型」里选一个，或先登录 claude 命令行");
     const plan = await planCanvas(s.llm, description);
     s.daemon.store.writeCanvas({ ...plan.canvas, nodes: plan.canvas.nodes.map(({ role, ...node }) => node) });
     writeProjectInfo(s.root, { description: description.trim(), stack: plan.stack, ...(plan.testCommand ? { testCommand: plan.testCommand } : {}) });
@@ -441,14 +492,15 @@ async function main() {
     return true;
   });
 
-  ipcMain.handle("agent-together:evolutions", () => {
+  ipcMain.handle("agent-together:evolutions", (_e, agent?: string) => {
     const s = need();
     return {
       reports: new Evolution(s.root, s.llm).list(),
       running: s.racing,
-      agents: raceAgents(s.root),
+      agents: Object.keys(runners), // evolution: any one assistant, not only the ones that race
       candidate: testHistory(s.root).consecutiveFailures ?? {},
-      suggestions: new ExperienceStore().suggestions(s.root),
+      // Proven with the assistant and model the user is about to evolve with, first.
+      suggestions: new ExperienceStore().suggestions(s.root, agent ? verifierFor(s, agent) : undefined),
     };
   });
   ipcMain.handle("agent-together:evolve", async (_e, nodeId: string, task: string, agent: string) => {
@@ -506,7 +558,13 @@ async function main() {
   const raceAgents = (root: string) => (loadRaceConfig(root).agents ?? ["claude-code", "codex"]).filter((a) => runners[a]);
   ipcMain.handle("agent-together:races", () => {
     const s = need();
-    return { running: s.racing, reports: s.race?.list() ?? [], agents: raceAgents(s.root) };
+    return { running: s.racing, reports: s.race?.list() ?? [], agents: raceAgents(s.root), all: Object.keys(runners) };
+  });
+  ipcMain.handle("agent-together:saveRaceAgents", (_e, agents: string[]) => {
+    const s = need();
+    const chosen = agents.filter((a) => runners[a]);
+    if (chosen.length < 2) throw new Error("赛马至少要两个 AI 助手");
+    return saveRaceAgents(s.root, chosen);
   });
   ipcMain.handle("agent-together:race", async (_e, nodeId: string, task: string, context?: string) => {
     const s = need();
@@ -518,7 +576,12 @@ async function main() {
       return await s.race.run(
         nodeId,
         task,
-        raceAgents(s.root).map((a) => runners[a](models[a])),
+        // Each contestant gets the memories proven with its own assistant and model (or with none).
+        raceAgents(s.root).map((a) => ({
+          id: a,
+          runner: runners[a](models[a]),
+          memories: splitByVerifier(s.daemon.memory.forNode(nodeId), verifierKey(a, models[a])).fit,
+        })),
         s.daemon.memory.forNode(nodeId),
         (message) => win.webContents.send("agent-together:raceProgress", message),
         context,

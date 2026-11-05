@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { listModels, parseCursorModels, parseGrokModels, projectModels, readCodexModels, saveProjectModels } from "../src/models.js";
+import { listModels, parseCursorModels, parseGrokModels, projectModels, readCodexModels, saveProjectModels, saveRaceAgents } from "../src/models.js";
 
 describe("model lists", () => {
   it("reads cursor-agent models, leaving out auto", () => {
@@ -55,5 +55,29 @@ describe("project models", () => {
     expect(JSON.parse(fs.readFileSync(path.join(root, ".agent-together", "race.json"), "utf8")).agents).toEqual(["codex"]);
     saveProjectModels(root, { "claude-code": "" });
     expect(projectModels(root)).toEqual({});
+  });
+});
+
+describe("helper model settings", () => {
+  it("saves provider, model and address, keeping other settings and dropping blanks", async () => {
+    const { loadLlmConfig, saveLlmConfig, createLlm } = await import("../src/llm.js");
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "at-llm-"));
+    fs.mkdirSync(path.join(root, ".agent-together"));
+    fs.writeFileSync(path.join(root, ".agent-together", "llm.json"), JSON.stringify({ maxCallsPerSession: 5, model: "old" }));
+    saveLlmConfig(root, { provider: "claude-cli", model: " sonnet ", baseUrl: "" });
+    expect(loadLlmConfig(root)).toEqual({ maxCallsPerSession: 5, provider: "claude-cli", model: "sonnet" });
+    expect(createLlm(loadLlmConfig(root))?.name).toBe("claude-cli (sonnet)");
+    saveLlmConfig(root, { provider: "off", model: "", baseUrl: "" });
+    expect(createLlm(loadLlmConfig(root))).toBeNull();
+    expect(loadLlmConfig(root)).toEqual({ maxCallsPerSession: 5, provider: "off" });
+  });
+});
+
+describe("race contestants", () => {
+  it("saves who races without touching models", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "at-race-"));
+    saveProjectModels(root, { cursor: "composer-2.5" });
+    expect(saveRaceAgents(root, ["claude-code", "cursor", "cursor"])).toEqual(["claude-code", "cursor"]);
+    expect(projectModels(root)).toEqual({ cursor: "composer-2.5" });
   });
 });

@@ -249,7 +249,7 @@ export class Evolution {
     this.save(report);
     if (!this.llm) {
       report.message =
-        "还没有可用的模型，请先在 .agent-together/llm.json 配置模型，或登录 claude 命令行。";
+        "还没有可用的帮手模型，请在项目设置的「帮手模型」里选一个，或先登录 claude 命令行。";
       this.save(report);
       return report;
     }

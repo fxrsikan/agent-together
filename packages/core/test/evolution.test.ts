@@ -163,7 +163,7 @@ describe("evolution proposals", () => {
     const factory = vi.fn();
     const evolution = new Evolution(root, null, factory);
     const result = await evolution.run("task", "任务", runner);
-    expect(result.message).toContain("还没有可用的模型");
+    expect(result.message).toContain("还没有可用的帮手模型");
     expect(factory).not.toHaveBeenCalled();
     expect(evolution.load(result.id)).toEqual(result);
   });

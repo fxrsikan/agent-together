@@ -9,7 +9,7 @@ function seconds(ms: number) {
 }
 
 /**
- * Race the node's task between Claude Code and Codex, then compare the score
+ * Race the node's task between the chosen assistants (two or more), then compare the score
  * breakdowns side by side and adopt one (or discard all). Reports survive restarts.
  */
 export function RacePanel({
@@ -29,6 +29,7 @@ export function RacePanel({
   const [reports, setReports] = useState<RaceReport[]>([]);
   const [running, setRunning] = useState<string | null>(null);
   const [agents, setAgents] = useState<string[]>([]);
+  const [all, setAll] = useState<string[]>([]);
   const [progress, setProgress] = useState<string[]>([]);
 
   const refresh = () =>
@@ -36,7 +37,15 @@ export function RacePanel({
       setReports(r.reports);
       setRunning(r.running);
       setAgents(r.agents);
+      setAll(r.all);
     });
+
+  /** Ticks an assistant in or out; at least two must stay in. */
+  const toggle = async (agent: string) => {
+    const next = agents.includes(agent) ? agents.filter((a) => a !== agent) : all.filter((a) => a === agent || agents.includes(a));
+    if (next.length < 2) return onChange("赛马至少要两个 AI 助手");
+    setAgents(await window.agentTogether.saveRaceAgents(next));
+  };
 
   useEffect(() => {
     refresh();
@@ -78,6 +87,15 @@ export function RacePanel({
         <button onClick={start} disabled={running !== null || !!open} title={open ? "先采用或放弃上一场" : undefined}>
           {running === nodeId ? "比赛中…" : `开始比赛：${agents.map((a) => AGENT_NAMES[a] ?? a).join(" 对 ")}`}
         </button>
+      </div>
+      <div className="actions">
+        <span className="muted">参赛：</span>
+        {all.map((a) => (
+          <label key={a} className="check">
+            <input type="checkbox" checked={agents.includes(a)} disabled={running !== null} onChange={() => toggle(a)} />
+            {AGENT_NAMES[a] ?? a}
+          </label>
+        ))}
       </div>
       {running === nodeId && (
         <ol className="feed">

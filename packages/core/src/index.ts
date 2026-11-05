@@ -1,5 +1,5 @@
 export { Daemon, type DaemonEvents, type DaemonOptions, type Judgment } from "./daemon.js";
-export { createLlm, loadLlmConfig, type CompleteOptions, type Llm, type LlmConfig } from "./llm.js";
+export { createLlm, loadLlmConfig, saveLlmConfig, type CompleteOptions, type Llm, type LlmConfig } from "./llm.js";
 export { judgeTurn, parseJsonObject, refineMemory, turnWorthJudging, type TurnJudgment } from "./judge.js";
 export { Observer } from "./observer.js";
 export { builtinRules, type Rule, type RuleContext } from "./rules/index.js";
@@ -48,4 +48,4 @@ export * from "./evolution.js";
 export * from "./audit.js";
 
 export { draftRole, roleFromDraft, rolesFromDraft } from "./roles.js";
-export { listModels, parseCursorModels, parseGrokModels, projectModels, readCodexModels, saveProjectModels, type ModelAgent, type ModelChoice } from "./models.js";
+export { listModels, parseCursorModels, parseGrokModels, projectModels, readCodexModels, saveProjectModels, saveRaceAgents, type ModelAgent, type ModelChoice } from "./models.js";

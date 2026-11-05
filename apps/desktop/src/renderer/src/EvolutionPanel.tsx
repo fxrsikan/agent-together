@@ -50,7 +50,7 @@ export function EvolutionPanel({
   const [models, setModels] = useState<Record<string, string>>({});
   const refresh = async () => {
     const [data, memories, chosen] = await Promise.all([
-      window.agentTogether.evolutions(),
+      window.agentTogether.evolutions(agent || undefined),
       window.agentTogether.memories(),
       window.agentTogether.projectModels(),
     ]);
@@ -65,7 +65,7 @@ export function EvolutionPanel({
   };
   useEffect(() => {
     refresh();
-  }, [nodeId, version]);
+  }, [nodeId, version, agent]);
   const act = async (action: () => Promise<unknown>) => {
     setBusy(true);
     try {

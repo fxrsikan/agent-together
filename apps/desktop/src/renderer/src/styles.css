@@ -1,27 +1,88 @@
+/*
+ * Colours carry meaning, never decoration: each card kind has one colour, used for
+ * its border, label and focus ring, the same in light and dark. Status is a labelled
+ * chip (not colour alone). Cards are flat at rest; only focus glows.
+ * (The approach follows Archify's design system: https://github.com/tt-a1i/archify)
+ */
 :root {
-  --bg: #f7f7f5;
+  --bg: #f6f7f9;
   --panel: #ffffff;
-  --line: #dcdcd6;
-  --text: #1f1f1d;
-  --muted: #6b6b66;
-  --accent: #2f6fdb;
-  --warn: #c98a00;
-  --bad: #c8382e;
-  --good: #2e9e5b;
+  --canvas: #f1f3f6;
+  --dot: #c9ced6;
+  --line: #d9dde3;
+  --text: #111827;
+  --muted: #5b6472;
+  --accent: #0e7490;
+  --warn: #b45309;
+  --bad: #be123c;
+  --good: #047857;
+  /* Card kinds */
+  --kind-feature: #0891b2;
+  --kind-module: #059669;
+  --kind-decision: #d97706;
+  --kind-flow: #7c3aed;
+  /* Following the links: what a card builds on, what builds on it */
+  --deps: #7c3aed;
+  --dependents: #059669;
+  --edge: #94a3b8;
+  --shadow-float: 0 12px 32px rgba(15, 23, 42, 0.14);
+  --mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
   font-family: system-ui, "Microsoft YaHei", sans-serif;
   font-size: 13px;
   color: var(--text);
   background: var(--bg);
+  color-scheme: light;
 }
 
+/* Dark: the same vocabulary on a midnight console. Follows the system unless the user picks one. */
+:root[data-theme="dark"] {
+  --bg: #0b1120;
+  --panel: #0f172a;
+  --canvas: #020617;
+  --dot: #1e293b;
+  --line: #1e293b;
+  --text: #e5e7eb;
+  --muted: #94a3b8;
+  --accent: #22d3ee;
+  --warn: #fbbf24;
+  --bad: #fb7185;
+  --good: #34d399;
+  --kind-feature: #22d3ee;
+  --kind-module: #34d399;
+  --kind-decision: #fbbf24;
+  --kind-flow: #a78bfa;
+  --deps: #a78bfa;
+  --dependents: #34d399;
+  --edge: #475569;
+  --shadow-float: 0 18px 48px rgba(0, 0, 0, 0.45);
+  color-scheme: dark;
+}
 @media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #1b1b1a;
-    --panel: #252524;
-    --line: #3a3a38;
-    --text: #ececea;
-    --muted: #9a9a95;
+  :root:not([data-theme="light"]) {
+    --bg: #0b1120;
+    --panel: #0f172a;
+    --canvas: #020617;
+    --dot: #1e293b;
+    --line: #1e293b;
+    --text: #e5e7eb;
+    --muted: #94a3b8;
+    --accent: #22d3ee;
+    --warn: #fbbf24;
+    --bad: #fb7185;
+    --good: #34d399;
+    --kind-feature: #22d3ee;
+    --kind-module: #34d399;
+    --kind-decision: #fbbf24;
+    --kind-flow: #a78bfa;
+    --deps: #a78bfa;
+    --dependents: #34d399;
+    --edge: #475569;
+    --shadow-float: 0 18px 48px rgba(0, 0, 0, 0.45);
+    color-scheme: dark;
   }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
 }
 
 * { box-sizing: border-box; }
@@ -35,8 +96,10 @@ button {
   color: var(--text);
   cursor: pointer;
 }
+button { transition: border-color 0.15s, background 0.15s; }
 button:hover { border-color: var(--accent); }
-button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button:focus-visible, input:focus-visible, select:focus-visible, .task:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--panel); font-weight: 600; }
 .task { width: 100%; font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--text); resize: vertical; }
 .actions { display: flex; gap: 8px; margin-top: 8px; }
 .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -55,25 +118,77 @@ input, select { font: inherit; padding: 4px 8px; border: 1px solid var(--line); 
 .muted { color: var(--muted); }
 .notice { padding: 6px 16px; background: var(--panel); border-bottom: 1px solid var(--line); color: var(--muted); }
 .body { flex: 1; display: flex; min-height: 0; }
-.canvas { flex: 1; }
 .side { width: 340px; overflow-y: auto; padding: 12px 16px; border-left: 1px solid var(--line); background: var(--panel); }
 .side h3 { margin: 4px 0 8px; }
 .side h4 { margin: 16px 0 6px; }
 .side ul { margin: 0; padding-left: 18px; }
 
-.card { width: 220px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--text); }
-.card-active { border: 2px solid var(--accent); }
-.card-head { display: flex; justify-content: space-between; align-items: center; }
-.tag { font-size: 11px; color: var(--muted); }
-.card-title { font-weight: 600; font-size: 14px; margin: 4px 0; }
-.card-meta, .card-files { font-size: 11px; color: var(--muted); }
-.card-files { margin-top: 4px; font-family: ui-monospace, Consolas, monospace; }
-.card-hint { margin-top: 4px; font-size: 11px; color: var(--warn, #b45309); }
+/* Canvas: one dominant surface; chrome floats on it and stays small. */
+.canvas { flex: 1; position: relative; background: var(--canvas); }
+.react-flow { --xy-background-color: var(--canvas); }
+.react-flow__attribution { background: transparent !important; }
+.react-flow__attribution a { color: var(--muted) !important; }
 
-.signal { width: 10px; height: 10px; border-radius: 50%; background: var(--good); }
+/* Cards: kind colour on border, label and focus; flat at rest. */
+.card { --kind: var(--kind-module); width: 228px; padding: 10px 12px 9px; border: 1px solid color-mix(in srgb, var(--kind) 42%, var(--line)); border-radius: 10px; background: color-mix(in srgb, var(--kind) 5%, var(--panel)); color: var(--text); transition: opacity 0.16s, border-color 0.16s, box-shadow 0.16s; }
+.card[data-kind="feature"] { --kind: var(--kind-feature); }
+.card[data-kind="module"] { --kind: var(--kind-module); }
+.card[data-kind="decision"] { --kind: var(--kind-decision); }
+.card[data-kind="flow"] { --kind: var(--kind-flow); }
+.card-head { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+.card-kind { font: 700 10.5px/1.3 var(--mono); letter-spacing: 0.04em; color: var(--kind); }
+.card-title { font-weight: 650; font-size: 14px; line-height: 1.35; margin: 4px 0 6px; }
+.card-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: 11px; color: var(--muted); }
+.card-files { margin-top: 6px; font: 400 10.5px/1.45 var(--mono); color: var(--muted); word-break: break-all; }
+.card-hint { margin-top: 6px; font-size: 11px; color: var(--warn); }
+.tag { font-size: 11px; color: var(--muted); }
+.card .tag { font: 400 10.5px/1.3 var(--mono); }
+.chip { display: inline-flex; align-items: center; gap: 3px; padding: 0 6px; height: 18px; border: 1px solid var(--line); border-radius: 999px; font-size: 10.5px; color: var(--muted); white-space: nowrap; }
+.chip-done { border-color: color-mix(in srgb, var(--good) 55%, var(--line)); color: var(--good); }
+.chip-blocked { border-color: color-mix(in srgb, var(--bad) 55%, var(--line)); color: var(--bad); }
+.chip-in_progress { border-style: dashed; color: var(--text); }
+.chip-active { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+/* Selected: the one glow on the canvas. */
+.react-flow__node.selected .card { border-color: var(--kind); box-shadow: 0 0 0 1px var(--kind), 0 0 16px color-mix(in srgb, var(--kind) 40%, transparent); }
+/* Following links: the chain stays strong, the rest recedes. */
+.card-dim { opacity: 0.22; }
+.card-reach-deps { border-color: var(--deps); box-shadow: 0 0 0 1px var(--deps); }
+.card-reach-dependents { border-color: var(--dependents); box-shadow: 0 0 0 1px var(--dependents); }
+.react-flow__edge-path { transition: stroke 0.16s, opacity 0.16s; }
+.react-flow__edge-text { font: 500 10.5px var(--mono); }
+
+.signal { width: 9px; height: 9px; border-radius: 50%; background: var(--good); flex-shrink: 0; }
 .signal-log { background: var(--good); }
 .signal-warn { background: var(--warn); }
-.signal-ask, .signal-block { background: var(--bad); }
+.signal-ask, .signal-block { background: var(--bad); box-shadow: 0 0 0 3px color-mix(in srgb, var(--bad) 22%, transparent); }
+
+/* Floating canvas chrome */
+.canvas-toolbar { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); z-index: 5; display: flex; align-items: center; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 10px; background: color-mix(in srgb, var(--panel) 92%, transparent); box-shadow: var(--shadow-float); }
+.canvas-toolbar button { border: 1px solid transparent; background: transparent; height: 28px; padding: 0 9px; font-size: 12px; }
+.canvas-toolbar button:hover, .canvas-toolbar button.on { border-color: var(--line); background: var(--bg); }
+.canvas-toolbar button.on { color: var(--accent); }
+.canvas-toolbar .zoom { font: 600 11px var(--mono); color: var(--muted); min-width: 44px; text-align: center; }
+.canvas-toolbar .sep { width: 1px; height: 18px; background: var(--line); margin: 0 2px; }
+.finder { position: relative; }
+.finder input { width: 150px; height: 28px; border-radius: 8px; font-size: 12px; }
+.finder ul { position: absolute; bottom: 34px; left: 0; width: 240px; max-height: 240px; overflow-y: auto; margin: 0; padding: 4px; list-style: none; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); box-shadow: var(--shadow-float); }
+.finder li { padding: 5px 8px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+.finder li:hover, .finder li.hot { background: var(--bg); }
+.finder li .mono { font-size: 10.5px; color: var(--muted); }
+.focus-panel { position: absolute; left: 14px; top: 14px; z-index: 5; width: 290px; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--kind, var(--accent)) 50%, var(--line)); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow-float); display: flex; flex-direction: column; gap: 8px; }
+.focus-panel[data-kind="feature"] { --kind: var(--kind-feature); }
+.focus-panel[data-kind="module"] { --kind: var(--kind-module); }
+.focus-panel[data-kind="decision"] { --kind: var(--kind-decision); }
+.focus-panel[data-kind="flow"] { --kind: var(--kind-flow); }
+.focus-panel h5 { margin: 0; font-size: 14px; }
+.focus-label { font: 700 10.5px/1.3 var(--mono); letter-spacing: 0.04em; color: var(--kind, var(--accent)); }
+.reach-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.reach-buttons button { display: flex; justify-content: space-between; align-items: center; height: 32px; }
+.reach-buttons b { font: 700 12px var(--mono); }
+.reach-buttons .on-deps { border-color: var(--deps); color: var(--deps); }
+.reach-buttons .on-dependents { border-color: var(--dependents); color: var(--dependents); }
+.receipt { font-size: 11px; color: var(--muted); }
+.react-flow__minimap { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--panel) !important; }
 
 .feed { list-style: none; margin: 0; padding: 0; }
 .feed li { padding: 6px 0; border-bottom: 1px solid var(--line); }
@@ -139,9 +254,6 @@ button.link { border: none; background: none; padding: 0 4px; color: var(--muted
 .badge { font-size: 11px; padding: 1px 6px; border-radius: 10px; white-space: nowrap; }
 .badge-good { background: color-mix(in srgb, var(--good) 18%, transparent); color: var(--good); }
 .badge-bad { background: color-mix(in srgb, var(--bad) 18%, transparent); color: var(--bad); }
-.card-done { border-color: var(--good); }
-.card-blocked { border-color: var(--bad); }
-.card-in_progress { border-style: dashed; }
 
 /* Setup wizard */
 .setup-wizard { max-width: 720px; }

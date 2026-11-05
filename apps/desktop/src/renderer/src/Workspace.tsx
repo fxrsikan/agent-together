@@ -3,7 +3,7 @@ import {
   applyEdgeChanges,
   applyNodeChanges,
   Background,
-  Controls,
+  BackgroundVariant,
   MarkerType,
   ReactFlow,
   type Connection,
@@ -20,6 +20,9 @@ import { CheckpointsPanel } from "./CheckpointsPanel";
 import { ContextInspector } from "./ContextInspector";
 import { MemoryPanel } from "./MemoryPanel";
 import { NodeCard, type NodeCardType } from "./NodeCard";
+import { CanvasToolbar, FocusPanel } from "./CanvasChrome";
+import { edgeId, reachFrom, type ReachDirection } from "./reach";
+import { ThemeToggle } from "./theme";
 import { NodeEditor } from "./NodeEditor";
 import { ProjectSettings } from "./ProjectSettings";
 import { ModelSettings } from "./ModelSettings";
@@ -124,6 +127,15 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
   const [flowNodes, setFlowNodes] = useState<NodeCardType[]>([]);
   const [activeId, setActiveId] = useState<string | null>(info.activeNodeId);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  /** Following the selected card's links one way; null shows the whole canvas as usual. */
+  const [reachDir, setReachDir] = useState<ReachDirection | null>(null);
+  useEffect(() => setReachDir(null), [selectedId]);
+  const reach = useMemo(() => {
+    const links = canvas?.edges ?? [];
+    if (!selectedId) return null;
+    return { deps: reachFrom(selectedId, links, "deps"), dependents: reachFrom(selectedId, links, "dependents") };
+  }, [canvas, selectedId]);
+  const shownReach = reach && reachDir ? reach[reachDir] : null;
   const [feed, setFeed] = useState<EventRecord[]>([]);
   const [notice, setNotice] = useState("");
   const [task, setTask] = useState("");
@@ -203,24 +215,46 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
         type: "card",
         position: node.position ?? { x: (i % 4) * 300, y: Math.floor(i / 4) * 180 },
         selected: node.id === selectedId,
-        data: { node, active: node.id === activeId, signal: signals.get(node.id) ?? "off", tests: testRuns.byNode[node.id], evolutionCandidate: (testRuns.consecutiveFailures?.[node.id] ?? 0) >= 2 },
+        data: {
+          node,
+          active: node.id === activeId,
+          signal: signals.get(node.id) ?? "off",
+          tests: testRuns.byNode[node.id],
+          evolutionCandidate: (testRuns.consecutiveFailures?.[node.id] ?? 0) >= 2,
+          reach: shownReach?.nodes.has(node.id) ? reachDir! : undefined,
+          dim: !!shownReach && node.id !== selectedId && !shownReach.nodes.has(node.id),
+        },
       })),
     );
-  }, [canvas, activeId, signals, selectedId, testRuns]);
+  }, [canvas, activeId, signals, selectedId, testRuns, shownReach, reachDir]);
 
   // Edges too: React Flow keeps selection here, so a clicked edge can be deleted with the Delete key.
   const [edges, setEdges] = useState<Edge[]>([]);
   useEffect(() => {
     setEdges(
-      (canvas?.edges ?? []).map((e) => ({
-        id: `${e.from}->${e.to}`,
-        source: e.from,
-        target: e.to,
-        label: e.label,
-        markerEnd: { type: MarkerType.ArrowClosed },
-      })),
+      (canvas?.edges ?? []).map((e) => {
+        // On the followed chain: the direction's colour; off it, faded; otherwise quiet neutral.
+        const on = shownReach?.edges.has(edgeId(e));
+        // Counted imports ("3 处引用", from opening existing code) only matter next to the card you look at;
+        // shown everywhere they pile up. Labels someone wrote always show.
+        const counted = !!e.label && /^\d+ 处引用$/.test(e.label);
+        const near = e.from === selectedId || e.to === selectedId;
+        const stroke = on ? (reachDir === "deps" ? "var(--deps)" : "var(--dependents)") : "var(--edge)";
+        return {
+          id: edgeId(e),
+          source: e.from,
+          target: e.to,
+          label: counted && !near ? undefined : e.label,
+          style: { stroke, strokeWidth: on ? 2 : 1.4, opacity: shownReach && !on ? 0.15 : 1 },
+          labelStyle: { fill: on ? stroke : "var(--muted)" },
+          labelBgStyle: { fill: "var(--panel)", stroke: "var(--line)" },
+          labelBgPadding: [6, 3] as [number, number],
+          labelBgBorderRadius: 999,
+          markerEnd: { type: MarkerType.ArrowClosed, color: stroke, width: 16, height: 16 },
+        };
+      }),
     );
-  }, [canvas]);
+  }, [canvas, shownReach, reachDir, selectedId]);
 
   const selected = canvas?.nodes.find((n) => n.id === selectedId) ?? null;
 
@@ -342,6 +376,7 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
         <button onClick={addNode}>＋ 卡片</button>
         <button onClick={compileAll} title="把角色和技能说明写成各家 AI 助手认识的格式">更新 AI 说明</button>
         <button onClick={install} title="重新给各家 AI 助手装上观察者，让它们的动作被看到">重新接上观察者</button>
+        <ThemeToggle />
       </header>
       {notice && (
         <div className="notice row">
@@ -390,9 +425,19 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
               onPaneClick={() => setSelectedId(null)}
               fitView
             >
-              <Background />
-              <Controls />
+              <Background variant={BackgroundVariant.Dots} gap={18} size={1.3} color="var(--dot)" />
+              <CanvasToolbar nodes={canvas?.nodes ?? []} onPick={setSelectedId} />
             </ReactFlow>
+          )}
+          {selected && reach && (
+            <FocusPanel
+              node={selected}
+              deps={reach.deps}
+              dependents={reach.dependents}
+              direction={reachDir}
+              onDirection={setReachDir}
+              onClose={() => setSelectedId(null)}
+            />
           )}
         </div>
         <aside className="side">

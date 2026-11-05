@@ -48,3 +48,4 @@ export * from "./evolution.js";
 export * from "./audit.js";
 
 export { draftRole, roleFromDraft, rolesFromDraft } from "./roles.js";
+export { listModels, parseCursorModels, parseGrokModels, projectModels, readCodexModels, saveProjectModels, type ModelAgent, type ModelChoice } from "./models.js";

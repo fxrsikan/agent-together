@@ -22,6 +22,7 @@ import { MemoryPanel } from "./MemoryPanel";
 import { NodeCard, type NodeCardType } from "./NodeCard";
 import { NodeEditor } from "./NodeEditor";
 import { ProjectSettings } from "./ProjectSettings";
+import { ModelSettings } from "./ModelSettings";
 import { EvolutionPanel } from "./EvolutionPanel";
 import { RoleDraft } from "./RoleDraft";
 import { RacePanel } from "./RacePanel";
@@ -39,10 +40,18 @@ function shortPath(file: string, root: string): string {
   return f.toLowerCase().startsWith(r.toLowerCase() + "/") ? f.slice(r.length + 1) : file;
 }
 
+/** A shell command with the project folder written as "." (agents often cd into it first). */
+function shortCommand(command: string, root: string): string {
+  const variants = [root, root.replace(/\\/g, "/")];
+  let out = command;
+  for (const v of variants) out = out.split(`"${v}"`).join(".").split(v).join(".");
+  return out.replace(/^cd \. && /, "");
+}
+
 function describe(event: AgentEvent, root: string): string {
   if (event.kind === "turn.end") return "一轮结束";
   const a = event.action;
-  const what = a.type === "write" ? `写 ${shortPath(a.path, root)}` : a.type === "read" ? `读 ${shortPath(a.path, root)}` : a.type === "shell" ? `$ ${a.command}` : a.tool;
+  const what = a.type === "write" ? `写 ${shortPath(a.path, root)}` : a.type === "read" ? `读 ${shortPath(a.path, root)}` : a.type === "shell" ? `$ ${shortCommand(a.command, root)}` : a.tool;
   if (event.kind === "tool.after") return `${event.ok ? "完成" : "失败"} ${what}`;
   return what;
 }
@@ -117,6 +126,7 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
   const [notice, setNotice] = useState("");
   const [task, setTask] = useState("");
   const [agent, setAgent] = useState<Agent>("claude-code");
+  const [models, setModels] = useState<Record<string, string>>({});
   const [mode, setMode] = useState<"app" | "terminal">("app");
   const [runView, setRunView] = useState<RunView | null>(null);
   const [testRuns, setTestRuns] = useState<TestHistory>({ byNode: {} });
@@ -158,6 +168,7 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
     window.agentTogether.canvas().then(setCanvas);
     window.agentTogether.roles().then(setRoles);
     window.agentTogether.testHistory().then(setTestRuns);
+    window.agentTogether.projectModels().then(setModels);
   }, [version]);
 
   const changed = (text: string) => {
@@ -267,6 +278,7 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
 
   const dispatch = (nodeId: string, taskText = task) =>
     attempt(async () => {
+      setNotice(""); // an earlier notice ("已分配角色…") no longer describes what is happening
       if (mode === "terminal") {
         const file = await window.agentTogether.dispatch(nodeId, taskText, agent, context);
         changed(`已存检查点并在新窗口启动 ${AGENT_NAMES[agent]}，上下文：${file}`);
@@ -454,6 +466,7 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
                       </option>
                     ))}
                   </select>
+                  <span className="muted" title="在下方「用哪个模型」里修改">模型：{models[agent] || "默认"}</span>
                   <button className="primary" onClick={() => dispatch(selected.id)} disabled={runView?.state === "running" || runView?.state === "testing"}>
                     交给 AI 去做
                   </button>
@@ -494,6 +507,7 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
                 </p>
               )}
               <ProjectSettings version={version} onChange={changed} />
+              <ModelSettings version={version} onChange={changed} />
               <MemoryPanel nodeId={null} version={version} onChange={changed} />
             </>
           )}

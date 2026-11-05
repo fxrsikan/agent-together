@@ -76,7 +76,7 @@ export function RacePanel({
       <div className="row">
         <h4>赛马</h4>
         <button onClick={start} disabled={running !== null || !!open} title={open ? "先采用或放弃上一场" : undefined}>
-          {running === nodeId ? "进行中…" : agents.map((a) => AGENT_NAMES[a] ?? a).join(" vs ")}
+          {running === nodeId ? "比赛中…" : `开始比赛：${agents.map((a) => AGENT_NAMES[a] ?? a).join(" 对 ")}`}
         </button>
       </div>
       {running === nodeId && (

@@ -125,6 +125,12 @@ describe("evolution proposals", () => {
       evolutionWinner(report(contestant("baseline", true, 100), contestant("strategy-1", true))),
     ).toBe("strategy-1");
   });
+  it("does not count a slightly smaller change as better", () => {
+    // The real note-search run: every way passed in bounds, 189 vs 222 lines.
+    expect(evolutionWinner(report(contestant("baseline", true, 222), contestant("strategy-1", true, 189)))).toBeUndefined();
+    expect(evolutionWinner(report(contestant("baseline", true, 222), contestant("strategy-1", true, 150)))).toBe("strategy-1");
+    expect(evolutionWinner(report(contestant("baseline", true, 30), contestant("strategy-1", true, 15)))).toBeUndefined();
+  });
   it("ranks staying in bounds above passing tests", () => {
     // The real add-message run: the baseline passed by editing another node's test,
     // the strategy stayed inside and left that test failing.

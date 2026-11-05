@@ -15,6 +15,9 @@ import {
   compileCapabilities,
   contextSections,
   createProject,
+  listModels,
+  projectModels,
+  saveProjectModels,
   dispatchPrompt,
   estimateTokens,
   loadRaceConfig,
@@ -46,9 +49,9 @@ const hookProgram = () => {
   return fs.existsSync(bundled) ? bundled : path.resolve(app.getAppPath(), "../../packages/hook/dist/agent-together-hook.js");
 };
 
-/** Interactive command line that starts each agent on a prompt in a new terminal window. */
-function agentCommandLine(agent: Agent, prompt: string): string {
-  const quoted = `"${prompt}"`;
+/** Interactive command line that starts each agent on a prompt (and model) in a new terminal window. */
+function agentCommandLine(agent: Agent, prompt: string, model?: string): string {
+  const quoted = `${model && /^[\w.\-[\]=,:]+$/.test(model) ? `--model ${model} ` : ""}"${prompt}"`;
   switch (agent) {
     case "codex":
       return `codex ${quoted}`;
@@ -61,9 +64,36 @@ function agentCommandLine(agent: Agent, prompt: string): string {
   }
 }
 
-// Recent projects and setup completion live in the app's own folder (not in projects).
+// Recent projects, setup completion and default models live in the app's own folder (not in projects).
 const recentFile = () => path.join(app.getPath("userData"), "recent-projects.json");
 const setupDoneFile = () => path.join(app.getPath("userData"), "setup-done.json");
+const modelsFile = () => path.join(app.getPath("userData"), "models.json");
+const APP_FILES = ["recent-projects.json", "setup-done.json", "models.json"];
+
+/**
+ * Before the app was named "Agent Together" its folder was named after the package
+ * (@agent-together/desktop); carries the app's own files over once so recent projects stay.
+ */
+function carryOverOldAppData() {
+  const old = path.join(app.getPath("appData"), "@agent-together", "desktop");
+  for (const name of APP_FILES) {
+    const from = path.join(old, name);
+    const to = path.join(app.getPath("userData"), name);
+    if (fs.existsSync(from) && !fs.existsSync(to)) {
+      fs.mkdirSync(path.dirname(to), { recursive: true });
+      fs.copyFileSync(from, to);
+    }
+  }
+}
+
+/** Models last chosen in any project; a new project starts with them. */
+function defaultModels(): Record<string, string> {
+  try {
+    return JSON.parse(fs.readFileSync(modelsFile(), "utf8"));
+  } catch {
+    return {};
+  }
+}
 function recentProjects(): string[] {
   try {
     return JSON.parse(fs.readFileSync(recentFile(), "utf8"));
@@ -90,10 +120,13 @@ function markSetupCompleted() {
 
 async function main() {
   await app.whenReady();
+  carryOverOldAppData();
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
     title: "Agent Together",
+    // The installed app takes its icon from the exe; in dev, use the source image.
+    ...(app.isPackaged ? {} : { icon: path.join(app.getAppPath(), "build/icon.png") }),
     webPreferences: { preload: path.join(__dirname, "../preload/index.js") },
   });
 
@@ -145,6 +178,7 @@ async function main() {
     if (!folder) throw new Error("请填写项目名");
     const root = createProject(path.join(parent, folder), name.trim());
     if (description.trim()) writeProjectInfo(root, { description: description.trim() });
+    saveProjectModels(root, defaultModels());
     const info = await switchTo(root);
     need().installHooks(hookProgram());
     return info;
@@ -163,6 +197,20 @@ async function main() {
   ipcMain.handle("agent-together:info", () => session?.info() ?? null);
   ipcMain.handle("agent-together:recentLog", () => need().daemon.store.recentLog(100));
   ipcMain.handle("agent-together:projectInfo", () => readProjectInfo(need().root));
+  // Which model each assistant uses: per project, remembered as the default for new ones.
+  let modelList: ReturnType<typeof listModels> | null = null;
+  ipcMain.handle("agent-together:listModels", (_e, refresh?: boolean) => {
+    // Listing runs the assistants' command lines (a few seconds), so it is done once per app start.
+    if (!modelList || refresh) modelList = listModels();
+    return modelList;
+  });
+  ipcMain.handle("agent-together:projectModels", () => projectModels(need().root));
+  ipcMain.handle("agent-together:saveProjectModels", (_e, models: Record<string, string>) => {
+    saveProjectModels(need().root, models);
+    fs.mkdirSync(path.dirname(modelsFile()), { recursive: true });
+    fs.writeFileSync(modelsFile(), JSON.stringify(projectModels(need().root), null, 2));
+    return projectModels(need().root);
+  });
   ipcMain.handle("agent-together:saveProjectInfo", (_e, patch: { description?: string; stack?: string; testCommand?: string }) =>
     writeProjectInfo(need().root, patch),
   );
@@ -264,7 +312,7 @@ async function main() {
       s.daemon.store.saveNode({ ...node, status: "in_progress", executor: agent });
       s.canvasChanged();
     }
-    openTerminal(s.root, agentCommandLine(agent, dispatchPrompt(file)), `Agent Together - ${nodeId} - ${agent}`);
+    openTerminal(s.root, agentCommandLine(agent, dispatchPrompt(file), loadRaceConfig(s.root).models?.[agent]), `Agent Together - ${nodeId} - ${agent}`);
     return file;
   });
 

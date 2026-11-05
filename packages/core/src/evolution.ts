@@ -94,9 +94,10 @@ export function evolutionOutcome(c: ContestantResult, nodeId: string): Evolution
 }
 
 /** Outcome first, then warnings, then a smaller change, then the race score. */
+const warnings = (c: ContestantResult) => c.findings.filter((f) => f.level === "warn").length;
+const size = (c: ContestantResult) => c.files.reduce((sum, f) => sum + f.added + f.removed, 0);
+
 export function compareEvolution(a: ContestantResult, b: ContestantResult, nodeId: string): number {
-  const warnings = (c: ContestantResult) => c.findings.filter((f) => f.level === "warn").length;
-  const size = (c: ContestantResult) => c.files.reduce((sum, f) => sum + f.added + f.removed, 0);
   return (
     OUTCOME_RANK[evolutionOutcome(a, nodeId)] - OUTCOME_RANK[evolutionOutcome(b, nodeId)] ||
     warnings(a) - warnings(b) ||
@@ -110,14 +111,27 @@ export function evolutionRanking(race: RaceReport): string[] {
   return [...race.contestants].sort((a, b) => compareEvolution(a, b, race.nodeId)).map((c) => c.id);
 }
 
-/** A strategy counts only if it ends clean or escalated, ran normally, and beats the baseline. */
+/**
+ * Better by more than run-to-run noise: a better outcome or fewer observer warnings,
+ * or, when those tie, a change at least 20% and 20 lines smaller. Two runs of the
+ * same instructions easily differ by a few dozen lines, which is no lesson to keep.
+ */
+function clearlyBetter(best: ContestantResult, baseline: ContestantResult, nodeId: string): boolean {
+  const outcome = OUTCOME_RANK[evolutionOutcome(best, nodeId)] - OUTCOME_RANK[evolutionOutcome(baseline, nodeId)];
+  if (outcome) return outcome < 0;
+  if (warnings(best) !== warnings(baseline)) return warnings(best) < warnings(baseline);
+  const saved = size(baseline) - size(best);
+  return saved >= 20 && size(best) <= size(baseline) * 0.8;
+}
+
+/** A strategy counts only if it ends clean or escalated, ran normally, and clearly beats the baseline. */
 export function evolutionWinner(race: RaceReport): string | undefined {
   const baseline = race.contestants.find((c) => c.id === "baseline");
   if (!baseline) return;
   const best = race.contestants.find((c) => c.id === evolutionRanking(race)[0])!;
   const outcome = evolutionOutcome(best, race.nodeId);
   if (best.id === "baseline" || !best.run.ok || (outcome !== "clean" && outcome !== "escalated")) return;
-  return compareEvolution(best, baseline, race.nodeId) < 0 ? best.id : undefined;
+  return clearlyBetter(best, baseline, race.nodeId) ? best.id : undefined;
 }
 
 /** A strategy approved in projects, with links to its supporting reports. */
@@ -276,7 +290,7 @@ export class Evolution {
       );
       report.message = report.winner
         ? "有做法比原来的方式更好，点同意后才会记住。"
-        : "这次没有找到比原来的方式更好的做法。";
+        : "这次没有找到明显比原来的方式更好的做法（只是改动多几行少几行的，不算）。";
     } catch (error) {
       report.message = `这次进化没有完成：${error instanceof Error ? error.message : String(error)}`;
     }

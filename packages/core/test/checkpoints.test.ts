@@ -41,6 +41,18 @@ describe("Checkpoints", { timeout: 30_000 }, () => {
     expect(read("other/keep.txt")).toBe("v2");
   });
 
+  it("removes new files with Chinese names on rollback", () => {
+    const { app } = repo();
+    const cp = new Checkpoints(app);
+    const first = cp.create("派发前");
+    fs.mkdirSync(path.join(app, "src", "新目录"), { recursive: true });
+    fs.writeFileSync(path.join(app, "src", "新文件.ts"), "new");
+    fs.writeFileSync(path.join(app, "src", "新目录", "页面.tsx"), "new");
+    cp.rollback(first.id);
+    expect(fs.existsSync(path.join(app, "src", "新文件.ts"))).toBe(false);
+    expect(fs.existsSync(path.join(app, "src", "新目录", "页面.tsx"))).toBe(false);
+  });
+
   it("keeps the user's index and branch untouched, and can undo a rollback", () => {
     const { app, read } = repo();
     const cp = new Checkpoints(app);

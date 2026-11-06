@@ -1,4 +1,4 @@
-import picomatch from "picomatch";
+import { ownerOf } from "../owners.js";
 import { relativeToRoot } from "../paths.js";
 import type { Rule } from "./types.js";
 
@@ -6,18 +6,21 @@ import type { Rule } from "./types.js";
 export const scopeFence: Rule = {
   id: "scope-fence",
   defaultLevel: "ask",
-  check(event, { root, activeNode }) {
+  check(event, { root, canvas, activeNode }) {
     if (event.kind !== "tool.before" || event.action.type !== "write" || !activeNode) return null;
     const rel = relativeToRoot(root, event.action.path);
     if (rel?.startsWith(".agent-together/")) {
       return { nodeId: activeNode.id, message: `${rel} belongs to Agent Together itself; agents do not edit it.` };
     }
-    if (rel && activeNode.files.length > 0 && picomatch(activeNode.files)(rel)) return null;
+    // Same answer as everywhere else that asks "whose file is this": the most specific glob wins.
+    // A file matching this card's globs but owned more specifically by another card is that card's.
+    const owner = rel ? ownerOf(canvas, rel) : null;
+    if (owner?.id === activeNode.id) return null;
     return {
       nodeId: activeNode.id,
       message:
         `${rel ?? event.action.path} is outside node "${activeNode.title}" ` +
-        `(owns: ${activeNode.files.join(", ") || "nothing yet"}). ` +
+        `(owns: ${activeNode.files.join(", ") || "nothing yet"}${owner ? `; this file belongs to "${owner.title}"` : ""}). ` +
         `Explain how this serves the node's goal, or stay within its files.`,
     };
   },

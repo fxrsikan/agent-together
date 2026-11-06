@@ -48,7 +48,7 @@ import {
   testHistory,
   writeProjectInfo,
 } from "@agent-together/core";
-import { Capability } from "@agent-together/schema";
+import { Capability, ranNoTests } from "@agent-together/schema";
 import type { AgentRunner, CanvasEdge, CanvasNode, Memory } from "@agent-together/schema";
 import { Session } from "./session";
 
@@ -220,7 +220,12 @@ async function main() {
     const res = await dialog.showOpenDialog(win, { title, properties: ["openDirectory", "createDirectory"] });
     return res.canceled ? null : res.filePaths[0];
   });
+  /** Switching or closing the project would cut off whatever it is doing. */
+  const notBusy = () => {
+    if (session?.busy) throw new Error(`正在${session.busy}，等它结束再换项目`);
+  };
   ipcMain.handle("agent-together:createProject", async (_e, parent: string, name: string, description: string) => {
+    notBusy();
     const folder = name.trim().replace(/[<>:"/\\|?*]+/g, "-");
     if (!folder) throw new Error("请填写项目名");
     const root = createProject(path.join(parent, folder), name.trim());
@@ -233,6 +238,7 @@ async function main() {
     return info;
   });
   ipcMain.handle("agent-together:openProject", async (_e, dir: string) => {
+    notBusy();
     const { root, created } = openProject(dir);
     if (created) {
       // Like a new project: start with the models last chosen (before the session reads them).
@@ -245,11 +251,13 @@ async function main() {
     return info;
   });
   ipcMain.handle("agent-together:closeProject", async () => {
+    notBusy();
     await session?.close();
     session = null;
     win.setTitle("Agent Together");
   });
   ipcMain.handle("agent-together:info", () => session?.info() ?? null);
+  ipcMain.handle("agent-together:busy", () => session?.busy ?? null);
   ipcMain.handle("agent-together:recentLog", () => need().daemon.store.recentLog(100));
   ipcMain.handle("agent-together:projectInfo", () => readProjectInfo(need().root));
   // Which model each assistant uses: per project, remembered as the default for new ones.
@@ -401,6 +409,7 @@ async function main() {
   ipcMain.handle("agent-together:deleteNode", async (_e, id: string) => {
     const s = need();
     const node = s.daemon.canvas.nodes.find((n) => n.id === id);
+    if (s.running?.nodeId === id) throw new Error(`AI 正在做「${node?.title ?? id}」，做完之前不能删除这张卡片`);
     const { response } = await dialog.showMessageBox(win, {
       type: "warning",
       buttons: ["删除", "取消"],
@@ -411,7 +420,7 @@ async function main() {
     });
     if (response !== 0) return false;
     s.daemon.store.deleteNode(id);
-    if (s.daemon.observer.activeNodeId === id) s.daemon.setActiveNode(null);
+    if (s.daemon.observer.activeNodeId === id) s.setActiveNode(null);
     s.canvasChanged();
     return true;
   });
@@ -422,7 +431,7 @@ async function main() {
     return saved;
   });
 
-  ipcMain.handle("agent-together:setActive", (_e, nodeId: string | null) => need().daemon.setActiveNode(nodeId));
+  ipcMain.handle("agent-together:setActive", (_e, nodeId: string | null) => need().setActiveNode(nodeId));
   ipcMain.handle("agent-together:installHooks", () => need().installHooks(hookProgram()));
 
   // Context inspector: what the agent would get, with sizes; memories can be left out per dispatch.
@@ -455,9 +464,10 @@ async function main() {
   // `context`, when given, is the inspector's (possibly edited) text and is handed out as is.
   ipcMain.handle("agent-together:dispatch", (_e, nodeId: string, task: string, agent: Agent, context?: string) => {
     const s = need();
+    if (s.busy) throw new Error(`正在${s.busy}，等它结束再试`);
     s.startDispatch(nodeId, agent);
     const file = s.daemon.store.writeContext(nodeId, context ?? contextFor(s, nodeId, task, agent));
-    s.daemon.setActiveNode(nodeId);
+    s.setActiveNode(nodeId);
     const node = s.daemon.canvas.nodes.find((n) => n.id === nodeId);
     if (node && node.status === "todo") {
       s.daemon.store.saveNode({ ...node, status: "in_progress", executor: agent });
@@ -477,10 +487,11 @@ async function main() {
     const tests = await runProjectTests(s.root, nodeId);
     win.webContents.send("agent-together:tests", tests);
     const title = s.daemon.canvas.nodes.find((n) => n.id === nodeId)?.title ?? "项目";
-    const checkpoint = tests?.passed && s.hasGit ? s.checkpoints.create(`测试通过：${title}`, nodeId) : null;
+    // A green run that ran no test at all ("0/0") is no evidence: no "tests passed" checkpoint for it.
+    const checkpoint = tests?.passed && !ranNoTests(tests) && s.hasGit ? s.checkpoints.create(`测试通过：${title}`, nodeId) : null;
     return { tests, checkpoint, audit };
   };
-  ipcMain.handle("agent-together:runTests", (_e, nodeId: string | null) => testAndCheckpoint(need(), nodeId));
+  ipcMain.handle("agent-together:runTests", (_e, nodeId: string | null) => need().exclusive("跑测试", () => testAndCheckpoint(need(), nodeId)));
   ipcMain.handle("agent-together:testHistory", () => testHistory(need().root));
   ipcMain.handle("agent-together:testCommand", () => testCommandFor(need().root));
 
@@ -489,6 +500,8 @@ async function main() {
   ipcMain.handle("agent-together:runAgent", async (_e, nodeId: string, task: string, agent: Agent, context?: string) => {
     const s = need();
     if (s.running) throw new Error(`已有 AI 助手在运行（${s.running.nodeId}）`);
+    const title = s.daemon.canvas.nodes.find((n) => n.id === nodeId)?.title ?? nodeId;
+    return s.exclusive(`让 AI 做「${title}」`, async () => {
     s.startDispatch(nodeId, agent);
     const file = s.daemon.store.writeContext(nodeId, context ?? contextFor(s, nodeId, task, agent));
     s.daemon.setActiveNode(nodeId);
@@ -513,6 +526,7 @@ async function main() {
       s.running = null;
       send("agentStatus", { nodeId, agent, state: "idle" });
     }
+    });
   });
   ipcMain.handle("agent-together:stopAgent", () => need().running?.stop.abort());
 
@@ -564,7 +578,7 @@ async function main() {
       detail: "当前状态会先自动存为一个检查点，回滚之后还可以再回来。被 git 忽略的文件不受影响。",
     });
     if (response !== 0) return false;
-    s.checkpoints.rollback(id);
+    await s.exclusive("回滚", () => s.checkpoints.rollback(id));
     s.canvasChanged();
     return true;
   });
@@ -586,21 +600,21 @@ async function main() {
     if (!runners[agent]) throw new Error("请选择一个可用的助手");
     s.racing = nodeId;
     try {
-      return await new Evolution(s.root, s.llm).run(
+      return await s.exclusive("比较几种做法（进化）", () => new Evolution(s.root, s.llm).run(
         nodeId,
         task,
         runners[agent](loadRaceConfig(s.root).models?.[agent]),
         (message) => win.webContents.send("agent-together:raceProgress", message),
         loadRaceConfig(s.root).models?.[agent],
-      );
+      ));
     } finally {
       s.racing = null;
     }
   });
-  ipcMain.handle("agent-together:approveEvolution", (_e, id: string, adopt: boolean) => {
+  ipcMain.handle("agent-together:approveEvolution", async (_e, id: string, adopt: boolean) => {
     const s = need();
     if (s.racing) throw new Error("请等当前比较结束");
-    const report = new Evolution(s.root, s.llm).approve(id, adopt);
+    const report = await s.exclusive(adopt ? "采用进化的代码" : "记下进化的做法", () => new Evolution(s.root, s.llm).approve(id, adopt));
     s.canvasChanged();
     return report;
   });
@@ -649,8 +663,9 @@ async function main() {
     if (s.racing) throw new Error(`已有一场赛马在进行（${s.racing}）`);
     s.racing = nodeId;
     const models = loadRaceConfig(s.root).models ?? {};
+    const race = s.race;
     try {
-      return await s.race.run(
+      return await s.exclusive("赛马", () => race.run(
         nodeId,
         task,
         // Each contestant gets the memories proven with its own assistant and model (or with none).
@@ -662,7 +677,7 @@ async function main() {
         s.daemon.memory.forNode(nodeId),
         (message) => win.webContents.send("agent-together:raceProgress", message),
         context,
-      );
+      ));
     } finally {
       s.racing = null;
     }
@@ -678,7 +693,7 @@ async function main() {
       detail: "应用前会自动存一个检查点，之后可以回滚。其他参赛者的独立工作区会被清理。",
     });
     if (response !== 0) return false;
-    s.race!.adopt(id, contestantId);
+    await s.exclusive("采用赛马结果", () => s.race!.adopt(id, contestantId));
     s.canvasChanged();
     return true;
   });

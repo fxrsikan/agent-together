@@ -264,6 +264,8 @@ button.link { border: none; background: none; padding: 0 4px; color: var(--muted
 .badge { font-size: 11px; padding: 1px 6px; border-radius: 10px; white-space: nowrap; }
 .badge-good { background: color-mix(in srgb, var(--good) 18%, transparent); color: var(--good); }
 .badge-bad { background: color-mix(in srgb, var(--bad) 18%, transparent); color: var(--bad); }
+.badge-warn { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
+.verdict-reasons { margin: 0; padding-left: 18px; }
 
 /* Setup wizard */
 .setup-wizard { max-width: 720px; }

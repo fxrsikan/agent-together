@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import type { Checkpoint } from "@agent-together/core";
+import { errorText } from "./errors";
 import { clock } from "./time";
 
 const SHOWN = 8;
 
 /** Recent checkpoints with a rollback button each. Rollback asks for confirmation in the main process. */
-export function CheckpointsPanel({ version, onChange }: { version: number; onChange: (notice: string) => void }) {
+export function CheckpointsPanel({ version, busy, onChange }: { version: number; busy?: string | null; onChange: (notice: string) => void }) {
   const [list, setList] = useState<Checkpoint[]>([]);
 
   useEffect(() => {
@@ -18,7 +19,11 @@ export function CheckpointsPanel({ version, onChange }: { version: number; onCha
   };
 
   const rollback = async (cp: Checkpoint) => {
-    if (await window.agentTogether.rollback(cp.id)) onChange(`已回滚到"${cp.label}"（${clock(cp.at)}），回滚前的状态也存成了检查点`);
+    try {
+      if (await window.agentTogether.rollback(cp.id)) onChange(`已回滚到"${cp.label}"（${clock(cp.at)}），回滚前的状态也存成了检查点`);
+    } catch (err) {
+      onChange(errorText(err));
+    }
   };
 
   return (
@@ -35,7 +40,9 @@ export function CheckpointsPanel({ version, onChange }: { version: number; onCha
               <span className="muted">{clock(cp.at)}</span> {cp.label}
               {cp.nodeId ? <span className="muted"> · {cp.nodeId}</span> : null}
             </span>
-            <button onClick={() => rollback(cp)}>回滚到这里</button>
+            <button onClick={() => rollback(cp)} disabled={!!busy} title={busy ? `正在${busy}，等它结束再回滚` : undefined}>
+              回滚到这里
+            </button>
           </li>
         ))}
       </ol>

@@ -31,11 +31,14 @@ export function EvolutionPanel({
   nodeId,
   task,
   version,
+  projectBusy,
   onChange,
 }: {
   nodeId: string;
   task: string;
   version: number;
+  /** What else the project is doing; evolving or adopting waits for it. */
+  projectBusy?: string | null;
   onChange: (message: string) => void;
 }) {
   const [reportId, setReportId] = useState("");
@@ -43,7 +46,8 @@ export function EvolutionPanel({
   const [suggestions, setSuggestions] = useState<Experience[]>([]);
   const [agents, setAgents] = useState<string[]>([]);
   const [agent, setAgent] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [working, setBusy] = useState(false);
+  const busy = working || !!projectBusy;
   const [candidate, setCandidate] = useState(false);
   /** This card's evolution memories and the project's model per assistant, to warn when they no longer match. */
   const [proven, setProven] = useState<string[]>([]);
@@ -114,7 +118,7 @@ export function EvolutionPanel({
           })
         }
       >
-        {busy ? "比较中…" : "进化"}
+        {working ? "比较中…" : "进化"}
       </button>
       {reports.length > 1 && (
         <select value={latest?.id ?? ""} onChange={(e) => setReportId(e.target.value)}>

@@ -48,6 +48,24 @@ describe("scope-fence", () => {
     expect(observer(null).evaluate(write(`${root}/src/db/schema.ts`, "x")).level).toBe("off");
   });
 
+  it("lets a write through only when the file's owner is the active node, as ownership says everywhere else", () => {
+    // tests/** belongs to "tests", but the more specific tests/test_store.py belongs to "store".
+    const overlap = Canvas.parse({
+      version: 1,
+      nodes: [
+        { id: "tests", kind: "module", title: "Tests", files: ["tests/**"] },
+        { id: "store", kind: "module", title: "Store", files: ["src/store/**", "tests/test_store.py"] },
+      ],
+      edges: [],
+    });
+    const asTests = new Observer(root, overlap, {}, undefined, "tests");
+    expect(asTests.evaluate(write(`${root}/tests/test_cli.py`, "x")).level).toBe("off");
+    const v = asTests.evaluate(write(`${root}/tests/test_store.py`, "x"));
+    expect(v.level).toBe("ask");
+    expect(v.findings[0].message).toContain('belongs to "Store"');
+    expect(new Observer(root, overlap, {}, undefined, "store").evaluate(write(`${root}/tests/test_store.py`, "x")).level).toBe("off");
+  });
+
   it("honours a level override from rules.json", () => {
     const o = new Observer(root, canvas, { "scope-fence": "block" }, undefined, "login-form");
     expect(o.evaluate(write(`${root}/src/db/schema.ts`, "x")).level).toBe("block");

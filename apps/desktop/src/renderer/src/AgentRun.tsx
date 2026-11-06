@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { auditFailed, ranNoTests, workVerdict } from "@agent-together/schema";
 import type { AgentRunOutcome, TestRun } from "../../preload";
 import { clock } from "./time";
 
@@ -11,19 +12,29 @@ export type RunView = {
   error?: string;
 };
 
+/** A test run in a few words; a green run that ran no test at all ("0/0") is not shown as passing. */
+export function testLabel(run: TestRun): string {
+  if (run.passed && ranNoTests(run)) return "还没有测试";
+  const counts = run.pass !== undefined ? ` ${run.pass}/${run.pass + (run.fail ?? 0)}` : "";
+  return `${run.passed ? "测试通过" : "测试失败"}${counts}`;
+}
+
 export function TestBadge({ run }: { run: TestRun | null | undefined }) {
   if (!run) return null;
-  const counts = run.pass !== undefined ? ` ${run.pass}/${run.pass + (run.fail ?? 0)}` : "";
+  const empty = run.passed && ranNoTests(run);
   return (
-    <span className={`badge ${run.passed ? "badge-good" : "badge-bad"}`} title={`${run.command} · ${clock(run.at)}`}>
-      {run.passed ? "测试通过" : "测试失败"}
-      {counts}
+    <span
+      className={`badge ${empty ? "badge-warn" : run.passed ? "badge-good" : "badge-bad"}`}
+      title={empty ? `${run.command} 跑了，但一个测试都没有，不能证明代码是对的 · ${clock(run.at)}` : `${run.command} · ${clock(run.at)}`}
+    >
+      {testLabel(run)}
     </span>
   );
 }
 
-/** One line for a notice: what the after-run check found, or "" when nothing. */
+/** One line for a notice: what the after-run check found or why it failed, "" when it found nothing. */
 export function auditSummary(audit: AgentRunOutcome["audit"] | undefined): string {
+  if (auditFailed(audit)) return "事后检查没跑成，没法确认这次的改动有没有越界";
   if (!audit?.findings.length) return "";
   const missed = audit.findings.filter((f) => !f.seenLive).length;
   return `事后检查发现 ${audit.findings.length} 个问题${missed ? `，其中 ${missed} 个是观察者当场没看到的（多半是用命令行改的）` : ""}`;
@@ -34,6 +45,13 @@ export function auditSummary(audit: AgentRunOutcome["audit"] | undefined): strin
  * A finding the observer never saw live means a write slipped past the hooks.
  */
 export function AuditNotice({ audit }: { audit: AgentRunOutcome["audit"] | undefined }) {
+  if (auditFailed(audit))
+    return (
+      <div className="finding finding-block">
+        <strong>{auditSummary(audit)}</strong>
+        <p className="small">原因：{audit.error}</p>
+      </div>
+    );
   if (!audit?.findings.length) return null;
   const strong = audit.findings.some((f) => f.level === "ask" || f.level === "block");
   return (
@@ -60,11 +78,14 @@ export function AuditNotice({ audit }: { audit: AgentRunOutcome["audit"] | undef
 export function AgentRun({
   view,
   titles,
+  hasGit,
   onStop,
   onDone,
   onRetry,
 }: {
   view: RunView;
+  /** The project uses git, so an after-run check is expected for every run. */
+  hasGit: boolean;
   /** Node id → title, to name the node a failing test belongs to. */
   titles: Record<string, string>;
   onStop: () => void;
@@ -78,6 +99,8 @@ export function AgentRun({
   }, [view.lines.length]);
 
   const { run, tests, checkpoint, audit } = view.outcome ?? {};
+  // "Mark done" only on a full pass: the agent finished, tests exist and pass, the after-run check ran clean.
+  const verdict = view.outcome ? workVerdict({ run, tests, audit, auditRequired: hasGit }) : null;
   const failureTask = tests && !tests.passed ? `项目测试没有通过（${tests.command}），请修复。测试输出的最后部分：\n\n${tests.output.slice(-1500)}` : "";
   // A change here can break a test another node owns; that node is the one to fix it.
   const owners = (tests?.failingNodes ?? []).filter((id) => id !== view.nodeId && titles[id]);
@@ -107,6 +130,19 @@ export function AgentRun({
       )}
       {view.state === "done" && view.outcome && (
         <>
+          <div className="row">
+            <span className={`badge ${verdict?.status === "passed" ? "badge-good" : verdict?.status === "no-tests" || verdict?.status === "unverified" ? "badge-warn" : "badge-bad"}`}>
+              {verdict?.label}
+            </span>
+            {verdict && verdict.status !== "passed" && <span className="muted small grow">还不能标记完成</span>}
+          </div>
+          {verdict && verdict.reasons.length > 0 && (
+            <ul className="small verdict-reasons">
+              {verdict.reasons.map((r, i) => (
+                <li key={i}>{r}</li>
+              ))}
+            </ul>
+          )}
           <AuditNotice audit={audit} />
           {tests ? (
             <div className="row">
@@ -121,7 +157,7 @@ export function AgentRun({
           )}
           {tests && !tests.passed && <pre className="test-output">{tests.output.slice(-1200)}</pre>}
           <div className="actions">
-            {tests?.passed && (
+            {verdict?.status === "passed" && (
               <button className="primary" onClick={onDone}>
                 标记为完成
               </button>

@@ -27,6 +27,7 @@ import {
   readProjectInfo,
   testCommandFor,
   testCounts,
+  zNumstat,
 } from "@agent-together/core";
 import type { AgentEvent, AgentRunner, Finding } from "@agent-together/schema";
 
@@ -173,13 +174,8 @@ async function runOne(fixture: string, t: BenchTask, condition: Condition, repea
 
   // Measure the final state, identically for both conditions.
   git(dir, ["add", "-A"]);
-  const files = git(dir, ["diff", "--cached", "--numstat", "HEAD"])
-    .split("\n")
-    .filter(Boolean)
-    .map((line) => {
-      const [added, removed, rel] = line.split("\t");
-      return { path: rel, added: Number(added) || 0, removed: Number(removed) || 0, owner: ownerOf(canvas, rel)?.id ?? null };
-    })
+  const files = zNumstat(git(dir, ["diff", "--cached", "--numstat", "-z", "--no-renames", "HEAD"]))
+    .map((f) => ({ ...f, owner: ownerOf(canvas, f.path)?.id ?? null }))
     .filter((f) => !IGNORED(f.path));
   const outside = files.filter((f) => f.owner !== t.node).map((f) => f.path);
 

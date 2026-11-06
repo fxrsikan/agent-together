@@ -6,6 +6,7 @@ import { capabilityRules, CapabilityStore } from "./capabilities.js";
 import { Checkpoints } from "./checkpoints.js";
 import { Observer } from "./observer.js";
 import { ownerOf } from "./owners.js";
+import { zNumstat } from "./paths.js";
 import { builtinRules } from "./rules/index.js";
 import { ProjectStore } from "./store.js";
 
@@ -25,6 +26,9 @@ export interface AuditResult {
   files: { path: string; added: number; removed: number; owner: string | null }[];
   findings: AuditFinding[];
 }
+
+/** The after-run check's answer: its result, or why it could not run (never silently nothing). */
+export type AuditOutcome = AuditResult | { error: string };
 
 const git = (cwd: string, args: string[]) =>
   execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 64 * 1024 * 1024 }).trim();
@@ -51,13 +55,8 @@ export function auditChanges(root: string, base: string, nodeId: string | null, 
   const store = new ProjectStore(root);
   const now = canvas ?? store.loadCanvas();
   const after = new Checkpoints(root).snapshot("事后检查");
-  const files = git(root, ["diff", "--numstat", "--relative", "--no-renames", base, after])
-    .split("\n")
-    .filter(Boolean)
-    .map((line) => {
-      const [added, removed, rel] = line.split("\t");
-      return { path: rel, added: Number(added) || 0, removed: Number(removed) || 0, owner: ownerOf(now, rel)?.id ?? null };
-    })
+  const files = zNumstat(git(root, ["diff", "--numstat", "-z", "--relative", "--no-renames", base, after]))
+    .map((f) => ({ ...f, owner: ownerOf(now, f.path)?.id ?? null }))
     .filter((f) => !SKIP(f.path));
 
   const observer = new Observer(

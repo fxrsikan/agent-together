@@ -8,6 +8,7 @@ import { capabilityRules, CapabilityStore } from "./capabilities.js";
 import { Checkpoints } from "./checkpoints.js";
 import { buildNodeContext } from "./context.js";
 import { readProjectInfo } from "./project.js";
+import { zNumstat } from "./paths.js";
 import { allowTestCommands, failingTestFiles, testCommandFor } from "./tests.js";
 import { ownerOf } from "./owners.js";
 import { Observer } from "./observer.js";
@@ -212,13 +213,8 @@ export class Race {
 
         const commit = new Checkpoints(project).snapshot(`赛马 ${id} ${contestantId}`);
         git(this.top, ["update-ref", `refs/agent-together/races/${id}/${contestantId}`, commit]);
-        const files = git(this.top, ["diff-tree", "-r", "--numstat", base, commit])
-          .split("\n")
-          .filter(Boolean)
-          .map((line) => {
-            const [added, removed, repoPath] = line.split("\t");
-            return { path: this.toProject(repoPath), added: Number(added) || 0, removed: Number(removed) || 0 };
-          })
+        const files = zNumstat(git(this.top, ["diff-tree", "-r", "-z", "--numstat", "--no-renames", base, commit]))
+          .map((f) => ({ ...f, path: this.toProject(f.path) }))
           .filter((f): f is { path: string; added: number; removed: number } => f.path !== null && !SKIP(f.path));
 
         const findings = this.replay(project, nodeId, base, files.map((f) => f.path), runner.id);

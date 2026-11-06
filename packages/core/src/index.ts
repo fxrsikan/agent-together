@@ -4,7 +4,7 @@ export { judgeTurn, parseJsonObject, refineMemory, turnWorthJudging, type TurnJu
 export { Observer } from "./observer.js";
 export { builtinRules, type Rule, type RuleContext } from "./rules/index.js";
 export { ProjectStore } from "./store.js";
-export { relativeToRoot } from "./paths.js";
+export { relativeToRoot, zNames, zNumstat } from "./paths.js";
 export { mayDepend, ownerOf } from "./owners.js";
 export { buildNodeContext, buildNodeGuide, contextSections, estimateTokens } from "./context.js";
 export { draftsFromFindings, MemoryStore, splitByVerifier, verifierKey, verifierLabel } from "./memory.js";

@@ -1,12 +1,12 @@
 import type { CheckedSource, EvolutionReport, Experience, ImportProposal, ModelChoice, ProposedCard, ProposedItem, SetupReport } from "@agent-together/core";
 import { contextBridge, ipcRenderer } from "electron";
-import type { AuditResult, CanvasPlan, Checkpoint, CompileReport, Judgment, ProjectInfo, RaceReport, TestHistory, TestRun } from "@agent-together/core";
+import type { AuditOutcome, AuditResult, CanvasPlan, Checkpoint, CompileReport, Judgment, ProjectInfo, RaceReport, TestHistory, TestRun } from "@agent-together/core";
 import type { AgentEvent, Capability, Canvas, CanvasEdge, CanvasNode, Memory, RunResult, Verdict } from "@agent-together/schema";
 
 export type EventRecord = { event: AgentEvent; verdict: Verdict };
 export type { Judgment, RaceReport, RunResult, TestHistory, TestRun };
-export type { AuditResult };
-export type AgentRunOutcome = { run: RunResult; tests: TestRun | null; checkpoint: Checkpoint | null; audit: AuditResult | null };
+export type { AuditOutcome, AuditResult };
+export type AgentRunOutcome = { run: RunResult; tests: TestRun | null; checkpoint: Checkpoint | null; audit: AuditOutcome | null };
 export type Agent = "claude-code" | "codex" | "cursor" | "grok-build";
 /** Where an imported project stands: what the checklist still has to offer. */
 export type ImportStatus = {
@@ -106,7 +106,7 @@ const api = {
   stopAgent: () => invoke<void>("stopAgent"),
   onAgentText: (cb: (e: { nodeId: string; text: string }) => void) => on("agentText", cb),
   onAgentStatus: (cb: (e: { nodeId: string; agent: Agent; state: "running" | "testing" | "idle" }) => void) => on("agentStatus", cb),
-  runTests: (nodeId: string | null) => invoke<{ tests: TestRun | null; checkpoint: Checkpoint | null; audit: AuditResult | null }>("runTests", nodeId),
+  runTests: (nodeId: string | null) => invoke<{ tests: TestRun | null; checkpoint: Checkpoint | null; audit: AuditOutcome | null }>("runTests", nodeId),
   testHistory: () => invoke<TestHistory>("testHistory"),
   testCommand: () => invoke<string | null>("testCommand"),
   onTests: (cb: (run: TestRun | null) => void) => on("tests", cb),
@@ -116,6 +116,9 @@ const api = {
   measureContext: (markdown: string) => invoke<{ tokens: number; sections: { title: string; tokens: number }[] }>("measureContext", markdown),
   onEvent: (cb: (record: EventRecord) => void) => on("event", cb),
   onActive: (cb: (nodeId: string | null) => void) => on("active", cb),
+  /** What the project is busy with (an agent run, tests, a rollback…), or null when free. */
+  onBusy: (cb: (what: string | null) => void) => on("busy", cb),
+  busy: () => invoke<string | null>("busy"),
   onJudgment: (cb: (j: Judgment) => void) => on("judgment", cb),
   onL2Error: (cb: (message: string) => void) => on("l2error", cb),
 

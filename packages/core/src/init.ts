@@ -4,6 +4,7 @@ import path from "node:path";
 import { Canvas, type CanvasEdge, type CanvasNode } from "@agent-together/schema";
 import { importCandidates, importSpecifiers, SOURCE_FILE } from "./imports.js";
 import { ownerOf } from "./owners.js";
+import { zNames } from "./paths.js";
 
 const SKIP_DIRS = new Set(["node_modules", ".git", ".agent-together", ".claude", ".codex", ".cursor", "dist", "out", "build", "coverage", "__pycache__", ".venv", "venv", ".tox", ".mypy_cache", ".pytest_cache", "target", ".gradle"]);
 const MAX_SOURCE_BYTES = 512 * 1024;
@@ -11,12 +12,13 @@ const MAX_SOURCE_BYTES = 512 * 1024;
 /** Project files as posix paths: git's view (tracked + untracked, minus ignored) when available. */
 export function listFiles(root: string): string[] {
   try {
-    const out = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard"], {
+    const out = execFileSync("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], {
       cwd: root,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
+      maxBuffer: 64 * 1024 * 1024,
     });
-    return out.split("\n").filter(Boolean);
+    return zNames(out);
   } catch {
     const files: string[] = [];
     const walk = (dir: string) => {

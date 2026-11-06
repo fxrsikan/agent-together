@@ -17,6 +17,7 @@ export function RacePanel({
   task,
   context,
   version,
+  projectBusy,
   onChange,
 }: {
   nodeId: string;
@@ -24,6 +25,8 @@ export function RacePanel({
   /** The inspector's context text, when open; otherwise the generated one is used. */
   context?: string;
   version: number;
+  /** What else the project is doing; a race or adopting one waits for it. */
+  projectBusy?: string | null;
   onChange: (notice: string) => void;
 }) {
   const [reports, setReports] = useState<RaceReport[]>([]);
@@ -67,8 +70,12 @@ export function RacePanel({
   };
 
   const adopt = async (report: RaceReport, contestantId: string) => {
-    if (await window.agentTogether.adoptRace(report.id, contestantId))
-      onChange(`已采用 ${AGENT_NAMES[contestantId] ?? contestantId} 的改动，采用前的状态存成了检查点`);
+    try {
+      if (await window.agentTogether.adoptRace(report.id, contestantId))
+        onChange(`已采用 ${AGENT_NAMES[contestantId] ?? contestantId} 的改动，采用前的状态存成了检查点`);
+    } catch (err) {
+      onChange(`没能采用：${err instanceof Error ? err.message : String(err)}`);
+    }
   };
 
   const discard = async (report: RaceReport) => {
@@ -84,7 +91,7 @@ export function RacePanel({
     <section>
       <div className="row">
         <h4>赛马</h4>
-        <button onClick={start} disabled={running !== null || !!open} title={open ? "先采用或放弃上一场" : undefined}>
+        <button onClick={start} disabled={running !== null || !!open || !!projectBusy} title={projectBusy ? `正在${projectBusy}，等它结束` : open ? "先采用或放弃上一场" : undefined}>
           {running === nodeId ? "比赛中…" : `开始比赛：${agents.map((a) => AGENT_NAMES[a] ?? a).join(" 对 ")}`}
         </button>
       </div>
@@ -147,7 +154,7 @@ export function RacePanel({
                   ))}
                   {c.run.summary && <p className="summary">{c.run.summary.slice(0, 300)}</p>}
                   {open && (
-                    <button className={i === 0 ? "primary" : ""} onClick={() => adopt(latest, c.id)}>
+                    <button className={i === 0 ? "primary" : ""} onClick={() => adopt(latest, c.id)} disabled={!!projectBusy}>
                       采用
                     </button>
                   )}

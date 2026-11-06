@@ -12,7 +12,7 @@ import {
   type NodeChange,
   type ReactFlowInstance,
 } from "@xyflow/react";
-import { strongest, type AgentEvent, type Canvas, type Capability, type Level } from "@agent-together/schema";
+import { ranNoTests, strongest, type AgentEvent, type Canvas, type Capability, type Level } from "@agent-together/schema";
 import type { CompileReport } from "@agent-together/core";
 import type { Agent, EventRecord, Judgment, SessionInfo, TestHistory } from "../../preload";
 import { AgentRun, TestBadge, type RunView, auditSummary } from "./AgentRun";
@@ -148,6 +148,8 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
   const [runView, setRunView] = useState<RunView | null>(null);
   const [testRuns, setTestRuns] = useState<TestHistory>({ byNode: {} });
   const [testing, setTesting] = useState(false);
+  /** What the project is busy with; the other actions wait until it is done. */
+  const [busy, setBusy] = useState<string | null>(null);
   const [inspecting, setInspecting] = useState(false);
   const [contextText, setContextText] = useState("");
   const flow = useRef<ReactFlowInstance<NodeCardType, Edge> | null>(null);
@@ -167,6 +169,7 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
         if (r.event.kind === "turn.end") setVersion((v) => v + 1);
       }),
       window.agentTogether.onActive(setActiveId),
+      window.agentTogether.onBusy(setBusy),
       window.agentTogether.onMemoryDrafts((drafts) => {
         setNotice(`有 ${drafts.length} 条记忆草稿待审批，点开对应卡片查看`);
         setVersion((v) => v + 1);
@@ -183,6 +186,7 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
 
   useEffect(() => {
     window.agentTogether.canvas().then(setCanvas);
+    window.agentTogether.busy().then(setBusy);
     window.agentTogether.roles().then(setRoles);
     window.agentTogether.testHistory().then(setTestRuns);
     window.agentTogether.staleCards().then(setStale);
@@ -351,13 +355,21 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
       changed(`"${node.title}"已完成`);
     });
 
+  /** The card an agent is working on right now, if any. */
+  const runningNode = runView && (runView.state === "running" || runView.state === "testing") ? runView.nodeId : null;
+
   const runTests = () =>
     attempt(async () => {
       setTesting(true);
       try {
         const { tests, checkpoint, audit } = await window.agentTogether.runTests(selectedId);
         const found = auditSummary(audit);
-        changed((tests ? `${tests.passed ? "测试通过" : "测试失败"}（${tests.command}）${checkpoint ? "，已存检查点" : ""}` : "项目没有测试命令：在项目设置里填写") + (found ? `。${found}` : ""));
+        const said = !tests
+          ? "项目没有测试命令：在项目设置里填写"
+          : tests.passed && ranNoTests(tests)
+            ? `测试命令跑了，但一个测试都没有（${tests.command}），不能证明代码是对的`
+            : `${tests.passed ? "测试通过" : "测试失败"}（${tests.command}）${checkpoint ? "，已存检查点" : ""}`;
+        changed(said + (found ? `。${found}` : ""));
       } finally {
         setTesting(false);
       }
@@ -373,7 +385,8 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
         <span className="muted path one-line" title={info.root}>{info.root}</span>
         <span className="spacer" />
         <TestBadge run={testRuns.last} />
-        <button onClick={runTests} disabled={testing || runView?.state === "running"}>
+        {busy && <span className="badge badge-warn" title="这件事做完之前，其他会改动项目的操作要等一等">正在{busy}</span>}
+        <button onClick={runTests} disabled={testing || !!busy || runView?.state === "running"}>
           {testing ? "测试中…" : "运行测试"}
         </button>
         <span className="muted" title={`AI 做完后，另用一个模型复查改动有没有偏离卡片${info.l2 ? `（${info.l2}）` : ""}`}>复查：{info.l2 ? "开" : "关"}</span>
@@ -521,13 +534,18 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
                     ))}
                   </select>
                   <span className="muted" title="在下方「用哪个模型」里修改">模型：{models[agent] || "默认"}</span>
-                  <button className="primary" onClick={() => dispatch(selected.id)} disabled={runView?.state === "running" || runView?.state === "testing"}>
+                  <button className="primary" onClick={() => dispatch(selected.id)} disabled={!!busy || runView?.state === "running" || runView?.state === "testing"} title={busy ? `正在${busy}，等它结束` : undefined}>
                     交给 AI 去做
                   </button>
+                  {/* While an agent runs, its card stays the current one: the observer judges against it. */}
                   {selected.id === activeId ? (
-                    <button onClick={() => window.agentTogether.setActive(null)}>取消当前卡片</button>
+                    <button onClick={() => attempt(() => window.agentTogether.setActive(null))} disabled={!!runningNode} title={runningNode ? "AI 做完之前不能换当前卡片" : undefined}>
+                      取消当前卡片
+                    </button>
                   ) : (
-                    <button onClick={() => window.agentTogether.setActive(selected.id)}>设为当前卡片</button>
+                    <button onClick={() => attempt(() => window.agentTogether.setActive(selected.id))} disabled={!!runningNode} title={runningNode ? "AI 做完之前不能换当前卡片" : undefined}>
+                      设为当前卡片
+                    </button>
                   )}
                   <button onClick={() => setInspecting((v) => !v)}>{inspecting ? "收起上下文" : "检查上下文"}</button>
                   <button onClick={() => exportCapability(selected.id)}>导出为可复用技能说明</button>
@@ -538,6 +556,7 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
                 <AgentRun
                   view={runView}
                   titles={Object.fromEntries((canvas?.nodes ?? []).map((n) => [n.id, n.title]))}
+                  hasGit={info.hasGit}
                   onStop={() => window.agentTogether.stopAgent()}
                   onDone={() => markDone(selected.id)}
                   onRetry={(nodeId, retryTask) => {
@@ -546,8 +565,8 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
                   }}
                 />
               )}
-              {info.hasGit && <EvolutionPanel nodeId={selected.id} task={task} version={version} onChange={changed} />}
-              {info.hasGit && <RacePanel nodeId={selected.id} task={task} context={context} version={version} onChange={changed} />}
+              {info.hasGit && <EvolutionPanel nodeId={selected.id} task={task} version={version} projectBusy={busy} onChange={changed} />}
+              {info.hasGit && <RacePanel nodeId={selected.id} task={task} context={context} version={version} projectBusy={busy} onChange={changed} />}
               <MemoryPanel nodeId={selected.id} version={version} onChange={changed} />
             </>
           ) : (
@@ -566,7 +585,7 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
               <MemoryPanel nodeId={null} version={version} onChange={changed} />
             </>
           )}
-          {info.hasGit ? <CheckpointsPanel version={version} onChange={changed} /> : <p className="muted">项目不在 git 仓库中，检查点和赛马不可用。</p>}
+          {info.hasGit ? <CheckpointsPanel version={version} busy={busy} onChange={changed} /> : <p className="muted">项目不在 git 仓库中，检查点和赛马不可用。</p>}
           {judgments.length > 0 && (
             <>
               <h4>事后智能判断</h4>

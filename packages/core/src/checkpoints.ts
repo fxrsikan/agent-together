@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { zNames } from "./paths.js";
 
 export interface Checkpoint {
   id: string;
@@ -93,8 +94,8 @@ export class Checkpoints {
     const safety = this.create(`回滚前（回到 ${target.label}）`, target.nodeId);
     const top = this.git(["rev-parse", "--show-toplevel"]);
     // Files that appeared after the checkpoint: restore leaves untracked ones behind, so remove them.
-    const added = this.git(["diff-tree", "-r", "--name-only", "--diff-filter=A", target.commit, safety.commit, "--", "."]);
-    for (const rel of added.split("\n").filter(Boolean)) fs.rmSync(path.join(top, rel), { force: true });
+    const added = this.git(["diff-tree", "-r", "-z", "--name-only", "--diff-filter=A", target.commit, safety.commit, "--", "."]);
+    for (const rel of zNames(added)) fs.rmSync(path.join(top, rel), { force: true });
     this.git(["restore", `--source=${target.commit}`, "--worktree", "--", "."]);
     return safety;
   }

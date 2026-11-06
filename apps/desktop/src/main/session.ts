@@ -3,7 +3,7 @@ import type { BrowserWindow } from "electron";
 import { installHooks } from "@agent-together/adapter-claude-code";
 import { installCodexHooks } from "@agent-together/adapter-codex";
 import { installCursorHooks } from "@agent-together/adapter-cursor";
-import { allowTestCommands, auditChanges, Checkpoints, createLlm, Daemon, loadLlmConfig, Race, readProjectInfo, writtenPaths, type AuditResult, type Llm } from "@agent-together/core";
+import { allowTestCommands, auditChanges, Checkpoints, createLlm, Daemon, loadLlmConfig, Race, readProjectInfo, writtenPaths, type AuditOutcome, type Llm } from "@agent-together/core";
 import type { AgentEvent } from "@agent-together/schema";
 
 /** Everything that belongs to one open project; closing it stops its daemon. */
@@ -91,14 +91,43 @@ export class Session {
   }
 
   /** Every change since the node's last dispatch, put through the observer; null without git or a dispatch. */
-  audit(nodeId: string | null): AuditResult | null {
+  /** null when there is nothing to check (no dispatch watched, no git); an error when the check itself failed. */
+  audit(nodeId: string | null): AuditOutcome | null {
     const w = nodeId ? this.watches.get(nodeId) : undefined;
     if (!w || !nodeId) return null;
     try {
       return auditChanges(this.root, w.base, nodeId, writtenPaths(this.root, w.events), this.daemon.canvas);
-    } catch {
-      return null;
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : String(err) };
     }
+  }
+
+  /**
+   * What the project is doing that must not overlap with anything else: an agent
+   * run, tests, a rollback, a race or evolution, adopting a result. One at a time;
+   * the window greys out the other actions while it lasts.
+   */
+  busy: string | null = null;
+
+  async exclusive<T>(what: string, work: () => Promise<T> | T): Promise<T> {
+    if (this.busy) throw new Error(`正在${this.busy}，等它结束再试`);
+    this.busy = what;
+    this.win.webContents.send("agent-together:busy", what);
+    try {
+      return await work();
+    } finally {
+      this.busy = null;
+      this.win.webContents.send("agent-together:busy", null);
+    }
+  }
+
+  /** A run is bound to its card: the observer's current card cannot change under it. */
+  setActiveNode(nodeId: string | null) {
+    if (this.running && nodeId !== this.running.nodeId) {
+      const title = this.daemon.canvas.nodes.find((n) => n.id === this.running!.nodeId)?.title ?? this.running.nodeId;
+      throw new Error(`AI 正在做「${title}」，做完之前不能换当前卡片`);
+    }
+    this.daemon.setActiveNode(nodeId);
   }
 
   /** The canvas changed on disk: the observer judges against the new one, the window redraws. */

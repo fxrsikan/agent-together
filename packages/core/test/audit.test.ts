@@ -52,6 +52,23 @@ describe("auditChanges", { timeout: 30_000 }, () => {
     expect(audit.findings[0]).toMatchObject({ rule: "scope-fence", path: "src/db/schema.ts", seenLive: false });
   });
 
+  it("reads Chinese file names as they are, judging and reading the right files", () => {
+    const { root, write } = project();
+    write("src/auth/登录页.ts", "export const a = 1;\n");
+    execFileSync("git", ["add", "-A"], { cwd: root });
+    execFileSync("git", ["commit", "-qm", "中文"], { cwd: root, env });
+    const base = new Checkpoints(root).create("before", "auth").commit;
+    write("src/auth/登录页.ts", "export const a = 2;\n"); // edited, inside the card
+    write("src/db/数据表.ts", "export const t = 1;\n"); // new, outside the card
+    const audit = auditChanges(root, base, "auth");
+    expect(audit.files.map((f) => [f.path, f.owner]).sort()).toEqual([
+      ["src/auth/登录页.ts", "auth"],
+      ["src/db/数据表.ts", "db"],
+    ]);
+    expect(audit.findings).toHaveLength(1);
+    expect(audit.findings[0]).toMatchObject({ rule: "scope-fence", path: "src/db/数据表.ts" });
+  });
+
   it("catches a deleted test file and ignores bookkeeping folders", () => {
     const { root, write } = project();
     const base = new Checkpoints(root).create("before", "auth").commit;

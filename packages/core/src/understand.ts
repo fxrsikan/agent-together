@@ -86,22 +86,35 @@ const lines = (text: string) => {
   return all;
 };
 
+/** Test files: `x.test.ts`, `x.spec.js`, `test_x.py`, `x_test.go`, anything under tests/ or __tests__/. */
+const TEST_FILE = /(\.(test|spec)\.[cm]?[jt]sx?$)|((^|\/)test_[^/]+\.py$)|(_test\.(py|go)$)|((^|\/)(tests?|__tests__)\/)/;
+/** Files that hold no code worth citing. */
+const NOT_CODE = /\.(png|jpe?g|gif|ico|svg|pdf|zip|gz|lock|map|min\.js|woff2?|ttf|exe|dll|so|bin)$|(^|\/)package-lock\.json$/i;
+const MIN_FILE = 400;
+
 /**
  * A compact picture of a project for the helper model: the README and manifests,
- * then per card its files and the opening lines of a few of them, each line
- * numbered so the model can cite it. Capped at `budget` characters so a large
- * repository costs a bounded number of tokens. `only` limits it to one card.
+ * then per card its file list and the files themselves, each line numbered so the
+ * model can cite it. Within a card the entry files come first, then the other
+ * source files, then the tests: when the budget runs out it is the tests that are
+ * shortened or left out, never the code they test. Every source file gets an even
+ * share of what is left, and a file that is cut says how many lines are missing.
+ * Capped at `budget` characters so a large repository costs a bounded number of
+ * tokens. `only` limits it to one card.
  */
 export function projectDigest(root: string, canvas: Canvas, files: string[], budget = 40_000, only?: string): string {
   const read = (rel: string, max: number) => {
     try {
+      const all = lines(fs.readFileSync(path.join(root, rel), "utf8"));
       let out = "";
-      for (const [i, text] of lines(fs.readFileSync(path.join(root, rel), "utf8")).entries()) {
+      let n = 0;
+      for (const [i, text] of all.entries()) {
         const line = `${i + 1}| ${text}\n`;
         if (out.length + line.length > max) break;
         out += line;
+        n++;
       }
-      return out;
+      return n < all.length ? `${out}（第 ${n + 1}–${all.length} 行没有列出）\n` : out;
     } catch {
       return "";
     }
@@ -109,14 +122,38 @@ export function projectDigest(root: string, canvas: Canvas, files: string[], bud
   const nodes = only ? canvas.nodes.filter((n) => n.id === only) : canvas.nodes;
   const parts: string[] = [];
   for (const m of MANIFESTS.filter((m) => has(files, m))) parts.push(`### ${m}\n${read(m, only ? 1200 : 2500)}`);
-  const perNode = Math.max(1500, Math.floor((budget - parts.join("").length) / Math.max(1, nodes.length)));
-  for (const node of nodes) {
-    const mine = files.filter((f) => ownerOf(canvas, f)?.id === node.id);
-    const shown = [...mine.filter((f) => ENTRY.test(f)), ...mine.filter((f) => !ENTRY.test(f))].slice(0, only ? 8 : 3);
+  const owned = new Map(nodes.map((n) => [n.id, files.filter((f) => ownerOf(canvas, f)?.id === n.id)]));
+  const size = (id: string) => owned.get(id)!.reduce((sum, f) => sum + (fs.statSync(path.join(root, f), { throwIfNoEntry: false })?.size ?? 0), 0);
+  // Smallest cards first, so what a small card does not use goes to the bigger ones.
+  const bySize = [...nodes].sort((a, b) => size(a.id) - size(b.id));
+  let left = budget - parts.join("\n\n").length - 2 * nodes.length;
+  const sections = new Map<string, string>();
+  for (const [k, node] of bySize.entries()) {
+    const perNode = Math.max(1500, Math.floor(left / (bySize.length - k)));
+    const mine = owned.get(node.id)!;
+    const code = mine.filter((f) => !NOT_CODE.test(f));
+    const tests = code.filter((f) => TEST_FILE.test(f));
+    const sources = code.filter((f) => !TEST_FILE.test(f));
+    const ordered = [...sources.filter((f) => ENTRY.test(f)), ...sources.filter((f) => !ENTRY.test(f)), ...tests];
     let section = `## 卡片 ${node.id}（${node.title}，负责 ${node.files.join(" ")}，共 ${mine.length} 个文件）\n${mine.slice(0, 30).join("\n")}`;
-    for (const f of shown) section += `\n### ${f}\n${read(f, Math.floor(perNode / Math.max(2, shown.length)))}`;
-    parts.push(section.slice(0, perNode));
+    const omitted: string[] = [];
+    // Sources share the card's budget evenly; tests get what the sources leave.
+    for (const group of [ordered.filter((f) => !TEST_FILE.test(f)), ordered.filter((f) => TEST_FILE.test(f))]) {
+      for (const [i, f] of group.entries()) {
+        const left = perNode - section.length;
+        const share = Math.floor(left / (group.length - i)) - f.length - 8;
+        if (share < MIN_FILE) {
+          omitted.push(f);
+          continue;
+        }
+        section += `\n### ${f}\n${read(f, share)}`;
+      }
+    }
+    if (omitted.length) section += `\n（篇幅所限，没有列出这些文件的内容：${omitted.join("、")}）`;
+    sections.set(node.id, section);
+    left -= section.length;
   }
+  for (const node of nodes) parts.push(sections.get(node.id)!);
   return parts.join("\n\n").slice(0, budget);
 }
 
@@ -214,9 +251,19 @@ export function parseImportProposal(reply: string, canvas: Canvas, root = "", fi
  * plus what the project is, its stack and test command (falling back to a guess).
  */
 export async function understandProject(llm: Llm, root: string, canvas: Canvas, files: string[], only?: string): Promise<ImportProposal> {
-  const reply = await llm.complete(understandPrompt(projectDigest(root, canvas, files, 40_000, only), canvas, only), { timeoutMs: 180_000, maxTokens: 8000 });
-  const proposal = parseImportProposal(reply, canvas, root, files, only);
-  if (!proposal) throw new Error("帮手模型没有给出可用的卡片说明，请再试一次");
+  const prompt = understandPrompt(projectDigest(root, canvas, files, 40_000, only), canvas, only);
+  const ask = (p: string) => llm.complete(p, { timeoutMs: 180_000, maxTokens: 8000 });
+  let reply = await ask(prompt);
+  let proposal = parseImportProposal(reply, canvas, root, files, only);
+  // Models now and then answer with prose or broken JSON: ask once more, saying so.
+  if (!proposal) {
+    reply = await ask(`${prompt}\n\n上一次的回复不是要求的 JSON，或者里面没有这些卡片 id。这次只输出那个 JSON 对象，不要任何其他文字。`);
+    proposal = parseImportProposal(reply, canvas, root, files, only);
+  }
+  if (!proposal) {
+    const head = reply.trim().replace(/\s+/g, " ").slice(0, 120);
+    throw new Error(`帮手模型两次都没有给出可用的卡片说明，请再试一次${head ? `（它的回复开头是：${head}）` : "（它没有回复任何内容）"}`);
+  }
   if (!proposal.testCommand) proposal.testCommand = guessTestCommand(root, files);
   return proposal;
 }

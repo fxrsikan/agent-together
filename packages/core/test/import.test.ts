@@ -203,6 +203,39 @@ describe("citations", () => {
     expect(projectDigest(root, canvas, files, 40_000, "cli")).not.toContain("src/store/index.js");
   });
 
+  it("shows a card's source files before its tests and says what it left out", () => {
+    const body = (name: string) => Array.from({ length: 80 }, (_, i) => `const ${name}${i} = ${i};`).join("\n") + "\n";
+    const root = folder({
+      "src/store/add.test.js": body("ta"),
+      "src/store/add.js": body("add"),
+      "src/store/done.test.js": body("td"),
+      "src/store/done.js": body("done"),
+      "src/store/list.js": body("list"),
+      "src/store/rm.js": body("rm"),
+      "src/store/logo.png": "png",
+      "src/cli/main.js": "y",
+    });
+    const digest = projectDigest(root, canvas, listFiles(root), 9000);
+    const store = digest.slice(digest.indexOf("## 卡片 store"), digest.indexOf("## 卡片 cli"));
+    for (const f of ["add", "done", "list", "rm"]) expect(store).toContain(`### src/store/${f}.js\n1| const ${f}0 = 0;`);
+    expect(store.indexOf("### src/store/rm.js")).toBeLessThan(store.indexOf(".test.js\n1|") === -1 ? Infinity : store.indexOf(".test.js\n1|"));
+    expect(store).toMatch(/（第 \d+–80 行没有列出）|（篇幅所限，没有列出这些文件的内容：src\/store\/(add|done)\.test\.js/);
+    expect(store).not.toContain("### src/store/logo.png");
+  });
+
+  it("asks the helper model once more when its reply is not the JSON it was asked for", async () => {
+    const { root, files } = cited();
+    const replies = ["我先看看代码……", JSON.stringify({ nodes: [{ id: "store", goal: { text: "读写账本", sources: [{ path: "src/store/index.js", line: 1 }] } }] })];
+    const prompts: string[] = [];
+    const llm = { name: "fake", complete: async (p: string) => (prompts.push(p), replies.shift() ?? "") };
+    const p = await understandProject(llm, root, canvas, files, "store");
+    expect(prompts).toHaveLength(2);
+    expect(prompts[1]).toContain("上一次的回复不是要求的 JSON");
+    expect(p.nodes[0].goal.verified).toBe(true);
+    const silent = { name: "fake", complete: async () => "还是不行" };
+    await expect(understandProject(silent, root, canvas, files, "store")).rejects.toThrow("它的回复开头是：还是不行");
+  });
+
   it("keeps verified citations with file hashes and notices when the code changes", () => {
     const { root, files } = cited();
     const card = parseImportProposal(

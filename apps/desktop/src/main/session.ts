@@ -3,7 +3,7 @@ import type { BrowserWindow } from "electron";
 import { installHooks } from "@agent-together/adapter-claude-code";
 import { installCodexHooks } from "@agent-together/adapter-codex";
 import { installCursorHooks } from "@agent-together/adapter-cursor";
-import { allowTestCommands, auditChanges, Checkpoints, createLlm, Daemon, loadLlmConfig, Race, readProjectInfo, writtenPaths, type AuditOutcome, type Llm } from "@agent-together/core";
+import { allowTestCommands, auditChanges, Checkpoints, createLlm, Daemon, loadLlmConfig, Race, readProjectInfo, writtenPaths, type AuditOutcome, type Llm, type SpecPlan } from "@agent-together/core";
 import type { AgentEvent } from "@agent-together/schema";
 
 /** Everything that belongs to one open project; closing it stops its daemon. */
@@ -16,6 +16,8 @@ export class Session {
   port = 0;
   /** Node id while a race runs; one at a time. */
   racing: string | null = null;
+  /** A canvas migration planned from the confirmed spec, waiting for the user to look at it. */
+  pendingPlan: SpecPlan | null = null;
   /** The agent running in the app, if any; one at a time. */
   running: { nodeId: string; agent: string; stop: AbortController } | null = null;
   /** Per node: the checkpoint taken before its last dispatch and the events the observer saw since. */

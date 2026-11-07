@@ -11,6 +11,7 @@ export { draftsFromFindings, MemoryStore, splitByVerifier, verifierKey, verifier
 export { generateCanvas, initProject, layoutCanvas, listFiles } from "./init.js";
 export { createProject, ensureGitignore, initGit, newNodeId, openProject, readProjectInfo, writeProjectInfo, type ProjectInfo } from "./project.js";
 export { canvasFromDraft, planCanvas, planPrompt, type CanvasPlan } from "./planner.js";
+export * from "./spec.js";
 export { Checkpoints, type Checkpoint } from "./checkpoints.js";
 export { cleanEnv, dispatchPrompt, openTerminal } from "./terminal.js";
 export {

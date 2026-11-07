@@ -4,3 +4,4 @@ export * from "./memory.js";
 export * from "./capability.js";
 export * from "./race.js";
 export * from "./verdict.js";
+export * from "./spec.js";

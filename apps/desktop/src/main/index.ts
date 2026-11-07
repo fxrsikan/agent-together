@@ -42,6 +42,13 @@ import {
   openProject,
   openTerminal,
   planCanvas,
+  backupCanvas,
+  draftSpec,
+  planFromSpec,
+  requirementsTurn,
+  SpecStore,
+  specImpact,
+  type SpecPlan,
   readProjectInfo,
   runProjectTests,
   testCommandFor,
@@ -305,6 +312,119 @@ async function main() {
     s.canvasChanged();
     return plan;
   });
+  /*
+   * Requirements first (phase one, M1): a conversation with the helper model as product
+   * manager, a requirements spec with usage scenarios the user confirms, then the canvas
+   * planned from it (or the existing canvas migrated, after the user has seen the plan).
+   */
+  const specContext = (s: Session) => ({ name: s.name, description: readProjectInfo(s.root).description, canvas: s.daemon.canvas });
+  const needLlm = (s: Session) => {
+    if (!s.llm) throw new Error("没有可用的帮手模型：请在右边「帮手模型」里选一个，或先登录 claude 命令行");
+    return s.llm;
+  };
+  const specState = (s: Session) => {
+    const store = new SpecStore(s.root);
+    const spec = store.load();
+    const confirmed = store.confirmed();
+    return {
+      spec,
+      confirmed,
+      conversation: store.conversation(),
+      decisions: store.decisions(),
+      impact: spec ? specImpact(confirmed, spec, s.daemon.canvas) : null,
+      pendingPlan: s.pendingPlan,
+      cards: s.daemon.canvas.nodes.length,
+      hasLlm: !!s.llm,
+    };
+  };
+  ipcMain.handle("agent-together:specState", () => specState(need()));
+  // The user says something (or, with no text, asks for the last reply again after a failure); the product manager answers.
+  ipcMain.handle("agent-together:specSay", async (_e, text?: string) => {
+    const s = need();
+    const llm = needLlm(s);
+    const store = new SpecStore(s.root);
+    if (text?.trim()) store.say({ role: "user", text: text.trim() });
+    const turn = await requirementsTurn(llm, store.conversation(), specContext(s));
+    store.say({ role: "assistant", text: turn.text, questions: turn.questions, ready: turn.ready });
+    return specState(s);
+  });
+  ipcMain.handle("agent-together:specDraft", async () => {
+    const s = need();
+    const store = new SpecStore(s.root);
+    const spec = await draftSpec(needLlm(s), store.conversation(), specContext(s), store.load() ?? store.confirmed());
+    store.save(spec);
+    return specState(s);
+  });
+  ipcMain.handle("agent-together:specSave", (_e, spec: unknown) => {
+    const s = need();
+    new SpecStore(s.root).save(spec);
+    return specState(s);
+  });
+  ipcMain.handle("agent-together:specConfirm", (_e, input: unknown) => {
+    const s = need();
+    const store = new SpecStore(s.root);
+    const saved = store.save(input);
+    const impact = specImpact(store.confirmed(), saved, s.daemon.canvas);
+    const detail = store.confirmed()
+      ? [
+          impact.scenarios.added.length && `新增场景：${impact.scenarios.added.map((x) => `${x.id} ${x.name}`).join("；")}`,
+          impact.scenarios.removed.length && `去掉场景：${impact.scenarios.removed.map((x) => `${x.id} ${x.name}`).join("；")}`,
+          impact.scenarios.changed.length && `修改场景：${impact.scenarios.changed.map((x) => `${x.id} ${x.name}`).join("；")}`,
+          impact.cards.length && `涉及卡片：${impact.cards.map((c) => c.title).join("、")}`,
+        ].filter(Boolean).join("\n")
+      : saved.scenarios.map((x) => `${x.id} ${x.name}`).join("\n");
+    const spec = store.confirm(saved, detail || undefined);
+    if (!readProjectInfo(s.root).description?.trim() && spec.goal) writeProjectInfo(s.root, { description: spec.goal });
+    return specState(s);
+  });
+  /** Writes a planned canvas: a backup and a checkpoint first, then the cards, then the scenarios' links to them. */
+  const applySpecPlan = async (s: Session, plan: SpecPlan) =>
+    s.exclusive("按需求调整画布", () => {
+      const store = new SpecStore(s.root);
+      const migrating = s.daemon.canvas.nodes.length > 0;
+      const backup = migrating ? backupCanvas(s.root) : null;
+      if (migrating && s.hasGit) s.checkpoints.create("按需求调整画布之前", null);
+      // Proposed roles are drafts until the user saves them: cards do not point at them yet.
+      const canvas = s.daemon.store.writeCanvas({ ...plan.canvas, nodes: plan.canvas.nodes.map(({ role, ...node }) => node) });
+      const info = readProjectInfo(s.root);
+      writeProjectInfo(s.root, {
+        ...(plan.stack && (!migrating || !info.stack) ? { stack: plan.stack } : {}),
+        ...(plan.testCommand && !info.testCommand ? { testCommand: plan.testCommand } : {}),
+      });
+      store.linkCards(canvas);
+      if (migrating)
+        store.decide(
+          "migrate-canvas",
+          `按需求调整了画布：保留 ${plan.changes.filter((c) => c.change === "keep").length} 张，修改 ${plan.changes.filter((c) => c.change === "change").length} 张，新增 ${plan.changes.filter((c) => c.change === "new").length} 张，去掉 ${plan.removed.length} 张`,
+          backup ? `原画布备份在 ${path.relative(s.root, backup)}` : undefined,
+        );
+      s.pendingPlan = null;
+      s.canvasChanged();
+      return { backup: backup ? path.relative(s.root, backup) : null };
+    });
+  // Plans the canvas from the confirmed spec. An empty canvas is written at once; an existing one waits for the user's review.
+  ipcMain.handle("agent-together:specPlan", async () => {
+    const s = need();
+    const confirmed = new SpecStore(s.root).confirmed();
+    if (!confirmed || new SpecStore(s.root).load()?.status !== "confirmed") throw new Error("先确认需求说明，再生成画布");
+    const existing = s.daemon.canvas.nodes.length ? s.daemon.canvas : null;
+    const plan = await planFromSpec(needLlm(s), confirmed, existing, existing ? listFiles(s.root) : []);
+    if (existing) {
+      s.pendingPlan = plan;
+      return { plan, applied: false, backup: null };
+    }
+    const { backup } = await applySpecPlan(s, plan);
+    return { plan, applied: true, backup };
+  });
+  ipcMain.handle("agent-together:specApplyPlan", async () => {
+    const s = need();
+    if (!s.pendingPlan) throw new Error("没有待采用的调整方案，请重新生成");
+    return applySpecPlan(s, s.pendingPlan);
+  });
+  ipcMain.handle("agent-together:specDiscardPlan", () => {
+    need().pendingPlan = null;
+  });
+
   // Importing existing code: a checklist to finish the first-pass canvas drawn from the folders.
   ipcMain.handle("agent-together:importStatus", () => {
     const s = need();

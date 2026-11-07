@@ -1,7 +1,7 @@
-import type { CheckedSource, EvolutionReport, Experience, ImportProposal, ModelChoice, ProposedCard, ProposedItem, SetupReport } from "@agent-together/core";
+import type { SpecImpact, SpecPlan, CheckedSource, EvolutionReport, Experience, ImportProposal, ModelChoice, ProposedCard, ProposedItem, SetupReport } from "@agent-together/core";
 import { contextBridge, ipcRenderer } from "electron";
 import type { AuditOutcome, AuditResult, CanvasPlan, Checkpoint, CompileReport, Judgment, ProjectInfo, RaceReport, TestHistory, TestRun } from "@agent-together/core";
-import type { AgentEvent, Capability, Canvas, CanvasEdge, CanvasNode, Memory, RunResult, Verdict } from "@agent-together/schema";
+import type { ChatMessage, Decision, Scenario, Spec, AgentEvent, Capability, Canvas, CanvasEdge, CanvasNode, Memory, RunResult, Verdict } from "@agent-together/schema";
 
 export type EventRecord = { event: AgentEvent; verdict: Verdict };
 export type { Judgment, RaceReport, RunResult, TestHistory, TestRun };
@@ -38,6 +38,18 @@ export type ContextPreview = {
   /** Project-wide memories also mirrored into CLAUDE.md / AGENTS.md. */
   mirroredTokens: number;
 };
+/** The requirements: conversation, working spec, last confirmed version, what a change touches, a migration waiting for review. */
+export type SpecState = {
+  spec: Spec | null;
+  confirmed: Spec | null;
+  conversation: ChatMessage[];
+  decisions: Decision[];
+  impact: SpecImpact | null;
+  pendingPlan: SpecPlan | null;
+  cards: number;
+  hasLlm: boolean;
+};
+export type { ChatMessage, Decision, Scenario, Spec, SpecImpact, SpecPlan };
 export type SessionInfo = { root: string; name: string; port: number; hasGit: boolean; l2: string | null; activeNodeId: string | null };
 
 const invoke = <T>(channel: string, ...args: unknown[]): Promise<T> => ipcRenderer.invoke(`agent-together:${channel}`, ...args);
@@ -91,6 +103,15 @@ const api = {
   // Canvas
   canvas: () => invoke<Canvas>("canvas"),
   planCanvas: (description: string) => invoke<CanvasPlan>("planCanvas", description),
+  specState: () => invoke<SpecState>("specState"),
+  /** Says something to the product manager; with no text, asks it to answer the last message again. */
+  specSay: (text?: string) => invoke<SpecState>("specSay", text),
+  specDraft: () => invoke<SpecState>("specDraft"),
+  specSave: (spec: Spec) => invoke<SpecState>("specSave", spec),
+  specConfirm: (spec: Spec) => invoke<SpecState>("specConfirm", spec),
+  specPlan: () => invoke<{ plan: SpecPlan; applied: boolean; backup: string | null }>("specPlan"),
+  specApplyPlan: () => invoke<{ backup: string | null }>("specApplyPlan"),
+  specDiscardPlan: () => invoke<void>("specDiscardPlan"),
   addNode: (title: string, kind: CanvasNode["kind"], position?: { x: number; y: number }) => invoke<CanvasNode>("addNode", title, kind, position),
   saveNode: (node: CanvasNode) => invoke<CanvasNode>("saveNode", node),
   moveNodes: (moves: { id: string; x: number; y: number }[]) => invoke<void>("moveNodes", moves),

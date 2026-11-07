@@ -34,6 +34,7 @@ import { RoleDraft } from "./RoleDraft";
 import { RacePanel } from "./RacePanel";
 import { clock } from "./time";
 import { errorText } from "./errors";
+import { RequirementsPanel } from "./RequirementsPanel";
 
 const nodeTypes = { card: NodeCard };
 const FEED_LIMIT = 100;
@@ -92,7 +93,8 @@ function EmptyCanvas({ onAdd, onChange, onRoles }: { onRoles: (roles: Capability
   return (
     <div className="empty-canvas">
       <h3>画布是空的</h3>
-      <p className="muted">描述这个产品，让 AI 拆成卡片、目标、验收标准和依赖；生成后可以随意修改。</p>
+      <p>建议先在左边的「需求与反馈」里说说你想做什么。AI 会追问几个问题，整理成需求说明和使用场景，你确认后再按需求生成画布，每张卡片都知道自己负责哪些场景。</p>
+      <p className="muted">也可以跳过需求，直接用一段描述让 AI 拆成卡片：</p>
       <textarea
         className="task"
         rows={6}
@@ -102,8 +104,8 @@ function EmptyCanvas({ onAdd, onChange, onRoles }: { onRoles: (roles: Capability
       />
       {error && <div className="finding finding-block">{error}</div>}
       <div className="actions">
-        <button className="primary" disabled={busy || !description.trim()} onClick={plan}>
-          {busy ? "生成中…（约半分钟）" : "AI 生成画布"}
+        <button disabled={busy || !description.trim()} onClick={plan}>
+          {busy ? "生成中…（约半分钟）" : "跳过需求，直接生成画布"}
         </button>
         <button onClick={onAdd} disabled={busy}>
           手动添加卡片
@@ -148,6 +150,13 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
   const [runView, setRunView] = useState<RunView | null>(null);
   const [testRuns, setTestRuns] = useState<TestHistory>({ byNode: {} });
   const [testing, setTesting] = useState(false);
+  /** The requirements panel on the left; open until the first version is confirmed and planned. */
+  const [showReq, setShowReq] = useState(false);
+  /** Scenario id → name, to show which scenarios a card serves. */
+  const [scenarioNames, setScenarioNames] = useState<Record<string, string>>({});
+  useEffect(() => {
+    window.agentTogether.specState().then((st) => setShowReq(!st.confirmed || st.cards === 0 || st.spec?.status !== "confirmed"));
+  }, []);
   /** What the project is busy with; the other actions wait until it is done. */
   const [busy, setBusy] = useState<string | null>(null);
   const [inspecting, setInspecting] = useState(false);
@@ -186,6 +195,7 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
 
   useEffect(() => {
     window.agentTogether.canvas().then(setCanvas);
+    window.agentTogether.specState().then((st) => setScenarioNames(Object.fromEntries((st.spec?.scenarios ?? []).map((x) => [x.id, x.name]))));
     window.agentTogether.busy().then(setBusy);
     window.agentTogether.roles().then(setRoles);
     window.agentTogether.testHistory().then(setTestRuns);
@@ -391,6 +401,9 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
         </button>
         <span className="muted" title={`AI 做完后，另用一个模型复查改动有没有偏离卡片${info.l2 ? `（${info.l2}）` : ""}`}>复查：{info.l2 ? "开" : "关"}</span>
         <span className="muted">当前卡片：{canvas?.nodes.find((n) => n.id === activeId)?.title ?? "无"}</span>
+        <button className={showReq ? "on" : ""} onClick={() => setShowReq((v) => !v)} title="需求说明、使用场景和决定记录">
+          需求
+        </button>
         <button onClick={addNode}>＋ 卡片</button>
         <button onClick={compileAll} title="把角色和技能说明写成各家 AI 助手认识的格式">更新 AI 说明</button>
         <button onClick={install} title="重新给各家 AI 助手装上观察者，让它们的动作被看到">重新接上观察者</button>
@@ -405,6 +418,19 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
         </div>
       )}
       <main className="body">
+        {showReq && (
+          <RequirementsPanel
+            version={version}
+            canvas={canvas}
+            onChange={changed}
+            onRoles={(items, plan) => {
+              plannedIds.current = items.map((r) => r.id);
+              setDrafts(items);
+              setProposedCanvas(plan);
+            }}
+            onClose={() => setShowReq(false)}
+          />
+        )}
         <div className="canvas" onDragOver={(e) => e.preventDefault()} onDrop={(e) => {
           e.preventDefault();
           const role = roles.find((r) => r.id === e.dataTransfer.getData("application/agent-together-role"));
@@ -511,6 +537,11 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
           {selected ? (
             <>
               <NodeEditor node={selected} onChange={changed} />
+              {selected.scenarios?.length ? (
+                <p className="muted small">
+                  负责的使用场景：{selected.scenarios.map((id) => `${id}${scenarioNames[id] ? ` ${scenarioNames[id]}` : ""}`).join("；")}
+                </p>
+              ) : null}
               <CardEvidence node={selected} stale={stale[selected.id] ?? []} onChange={changed} />
               <section>
                 <h4>交给 AI 去做</h4>

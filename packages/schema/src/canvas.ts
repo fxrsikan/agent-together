@@ -24,6 +24,8 @@ export const CanvasNode = z.object({
   executor: z.string().optional(),
   /** Saved agent capability used for this step. */
   role: CapabilityId.optional(),
+  /** Ids of the usage scenarios (S-01, …) this card helps complete. */
+  scenarios: z.array(z.string()).optional(),
   /**
    * Where the card's description came from when the helper model wrote it from code:
    * the cited line ranges (checked against the files), each cited file's content hash

@@ -51,7 +51,7 @@ export function writtenPaths(root: string, events: AgentEvent[]): Set<string> {
  * changed. Hooks only see the agent's file tools; this also catches writes made
  * through shell commands or scripts.
  */
-export function auditChanges(root: string, base: string, nodeId: string | null, seen: Set<string> = new Set(), canvas?: Canvas): AuditResult {
+export function auditChanges(root: string, base: string, nodeId: string | null, seen: Set<string> = new Set(), canvas?: Canvas, grants: string[] = []): AuditResult {
   const store = new ProjectStore(root);
   const now = canvas ?? store.loadCanvas();
   const after = new Checkpoints(root).snapshot("事后检查");
@@ -65,6 +65,7 @@ export function auditChanges(root: string, base: string, nodeId: string | null, 
     store.loadRuleLevels(),
     [...builtinRules, ...capabilityRules(new CapabilityStore(root).list())],
     nodeId,
+    grants,
   );
   const findings: AuditFinding[] = [];
   for (const f of files) {

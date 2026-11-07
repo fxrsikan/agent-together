@@ -36,6 +36,7 @@ import { clock } from "./time";
 import { errorText } from "./errors";
 import { RequirementsPanel } from "./RequirementsPanel";
 import { ProductPanel } from "./ProductPanel";
+import { EnginePanel } from "./EnginePanel";
 
 const nodeTypes = { card: NodeCard };
 const FEED_LIMIT = 100;
@@ -153,6 +154,8 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
   const [testing, setTesting] = useState(false);
   /** The requirements panel on the left; open until the first version is confirmed and planned. */
   const [showReq, setShowReq] = useState(false);
+  /** Roles, settings, checkpoints, observer events: shown on request once the project has confirmed requirements. */
+  const [tech, setTech] = useState(true);
   /** The middle of the window: the product being built, or the canvas. The product once it knows how to start. */
   const [centerTab, setCenterTab] = useState<"product" | "canvas">("canvas");
   useEffect(() => {
@@ -161,7 +164,11 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
   /** Scenario id → name, to show which scenarios a card serves. */
   const [scenarioNames, setScenarioNames] = useState<Record<string, string>>({});
   useEffect(() => {
-    window.agentTogether.specState().then((st) => setShowReq(!st.confirmed || st.cards === 0 || st.spec?.status !== "confirmed"));
+    window.agentTogether.specState().then((st) => {
+      setShowReq(!st.confirmed || st.cards === 0 || st.spec?.status !== "confirmed");
+      // Projects made the requirements-first way see the run, not the machinery; others keep everything in view.
+      if (st.confirmed) setTech(false);
+    });
   }, []);
   /** What the project is busy with; the other actions wait until it is done. */
   const [busy, setBusy] = useState<string | null>(null);
@@ -502,7 +509,12 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
         </div>
         </div>
         <aside className="side">
+          <EnginePanel version={version} onChange={changed} />
+          <button className="link small tech-toggle" onClick={() => setTech((v) => !v)}>
+            {tech ? "收起技术详情" : "显示技术详情（角色、设置、检查点、观察者事件）"}
+          </button>
           <ImportChecklist version={version} onChange={changed} />
+          {tech && (
           <section>
             <h4>专职角色</h4>
             <p className="muted">把角色拖到空白处添加一步，拖到卡片上交给它来做。草稿同意后才会保存。</p>
@@ -551,6 +563,7 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
               />
             ))}
           </section>
+          )}
           {selected ? (
             <>
               <NodeEditor node={selected} onChange={changed} />
@@ -627,12 +640,18 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
                   {runView.agent} 正在处理"{canvas?.nodes.find((n) => n.id === runView.nodeId)?.title}"，点那张卡片查看进度。
                 </p>
               )}
-              <ProjectSettings version={version} onChange={changed} />
-              <ModelSettings version={version} onChange={changed} />
-              <HelperModelSettings onChange={changed} />
-              <MemoryPanel nodeId={null} version={version} onChange={changed} />
+              {tech && (
+                <>
+                  <ProjectSettings version={version} onChange={changed} />
+                  <ModelSettings version={version} onChange={changed} />
+                  <HelperModelSettings onChange={changed} />
+                  <MemoryPanel nodeId={null} version={version} onChange={changed} />
+                </>
+              )}
             </>
           )}
+          {tech && (
+          <>
           {info.hasGit ? <CheckpointsPanel version={version} busy={busy} onChange={changed} /> : <p className="muted">项目不在 git 仓库中，检查点和赛马不可用。</p>}
           {judgments.length > 0 && (
             <>
@@ -663,6 +682,8 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
               </li>
             ))}
           </ol>
+          </>
+          )}
         </aside>
       </main>
     </div>

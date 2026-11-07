@@ -1,4 +1,4 @@
-import type { ProductStatus, RunConfig, SpecImpact, SpecPlan, CheckedSource, EvolutionReport, Experience, ImportProposal, ModelChoice, ProposedCard, ProposedItem, SetupReport } from "@agent-together/core";
+import type { DecisionOption, EngineDecision, EngineLimits, RunRecord, StepRecord, ProductStatus, RunConfig, SpecImpact, SpecPlan, CheckedSource, EvolutionReport, Experience, ImportProposal, ModelChoice, ProposedCard, ProposedItem, SetupReport } from "@agent-together/core";
 import { contextBridge, ipcRenderer } from "electron";
 import type { PreviewProblem } from "../main/preview";
 import type { AuditOutcome, AuditResult, CanvasPlan, Checkpoint, CompileReport, Judgment, ProjectInfo, RaceReport, TestHistory, TestRun } from "@agent-together/core";
@@ -64,6 +64,18 @@ export type ProductState = {
   hasSpec: boolean;
   hasLlm: boolean;
 };
+export type RunInfo = {
+  run: RunRecord | null;
+  /** A run that has not finished (running, paused, waiting for you, interrupted). */
+  open: boolean;
+  version: number | null;
+  confirmed: boolean;
+  upcoming: { id: string; title: string }[];
+  agents: string[];
+  models: Record<string, string>;
+  limits: EngineLimits;
+};
+export type { DecisionOption, EngineDecision, EngineLimits, RunRecord, StepRecord };
 export type RunCheck = { ok: boolean; error: string | null; logs: string[]; config: RunConfig | null };
 export type { PreviewProblem, ProductStatus, RunConfig };
 export type SessionInfo = { root: string; name: string; port: number; hasGit: boolean; l2: string | null; activeNodeId: string | null };
@@ -128,6 +140,16 @@ const api = {
   specPlan: () => invoke<{ plan: SpecPlan; applied: boolean; backup: string | null }>("specPlan"),
   specApplyPlan: () => invoke<{ backup: string | null }>("specApplyPlan"),
   specDiscardPlan: () => invoke<void>("specDiscardPlan"),
+  /** Automatic progress (M3): the current run, what a new one would do, and the controls. */
+  runInfo: () => invoke<RunInfo>("runInfo"),
+  runStart: (agent: string, limits?: Partial<EngineLimits>) => invoke<RunInfo>("runStart", agent, limits),
+  runPause: () => invoke<RunInfo>("runPause"),
+  runResume: () => invoke<RunInfo>("runResume"),
+  runStop: () => invoke<RunInfo>("runStop"),
+  runDecide: (option: DecisionOption) => invoke<RunInfo>("runDecide", option),
+  runResumeInterrupted: () => invoke<RunInfo>("runResumeInterrupted"),
+  onRunState: (cb: (run: RunRecord) => void) => on("runState", cb),
+  onEngineText: (cb: (e: { nodeId: string; text: string }) => void) => on("engineText", cb),
   productState: () => invoke<ProductState>("productState"),
   /** Finds how to start the product and tries it; saved only when the start worked. */
   productDetect: () => invoke<RunCheck>("productDetect"),

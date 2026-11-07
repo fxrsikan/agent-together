@@ -13,6 +13,8 @@ export class Observer {
     private levels: Record<string, Level> = {},
     private rules: Rule[] = builtinRules,
     public activeNodeId: string | null = null,
+    /** Globs the active card may also write during the current run (see scope-fence). */
+    public grants: string[] = [],
   ) {}
 
   get canvasNow(): Canvas {
@@ -37,6 +39,7 @@ export class Observer {
       root: this.root,
       canvas: this.canvas,
       activeNode: this.canvas.nodes.find((n) => n.id === this.activeNodeId) ?? null,
+      grants: this.grants,
       history,
     };
     const findings: Finding[] = [];

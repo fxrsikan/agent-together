@@ -4,6 +4,8 @@ export interface RuleContext {
   root: string;
   canvas: Canvas;
   activeNode: CanvasNode | null;
+  /** Extra globs the active card may write during this run (pre-authorised integration work); empty otherwise. */
+  grants?: string[];
   /** Earlier events of the same agent session, oldest first. */
   history: AgentEvent[];
 }

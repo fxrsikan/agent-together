@@ -1,4 +1,4 @@
-import type { Canvas, CanvasNode, Capability, Memory } from "@agent-together/schema";
+import type { Canvas, CanvasNode, Capability, Memory, Scenario } from "@agent-together/schema";
 import { RUN_CONVENTIONS } from "./product.js";
 
 const list = (items: string[]) => (items.length ? items.map((i) => `- ${i}`).join("\n") : "- （无）");
@@ -58,13 +58,31 @@ ${list(memories.map((m) => `（${KIND_LABEL[m.kind]}）${m.content}`))}
 `;
 }
 
+/** The usage scenarios a card helps complete: what "done" means for the user, step by step. */
+function scenarioSection(scenarios: Scenario[]): string {
+  if (!scenarios.length) return "";
+  const one = (sc: Scenario) =>
+    [
+      `### ${sc.id} ${sc.name}`,
+      sc.preconditions.length ? `前置条件：${sc.preconditions.join("；")}` : "",
+      sc.input ? `测试样例：\n${sc.input}` : "",
+      sc.steps.length ? `步骤：\n${sc.steps.map((x, i) => `${i + 1}. ${x}`).join("\n")}` : "",
+      sc.expected.length ? `预期结果：\n${sc.expected.map((x) => `- ${x}`).join("\n")}` : "",
+      sc.dataChecks.length ? `数据检查：${sc.dataChecks.join("；")}` : "",
+      sc.errorChecks.length ? `出错时：${sc.errorChecks.join("；")}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+  return `## 相关使用场景（第一版做完的标准）\n\n${scenarios.map(one).join("\n\n")}\n\n`;
+}
+
 /** The context file handed to a dispatched agent: the task, then the node guide. */
 export function buildNodeContext(
   canvas: Canvas,
   nodeId: string,
   task: string,
   memories: Memory[] = [],
-  project?: { name: string; description?: string; stack?: string; webApp?: boolean },
+  project?: { name: string; description?: string; stack?: string; webApp?: boolean; scenarios?: Scenario[] },
   roles: Capability[] = [],
 ): string {
   const roleId = canvas.nodes.find((n) => n.id === nodeId)?.role;
@@ -79,7 +97,7 @@ export function buildNodeContext(
 ${RUN_CONVENTIONS}`,
   ].filter(Boolean);
   const projectSection = project && about.length ? `## 项目：${project.name}\n\n${about.join("\n\n")}\n\n` : "";
-  return `# 任务\n\n${task.trim() || "（未填写，请按节点的任务清单推进）"}\n\n${projectSection}${roleSection}${guide}`;
+  return `# 任务\n\n${task.trim() || "（未填写，请按节点的任务清单推进）"}\n\n${projectSection}${roleSection}${scenarioSection(project?.scenarios ?? [])}${guide}`;
 }
 
 /**

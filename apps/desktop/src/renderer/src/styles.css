@@ -326,3 +326,19 @@ header.bar button.on { border-color: var(--accent); color: var(--accent); }
 .prototype-bar { padding: 8px 10px; border: 1px solid color-mix(in srgb, var(--warn) 40%, var(--line)); border-radius: 8px; background: color-mix(in srgb, var(--warn) 8%, var(--bg)); }
 .run-setup { padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); display: flex; flex-direction: column; gap: 6px; max-width: 640px; }
 .problems { list-style: none; margin: 0; padding: 0; max-height: 120px; overflow: auto; display: flex; flex-direction: column; gap: 3px; }
+
+/* 制作状态 (automatic progress) */
+.engine { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; background: var(--bg); margin-bottom: 8px; }
+.engine h4 { margin: 4px 0; }
+.engine .decision { border: 1px solid color-mix(in srgb, var(--bad) 35%, var(--line)); border-radius: 8px; padding: 8px; margin: 6px 0; background: color-mix(in srgb, var(--bad) 6%, var(--bg)); }
+.engine .decision p { margin: 4px 0; }
+.tasks { list-style: none; margin: 6px 0; padding: 0; display: flex; flex-direction: column; gap: 3px; font-size: 13px; }
+.task-mark { display: inline-block; width: 16px; text-align: center; color: var(--muted); }
+.task-done .task-mark { color: var(--good); }
+.task-doing { font-weight: 600; }
+.task-doing .task-mark { color: var(--warn); }
+.task-skipped { color: var(--muted); }
+.engine-lines { margin: 4px 0 4px 20px; max-height: 110px; overflow: auto; font-size: 11px; font-weight: 400; white-space: pre-wrap; background: var(--panel); padding: 4px 6px; border-radius: 6px; }
+.steps ol { margin: 6px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.steps ul { margin: 2px 0 0; padding-left: 16px; }
+.tech-toggle { display: block; margin: 0 0 8px; }

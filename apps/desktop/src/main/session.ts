@@ -3,7 +3,7 @@ import type { BrowserWindow } from "electron";
 import { installHooks } from "@agent-together/adapter-claude-code";
 import { installCodexHooks } from "@agent-together/adapter-codex";
 import { installCursorHooks } from "@agent-together/adapter-cursor";
-import { allowTestCommands, auditChanges, Checkpoints, createLlm, Daemon, loadLlmConfig, Race, readProjectInfo, writtenPaths, ProductProcess, type AuditOutcome, type Llm, type SpecPlan } from "@agent-together/core";
+import { allowTestCommands, auditChanges, Checkpoints, createLlm, Daemon, loadLlmConfig, Race, readProjectInfo, writtenPaths, ProductProcess, type Engine, type AuditOutcome, type Llm, type SpecPlan } from "@agent-together/core";
 import type { AgentEvent } from "@agent-together/schema";
 import { ProductPreview } from "./preview";
 
@@ -22,10 +22,12 @@ export class Session {
   /** The product being built, running locally (M2), and its page shown in the window. */
   readonly product: ProductProcess;
   readonly preview: ProductPreview;
+  /** Automatic progress through the version's cards (M3); set up by the main process, which owns the assistants. */
+  engine: Engine | null = null;
   /** The agent running in the app, if any; one at a time. */
   running: { nodeId: string; agent: string; stop: AbortController } | null = null;
   /** Per node: the checkpoint taken before its last dispatch and the events the observer saw since. */
-  private watches = new Map<string, { base: string; events: AgentEvent[] }>();
+  private watches = new Map<string, { base: string; events: AgentEvent[]; grants: string[] }>();
 
   private constructor(
     readonly root: string,
@@ -89,13 +91,13 @@ export class Session {
    * approval), saves the pre-dispatch checkpoint and starts remembering what the
    * observer sees for this node.
    */
-  startDispatch(nodeId: string, agent: string) {
+  startDispatch(nodeId: string, agent: string, grants: string[] = []) {
     try {
       allowTestCommands(this.root);
     } catch {} // an unreadable settings file: the agent just can't run tests itself
     if (!this.hasGit) return;
     const checkpoint = this.checkpoints.create(`交给 AI 之前（${agent}）`, nodeId);
-    this.watches.set(nodeId, { base: checkpoint.commit, events: [] });
+    this.watches.set(nodeId, { base: checkpoint.commit, events: [], grants });
   }
 
   /** Every change since the node's last dispatch, put through the observer; null without git or a dispatch. */
@@ -104,7 +106,7 @@ export class Session {
     const w = nodeId ? this.watches.get(nodeId) : undefined;
     if (!w || !nodeId) return null;
     try {
-      return auditChanges(this.root, w.base, nodeId, writtenPaths(this.root, w.events), this.daemon.canvas);
+      return auditChanges(this.root, w.base, nodeId, writtenPaths(this.root, w.events), this.daemon.canvas, w.grants);
     } catch (err) {
       return { error: err instanceof Error ? err.message : String(err) };
     }
@@ -119,14 +121,18 @@ export class Session {
 
   async exclusive<T>(what: string, work: () => Promise<T> | T): Promise<T> {
     if (this.busy) throw new Error(`正在${this.busy}，等它结束再试`);
-    this.busy = what;
-    this.win.webContents.send("agent-together:busy", what);
+    this.setBusy(what);
     try {
       return await work();
     } finally {
-      this.busy = null;
-      this.win.webContents.send("agent-together:busy", null);
+      this.setBusy(null);
     }
+  }
+
+  /** Holds or releases the project lock without a callback: the automatic run holds it while it runs. */
+  setBusy(what: string | null) {
+    this.busy = what;
+    this.win.webContents.send("agent-together:busy", what);
   }
 
   /** A run is bound to its card: the observer's current card cannot change under it. */
@@ -145,6 +151,8 @@ export class Session {
   }
 
   async close() {
+    // The run stays "running" on disk: next time it opens as interrupted, to resume from a safe step.
+    this.engine?.halt();
     this.running?.stop.abort();
     await this.product.stop();
     this.preview.destroy();

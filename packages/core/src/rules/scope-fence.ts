@@ -1,3 +1,4 @@
+import picomatch from "picomatch";
 import { ownerOf } from "../owners.js";
 import { relativeToRoot } from "../paths.js";
 import type { Rule } from "./types.js";
@@ -6,7 +7,7 @@ import type { Rule } from "./types.js";
 export const scopeFence: Rule = {
   id: "scope-fence",
   defaultLevel: "ask",
-  check(event, { root, canvas, activeNode }) {
+  check(event, { root, canvas, activeNode, grants }) {
     if (event.kind !== "tool.before" || event.action.type !== "write" || !activeNode) return null;
     const rel = relativeToRoot(root, event.action.path);
     if (rel?.startsWith(".agent-together/")) {
@@ -16,6 +17,8 @@ export const scopeFence: Rule = {
     // A file matching this card's globs but owned more specifically by another card is that card's.
     const owner = rel ? ownerOf(canvas, rel) : null;
     if (owner?.id === activeNode.id) return null;
+    // Integration work authorised for this run (it ends with the run): wiring into the files it connects.
+    if (rel && grants?.length && picomatch(grants)(rel)) return null;
     return {
       nodeId: activeNode.id,
       message:

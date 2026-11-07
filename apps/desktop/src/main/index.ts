@@ -49,6 +49,11 @@ import {
   SpecStore,
   specImpact,
   guessRunConfig,
+  Engine,
+  DEFAULT_LIMITS,
+  versionCards,
+  type DecisionOption,
+  type EngineLimits,
   proposeRunConfig,
   readRunConfig,
   verifyRunConfig,
@@ -198,6 +203,7 @@ async function main() {
     try {
       session.daemon.memory.refreshAgentFiles(); // older versions mirrored every card's memories
     } catch {}
+    attachEngine(session);
     remember(root);
     win.setTitle(`${session.name} - Agent Together`);
     win.webContents.send("agent-together:project", session.info());
@@ -633,7 +639,13 @@ async function main() {
     splitByVerifier(s.daemon.memory.forNode(nodeId), verifierFor(s, agent)).other.map((m) => m.id);
   const nodeMemories = (s: Session, nodeId: string, without: string[]) => s.daemon.memory.forNode(nodeId).filter((m) => !without.includes(m.id));
   const contextFor = (s: Session, nodeId: string, task: string, agent: string, without = defaultWithout(s, nodeId, agent)) =>
-    buildNodeContext(s.daemon.canvas, nodeId, task, nodeMemories(s, nodeId, without), { ...readProjectInfo(s.root), webApp: !!new SpecStore(s.root).load() || !!readRunConfig(s.root) }, s.daemon.capabilities.list());
+    buildNodeContext(s.daemon.canvas, nodeId, task, nodeMemories(s, nodeId, without), projectForContext(s, nodeId), s.daemon.capabilities.list());
+  /** What every dispatch says about the project: description, stack, run conventions for web products, and the card's scenarios. */
+  const projectForContext = (s: Session, nodeId: string) => {
+    const spec = new SpecStore(s.root).confirmed() ?? new SpecStore(s.root).load();
+    const mine = new Set(s.daemon.canvas.nodes.find((n) => n.id === nodeId)?.scenarios ?? []);
+    return { ...readProjectInfo(s.root), webApp: !!spec || !!readRunConfig(s.root), scenarios: spec?.scenarios.filter((x) => mine.has(x.id)) ?? [] };
+  };
   ipcMain.handle("agent-together:previewContext", (_e, nodeId: string, task: string, without: string[] | null, agent: string) => {
     const s = need();
     const effective = without ?? defaultWithout(s, nodeId, agent);
@@ -689,26 +701,38 @@ async function main() {
 
   // In-app dispatch: the agent runs headless in the project, its words stream to the window,
   // its actions go through the hooks to the observer as usual; then the tests run.
-  ipcMain.handle("agent-together:runAgent", async (_e, nodeId: string, task: string, agent: Agent, context?: string) => {
-    const s = need();
-    if (s.running) throw new Error(`已有 AI 助手在运行（${s.running.nodeId}）`);
-    const title = s.daemon.canvas.nodes.find((n) => n.id === nodeId)?.title ?? nodeId;
-    return s.exclusive(`让 AI 做「${title}」`, async () => {
-    s.startDispatch(nodeId, agent);
-    const file = s.daemon.store.writeContext(nodeId, context ?? contextFor(s, nodeId, task, agent));
+  /**
+   * One assistant run on a card, the way every dispatch in the app goes: checkpoint and
+   * watch, context, the run itself (its words streamed to the window), then the
+   * after-run check and the tests. Grants let an integration card also write the
+   * files it connects, for this run only.
+   */
+  const executeAgent = async (
+    s: Session,
+    nodeId: string,
+    task: string,
+    agent: string,
+    opts: { context?: string; grants?: string[]; timeoutMs?: number; signal?: AbortSignal; channel?: "agentText" | "engineText" } = {},
+  ) => {
+    if (!runners[agent]) throw new Error(`不认识的助手：${agent}`);
+    const grants = opts.grants ?? [];
+    s.startDispatch(nodeId, agent, grants);
+    const file = s.daemon.store.writeContext(nodeId, opts.context ?? contextFor(s, nodeId, task, agent));
     s.daemon.setActiveNode(nodeId);
+    s.daemon.observer.grants = grants;
     const node = s.daemon.canvas.nodes.find((n) => n.id === nodeId);
     if (node && node.status === "todo") s.daemon.store.saveNode({ ...node, status: "in_progress", executor: agent });
     s.canvasChanged();
     const stop = new AbortController();
+    opts.signal?.addEventListener("abort", () => stop.abort());
     s.running = { nodeId, agent, stop };
     const send = (channel: string, payload: unknown) => win.webContents.send(`agent-together:${channel}`, payload);
     send("agentStatus", { nodeId, agent, state: "running" });
     try {
       const model = loadRaceConfig(s.root).models?.[agent];
-      const run = await runners[agent](model).run(s.root, dispatchPrompt(file), 30 * 60_000, {
+      const run = await runners[agent](model).run(s.root, dispatchPrompt(file), opts.timeoutMs ?? 30 * 60_000, {
         signal: stop.signal,
-        onText: (text) => send("agentText", { nodeId, text }),
+        onText: (text) => send(opts.channel ?? "agentText", { nodeId, text }),
       });
       send("agentStatus", { nodeId, agent, state: "testing" });
       const { tests, checkpoint, audit } = run.summary === "已停止" ? { tests: null, checkpoint: null, audit: s.audit(nodeId) } : await testAndCheckpoint(s, nodeId);
@@ -716,9 +740,110 @@ async function main() {
       return { run, tests, checkpoint, audit };
     } finally {
       s.running = null;
+      s.daemon.observer.grants = [];
       send("agentStatus", { nodeId, agent, state: "idle" });
     }
+  };
+
+  // In-app dispatch: the agent runs headless in the project, its words stream to the window,
+  // its actions go through the hooks to the observer as usual; then the tests run.
+  ipcMain.handle("agent-together:runAgent", async (_e, nodeId: string, task: string, agent: Agent, context?: string) => {
+    const s = need();
+    if (s.running) throw new Error(`已有 AI 助手在运行（${s.running.nodeId}）`);
+    const title = s.daemon.canvas.nodes.find((n) => n.id === nodeId)?.title ?? nodeId;
+    return s.exclusive(`让 AI 做「${title}」`, () => executeAgent(s, nodeId, task, agent, { context }));
+  });
+
+  /*
+   * Automatic progress (phase one, M3): the engine decides what comes next; each step
+   * is an executeAgent run, then (once the integration card is in) a real start of the
+   * product. The run holds the project lock while it runs.
+   */
+  function attachEngine(s: Session) {
+    const AUTO = "自动制作";
+    const integrationDone = () => s.daemon.canvas.nodes.some((n) => n.id === "integration" && n.status === "done");
+    s.engine = new Engine(s.root, {
+      canvas: () => s.daemon.canvas,
+      spec: () => new SpecStore(s.root).confirmed(),
+      auditRequired: s.hasGit,
+      checkpoint: (label, nodeId) => (s.hasGit ? s.checkpoints.create(label, nodeId).id : null),
+      rollback: (id) => {
+        s.checkpoints.rollback(id);
+        s.canvasChanged();
+      },
+      markDone: (nodeId) => {
+        const node = s.daemon.canvas.nodes.find((n) => n.id === nodeId);
+        if (node) s.daemon.store.saveNode({ ...node, status: "done" });
+        s.canvasChanged();
+      },
+      exec: async ({ nodeId, task, grants, timeoutMs, signal }) => {
+        const agent = s.engine?.current?.agent ?? "claude-code";
+        const outcome = await executeAgent(s, nodeId, task, agent, { grants, timeoutMs, signal, channel: "engineText" });
+        // Once the cards that wire the product together are in, it has to start: try it for real.
+        let productError: string | null = null;
+        const passedSoFar = outcome.run.ok && outcome.tests?.passed;
+        if (passedSoFar && (nodeId === "integration" || integrationDone())) {
+          const config = readRunConfig(s.root) ?? guessRunConfig(s.root, listFiles(s.root));
+          if (!config) productError = "还找不到启动命令（没有 start 脚本或 server.js 这类入口文件）";
+          else {
+            const shown = s.product.current.state === "running";
+            await s.product.stop();
+            const check = await verifyRunConfig(s.root, config, serviceMode(s));
+            if (!check.ok) productError = [check.error ?? "没能启动", ...check.logs.slice(-8)].join("\n");
+            else if (shown) {
+              // The preview was open: show the new version there.
+              const status = await s.product.start(check.config, serviceMode(s));
+              if (status.state === "running" && status.url) await s.preview.load(status.url);
+            }
+          }
+        }
+        return { run: outcome.run, tests: outcome.tests, audit: outcome.audit as never, productError };
+      },
+      onChange: (run) => {
+        if (run.status === "running" && s.busy !== AUTO) s.setBusy(AUTO);
+        if (run.status !== "running" && s.busy === AUTO) s.setBusy(null);
+        win.webContents.send("agent-together:runState", run);
+      },
     });
+  }
+  const runInfo = (s: Session) => {
+    const confirmed = new SpecStore(s.root).confirmed();
+    const cards = versionCards(s.daemon.canvas, confirmed);
+    return {
+      run: s.engine?.current ?? null,
+      open: !!s.engine?.open,
+      version: confirmed?.version ?? null,
+      confirmed: !!confirmed,
+      /** What a new run would work through, in order. */
+      upcoming: cards.map((n) => ({ id: n.id, title: n.title })),
+      agents: Object.keys(runners),
+      models: loadRaceConfig(s.root).models ?? {},
+      limits: DEFAULT_LIMITS,
+    };
+  };
+  ipcMain.handle("agent-together:runInfo", () => runInfo(need()));
+  ipcMain.handle("agent-together:runStart", (_e, agent: string, limits?: Partial<EngineLimits>) => {
+    const s = need();
+    if (!runners[agent]) throw new Error("请选择一个助手");
+    if (s.busy) throw new Error(`正在${s.busy}，等它结束再开始制作`);
+    if (!new SpecStore(s.root).confirmed()) throw new Error("先在「需求与反馈」里确认第一版的需求，再开始制作");
+    s.engine!.start({ agent, model: loadRaceConfig(s.root).models?.[agent], limits });
+    return runInfo(s);
+  });
+  ipcMain.handle("agent-together:runPause", () => (need().engine!.pause(), runInfo(need())));
+  ipcMain.handle("agent-together:runResume", () => {
+    const s = need();
+    if (s.busy && s.busy !== "自动制作") throw new Error(`正在${s.busy}，等它结束再继续`);
+    s.engine!.resume();
+    return runInfo(s);
+  });
+  ipcMain.handle("agent-together:runStop", () => (need().engine!.stop(), runInfo(need())));
+  ipcMain.handle("agent-together:runDecide", (_e, option: DecisionOption) => (need().engine!.decide(option), runInfo(need())));
+  ipcMain.handle("agent-together:runResumeInterrupted", () => {
+    const s = need();
+    if (s.busy) throw new Error(`正在${s.busy}，等它结束再继续`);
+    s.engine!.resumeInterrupted();
+    return runInfo(s);
   });
   ipcMain.handle("agent-together:stopAgent", () => need().running?.stop.abort());
 

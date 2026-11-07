@@ -35,6 +35,7 @@ import { RacePanel } from "./RacePanel";
 import { clock } from "./time";
 import { errorText } from "./errors";
 import { RequirementsPanel } from "./RequirementsPanel";
+import { ProductPanel } from "./ProductPanel";
 
 const nodeTypes = { card: NodeCard };
 const FEED_LIMIT = 100;
@@ -152,6 +153,11 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
   const [testing, setTesting] = useState(false);
   /** The requirements panel on the left; open until the first version is confirmed and planned. */
   const [showReq, setShowReq] = useState(false);
+  /** The middle of the window: the product being built, or the canvas. The product once it knows how to start. */
+  const [centerTab, setCenterTab] = useState<"product" | "canvas">("canvas");
+  useEffect(() => {
+    window.agentTogether.productState().then((p) => p.config && setCenterTab("product"));
+  }, []);
   /** Scenario id → name, to show which scenarios a card serves. */
   const [scenarioNames, setScenarioNames] = useState<Record<string, string>>({});
   useEffect(() => {
@@ -431,7 +437,17 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
             onClose={() => setShowReq(false)}
           />
         )}
-        <div className="canvas" onDragOver={(e) => e.preventDefault()} onDrop={(e) => {
+        <div className="center">
+        <div className="center-tabs">
+          <button className={centerTab === "product" ? "on" : ""} onClick={() => setCenterTab("product")} title="正在做的产品，可以直接操作">
+            产品预览
+          </button>
+          <button className={centerTab === "canvas" ? "on" : ""} onClick={() => setCenterTab("canvas")} title="开发卡片、依赖和归属">
+            画布
+          </button>
+        </div>
+        <ProductPanel visible={centerTab === "product"} version={version} onChange={changed} />
+        <div className="canvas" style={centerTab === "canvas" ? undefined : { display: "none" }} onDragOver={(e) => e.preventDefault()} onDrop={(e) => {
           e.preventDefault();
           const role = roles.find((r) => r.id === e.dataTransfer.getData("application/agent-together-role"));
           if (!role) return;
@@ -483,6 +499,7 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
               onClose={() => setSelectedId(null)}
             />
           )}
+        </div>
         </div>
         <aside className="side">
           <ImportChecklist version={version} onChange={changed} />

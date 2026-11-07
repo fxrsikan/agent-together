@@ -3,8 +3,9 @@ import type { BrowserWindow } from "electron";
 import { installHooks } from "@agent-together/adapter-claude-code";
 import { installCodexHooks } from "@agent-together/adapter-codex";
 import { installCursorHooks } from "@agent-together/adapter-cursor";
-import { allowTestCommands, auditChanges, Checkpoints, createLlm, Daemon, loadLlmConfig, Race, readProjectInfo, writtenPaths, type AuditOutcome, type Llm, type SpecPlan } from "@agent-together/core";
+import { allowTestCommands, auditChanges, Checkpoints, createLlm, Daemon, loadLlmConfig, Race, readProjectInfo, writtenPaths, ProductProcess, type AuditOutcome, type Llm, type SpecPlan } from "@agent-together/core";
 import type { AgentEvent } from "@agent-together/schema";
+import { ProductPreview } from "./preview";
 
 /** Everything that belongs to one open project; closing it stops its daemon. */
 export class Session {
@@ -18,6 +19,9 @@ export class Session {
   racing: string | null = null;
   /** A canvas migration planned from the confirmed spec, waiting for the user to look at it. */
   pendingPlan: SpecPlan | null = null;
+  /** The product being built, running locally (M2), and its page shown in the window. */
+  readonly product: ProductProcess;
+  readonly preview: ProductPreview;
   /** The agent running in the app, if any; one at a time. */
   running: { nodeId: string; agent: string; stop: AbortController } | null = null;
   /** Per node: the checkpoint taken before its last dispatch and the events the observer saw since. */
@@ -46,6 +50,8 @@ export class Session {
     this.daemon.on("memory", send("memoryDrafts"));
     this.daemon.on("judgment", send("judgment"));
     this.daemon.on("l2error", send("l2error"));
+    this.product = new ProductProcess(root, send("productStatus"));
+    this.preview = new ProductPreview(win, root, send("previewProblem"));
   }
 
   static async open(root: string, win: BrowserWindow): Promise<Session> {
@@ -140,6 +146,8 @@ export class Session {
 
   async close() {
     this.running?.stop.abort();
+    await this.product.stop();
+    this.preview.destroy();
     this.daemon.removeAllListeners();
     await this.daemon.stop();
   }

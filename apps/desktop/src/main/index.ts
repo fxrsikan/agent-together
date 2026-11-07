@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { app, BrowserWindow, clipboard, dialog, ipcMain } from "electron";
+import { app, BrowserWindow, clipboard, dialog, ipcMain, shell } from "electron";
 import { claudeCodeCompiler, claudeCodeRunner } from "@agent-together/adapter-claude-code";
 import { agentSkillsCompiler, codexRunner } from "@agent-together/adapter-codex";
 import { cursorAgentCommand, cursorRulesCompiler, cursorRunner } from "@agent-together/adapter-cursor";
@@ -48,6 +48,11 @@ import {
   requirementsTurn,
   SpecStore,
   specImpact,
+  guessRunConfig,
+  proposeRunConfig,
+  readRunConfig,
+  verifyRunConfig,
+  type RunConfig,
   type SpecPlan,
   readProjectInfo,
   runProjectTests,
@@ -425,6 +430,73 @@ async function main() {
     need().pendingPlan = null;
   });
 
+  /*
+   * The product (phase one, M2): how to start it, starting and stopping it, its page
+   * shown in the window, and the user's verdict on the sample-data prototype.
+   */
+  const serviceMode = (s: Session): "mock" | "real" => {
+    const services = new SpecStore(s.root).load()?.services ?? [];
+    return services.length && services.every((v) => v.mode === "real") ? "real" : "mock";
+  };
+  const productState = (s: Session) => {
+    const spec = new SpecStore(s.root).load();
+    const config = readRunConfig(s.root);
+    return {
+      status: s.product.current,
+      config,
+      guess: config ? null : guessRunConfig(s.root, listFiles(s.root)),
+      logs: s.product.logs(120),
+      problems: s.preview.problems.slice(-30),
+      /** How usable the preview is: the sample-data prototype, or a functional version. */
+      stage: !spec ? null : spec.services.some((v) => v.mode === "mock") ? ("prototype" as const) : ("functional" as const),
+      prototypeConfirmedAt: spec?.prototypeConfirmedAt ?? null,
+      hasSpec: !!spec,
+      hasLlm: !!s.llm,
+    };
+  };
+  ipcMain.handle("agent-together:productState", () => productState(need()));
+  // Finds how to start the product (the files first, else the helper model) and tries it for real; saved only when it worked.
+  ipcMain.handle("agent-together:productDetect", async () => {
+    const s = need();
+    const files = listFiles(s.root);
+    const config = guessRunConfig(s.root, files) ?? (s.llm ? await proposeRunConfig(s.llm, s.root, files) : null);
+    if (!config) return { ok: false, error: "从文件看不出怎么启动这个产品。可以等 AI 写好服务器入口后再试，或者在下面手动填启动命令。", logs: [], config: null };
+    await s.product.stop();
+    return verifyRunConfig(s.root, config, serviceMode(s));
+  });
+  ipcMain.handle("agent-together:productSaveConfig", async (_e, config: RunConfig) => {
+    const s = need();
+    if (!config.start?.trim()) throw new Error("请填写启动命令");
+    await s.product.stop();
+    return verifyRunConfig(s.root, config, serviceMode(s));
+  });
+  ipcMain.handle("agent-together:productStart", async () => {
+    const s = need();
+    const config = readRunConfig(s.root);
+    if (!config) throw new Error("还不知道怎么启动这个产品，先点「找出启动方式」");
+    const status = await s.product.start(config, serviceMode(s));
+    if (status.state === "running" && status.url) await s.preview.load(status.url);
+    return productState(s);
+  });
+  ipcMain.handle("agent-together:productStop", async () => {
+    const s = need();
+    await s.product.stop();
+    await s.preview.clear();
+    return productState(s);
+  });
+  ipcMain.handle("agent-together:previewPlace", (_e, bounds: { x: number; y: number; width: number; height: number } | null) => session?.preview.place(bounds));
+  ipcMain.handle("agent-together:previewReload", () => need().preview.reload());
+  ipcMain.handle("agent-together:previewOpenExternal", () => {
+    const url = need().product.current.url;
+    if (url) void shell.openExternal(url);
+  });
+  ipcMain.handle("agent-together:prototypeVerdict", (_e, ok: boolean, feedback?: string) => {
+    const s = need();
+    if (!ok && !feedback?.trim()) throw new Error("说说哪里要改");
+    new SpecStore(s.root).prototypeVerdict(ok, feedback);
+    return productState(s);
+  });
+
   // Importing existing code: a checklist to finish the first-pass canvas drawn from the folders.
   ipcMain.handle("agent-together:importStatus", () => {
     const s = need();
@@ -561,7 +633,7 @@ async function main() {
     splitByVerifier(s.daemon.memory.forNode(nodeId), verifierFor(s, agent)).other.map((m) => m.id);
   const nodeMemories = (s: Session, nodeId: string, without: string[]) => s.daemon.memory.forNode(nodeId).filter((m) => !without.includes(m.id));
   const contextFor = (s: Session, nodeId: string, task: string, agent: string, without = defaultWithout(s, nodeId, agent)) =>
-    buildNodeContext(s.daemon.canvas, nodeId, task, nodeMemories(s, nodeId, without), readProjectInfo(s.root), s.daemon.capabilities.list());
+    buildNodeContext(s.daemon.canvas, nodeId, task, nodeMemories(s, nodeId, without), { ...readProjectInfo(s.root), webApp: !!new SpecStore(s.root).load() || !!readRunConfig(s.root) }, s.daemon.capabilities.list());
   ipcMain.handle("agent-together:previewContext", (_e, nodeId: string, task: string, without: string[] | null, agent: string) => {
     const s = need();
     const effective = without ?? defaultWithout(s, nodeId, agent);

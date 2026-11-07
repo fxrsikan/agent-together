@@ -1,5 +1,6 @@
-import type { SpecImpact, SpecPlan, CheckedSource, EvolutionReport, Experience, ImportProposal, ModelChoice, ProposedCard, ProposedItem, SetupReport } from "@agent-together/core";
+import type { ProductStatus, RunConfig, SpecImpact, SpecPlan, CheckedSource, EvolutionReport, Experience, ImportProposal, ModelChoice, ProposedCard, ProposedItem, SetupReport } from "@agent-together/core";
 import { contextBridge, ipcRenderer } from "electron";
+import type { PreviewProblem } from "../main/preview";
 import type { AuditOutcome, AuditResult, CanvasPlan, Checkpoint, CompileReport, Judgment, ProjectInfo, RaceReport, TestHistory, TestRun } from "@agent-together/core";
 import type { ChatMessage, Decision, Scenario, Spec, AgentEvent, Capability, Canvas, CanvasEdge, CanvasNode, Memory, RunResult, Verdict } from "@agent-together/schema";
 
@@ -50,6 +51,21 @@ export type SpecState = {
   hasLlm: boolean;
 };
 export type { ChatMessage, Decision, Scenario, Spec, SpecImpact, SpecPlan };
+/** The product (M2): its process, how it starts, what the preview saw, and the prototype verdict. */
+export type ProductState = {
+  status: ProductStatus;
+  config: RunConfig | null;
+  /** A start command guessed from the files, when none is saved yet. */
+  guess: RunConfig | null;
+  logs: string[];
+  problems: PreviewProblem[];
+  stage: "prototype" | "functional" | null;
+  prototypeConfirmedAt: string | null;
+  hasSpec: boolean;
+  hasLlm: boolean;
+};
+export type RunCheck = { ok: boolean; error: string | null; logs: string[]; config: RunConfig | null };
+export type { PreviewProblem, ProductStatus, RunConfig };
 export type SessionInfo = { root: string; name: string; port: number; hasGit: boolean; l2: string | null; activeNodeId: string | null };
 
 const invoke = <T>(channel: string, ...args: unknown[]): Promise<T> => ipcRenderer.invoke(`agent-together:${channel}`, ...args);
@@ -112,6 +128,19 @@ const api = {
   specPlan: () => invoke<{ plan: SpecPlan; applied: boolean; backup: string | null }>("specPlan"),
   specApplyPlan: () => invoke<{ backup: string | null }>("specApplyPlan"),
   specDiscardPlan: () => invoke<void>("specDiscardPlan"),
+  productState: () => invoke<ProductState>("productState"),
+  /** Finds how to start the product and tries it; saved only when the start worked. */
+  productDetect: () => invoke<RunCheck>("productDetect"),
+  productSaveConfig: (config: RunConfig) => invoke<RunCheck>("productSaveConfig", config),
+  productStart: () => invoke<ProductState>("productStart"),
+  productStop: () => invoke<ProductState>("productStop"),
+  onProductStatus: (cb: (status: ProductStatus) => void) => on("productStatus", cb),
+  onPreviewProblem: (cb: (p: PreviewProblem) => void) => on("previewProblem", cb),
+  /** Where the preview placeholder is on screen (CSS pixels), or null to hide the product page. */
+  previewPlace: (bounds: { x: number; y: number; width: number; height: number } | null) => invoke<void>("previewPlace", bounds),
+  previewReload: () => invoke<void>("previewReload"),
+  previewOpenExternal: () => invoke<void>("previewOpenExternal"),
+  prototypeVerdict: (ok: boolean, feedback?: string) => invoke<ProductState>("prototypeVerdict", ok, feedback),
   addNode: (title: string, kind: CanvasNode["kind"], position?: { x: number; y: number }) => invoke<CanvasNode>("addNode", title, kind, position),
   saveNode: (node: CanvasNode) => invoke<CanvasNode>("saveNode", node),
   moveNodes: (moves: { id: string; x: number; y: number }[]) => invoke<void>("moveNodes", moves),

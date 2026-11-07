@@ -310,3 +310,19 @@ button.small { font-size: 12px; padding: 2px 8px; }
 .decisions ul { margin: 6px 0 0; padding-left: 16px; }
 .pre { white-space: pre-wrap; }
 header.bar button.on { border-color: var(--accent); color: var(--accent); }
+
+/* The middle of the window: product preview or canvas */
+.center { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.center-tabs { display: flex; gap: 4px; padding: 6px 10px 0; border-bottom: 1px solid var(--line); background: var(--panel); }
+.center-tabs button { border: none; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 5px 10px; }
+.center-tabs button.on { border-bottom-color: var(--accent); color: var(--accent); font-weight: 600; }
+.center > .canvas { flex: 1; min-height: 0; }
+.product { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; background: var(--canvas); }
+.product-bar { justify-content: flex-start; flex-wrap: wrap; }
+.product-bar .one-line { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.product-slot { flex: 1; min-height: 120px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); position: relative; display: flex; align-items: center; justify-content: center; }
+.center-hint { padding: 24px; text-align: center; }
+.product-logs { max-height: 180px; overflow: auto; margin: 0; font-size: 11px; background: var(--panel); padding: 6px; border-radius: 6px; white-space: pre-wrap; }
+.prototype-bar { padding: 8px 10px; border: 1px solid color-mix(in srgb, var(--warn) 40%, var(--line)); border-radius: 8px; background: color-mix(in srgb, var(--warn) 8%, var(--bg)); }
+.run-setup { padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); display: flex; flex-direction: column; gap: 6px; max-width: 640px; }
+.problems { list-style: none; margin: 0; padding: 0; max-height: 120px; overflow: auto; display: flex; flex-direction: column; gap: 3px; }

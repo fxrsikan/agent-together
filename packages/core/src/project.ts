@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { initProject } from "./init.js";
+import type { RunConfig } from "./product.js";
 
 /** What stays out of git inside .agent-together/: machine-local state. */
 const DATA_GITIGNORE = ["runtime.json", "events/", "context/", "races/", "tests.json", "runs/", ""].join("\n");
@@ -22,6 +23,8 @@ export interface ProjectInfo {
   imported?: boolean;
   /** The user has gone through (or dismissed) the import checklist. */
   importReviewed?: boolean;
+  /** How to start the product (a local web app); saved once a start with it worked. */
+  run?: RunConfig;
 }
 
 const infoFile = (root: string) => path.join(root, ".agent-together", "project.json");

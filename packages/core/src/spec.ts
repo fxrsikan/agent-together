@@ -16,6 +16,7 @@ import { parseJsonObject } from "./judge.js";
 import type { Llm } from "./llm.js";
 import { canvasFromDraft } from "./planner.js";
 import { rolesFromDraft } from "./roles.js";
+import { RUN_CONVENTIONS } from "./product.js";
 
 /**
  * Requirements first (phase one, M1): a conversation with the helper model acting
@@ -91,6 +92,22 @@ export class SpecStore {
     }
   }
 
+  /** The prototype was tried: pages and flow are right, or here is what to change. Neither changes the scope. */
+  prototypeVerdict(ok: boolean, feedback = ""): Spec | null {
+    const at = new Date().toISOString();
+    if (ok) {
+      for (const name of ["spec.json", "confirmed.json"]) {
+        const spec = this.read(name, (v) => Spec.parse(v));
+        if (spec) this.write(name, { ...spec, prototypeConfirmedAt: at });
+      }
+      this.decide("confirm-prototype", "试用了示例数据版本：页面和流程没问题，可以接真实业务逻辑");
+    } else {
+      this.say({ role: "user", text: `【原型反馈】${feedback.trim()}` });
+      this.decide("prototype-feedback", "试用了示例数据版本，页面或流程要改", feedback.trim());
+    }
+    return this.load();
+  }
+
   conversation(): ChatMessage[] {
     return this.read("conversation.json", (v) => ChatMessage.array().parse(v)) ?? [];
   }
@@ -129,7 +146,7 @@ export class SpecStore {
 
 /** The parts of a spec the user confirms; scenario progress and link to cards do not count as a change. */
 function scopeOf(spec: Spec) {
-  const { status, confirmedAt, scenarios, ...rest } = spec;
+  const { status, confirmedAt, prototypeConfirmedAt, scenarios, ...rest } = spec;
   return { ...rest, scenarios: scenarios.map(({ status: _s, tasks: _t, ...s }) => s) };
 }
 const sameScope = (a: Spec, b: Spec) => JSON.stringify(scopeOf(a)) === JSON.stringify(scopeOf(b));
@@ -401,7 +418,9 @@ ${old}
 要求：
 - 技术栈：没有特别要求时，用 Node.js 内置的 http 模块写本地服务器，页面用原生 HTML、CSS、JavaScript，数据存在本地 JSON 文件，测试用 node:test，不引入框架和数据库。启动命令要简单（如 node server.js），在 Windows 和 macOS 上都能直接运行。
 - 4 到 9 张卡片，按"能独立实现、独立测试"来切分。每张：id（小写英文短横线）、kind（module 代码模块 / feature 用户能看到的功能 / flow 流程或集成）、title（中文短名）、goal（一句话）、acceptance（2 到 4 条能用测试验证的验收标准）、tasks（2 到 4 条任务）、files（文件 glob，卡片之间不要重叠）、scenarios（它帮助完成的场景 id）。
-- 外部服务（需求里的 services）放在一张"服务接入"卡片里：示例服务和真实服务实现同一个接口，靠配置切换，示例逻辑不要散落在页面里。
+- 运行约定（Agent Together 按它启动产品、在应用里预览，写进相关卡片的验收标准）：
+${RUN_CONVENTIONS}
+- 外部服务（需求里的 services）放在一张"服务接入"卡片里：示例服务和真实服务实现同一个接口，按 AT_SERVICE_MODE 切换，示例逻辑不要散落在页面里。
 - 必须有一张 id 为 "integration" 的集成卡片（kind 用 flow），负责把页面、接口和数据接通：服务器入口、路由、页面入口文件归它，scenarios 写全部场景 id。
 - 每个场景至少有一张卡片覆盖。
 - package.json 这类全项目共用的配置文件，交给没有依赖、最先做的那张卡片。

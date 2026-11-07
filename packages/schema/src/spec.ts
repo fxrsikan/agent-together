@@ -49,6 +49,8 @@ export const Spec = z.object({
   version: z.number().int().positive().default(1),
   status: z.enum(["draft", "confirmed"]).default("draft"),
   confirmedAt: z.string().optional(),
+  /** The user tried the sample-data prototype and said the pages and flow are right (M2). */
+  prototypeConfirmedAt: z.string().optional(),
   /** Phase one builds local web apps only: one user, data on this machine, runs on this machine. */
   productType: z.literal("local-web-app").default("local-web-app"),
   /** Who uses it. */
@@ -90,7 +92,7 @@ export type ChatMessage = z.infer<typeof ChatMessage>;
 export const Decision = z.object({
   id: z.string(),
   at: z.string(),
-  kind: z.enum(["confirm-scope", "change-scope", "migrate-canvas", "other"]),
+  kind: z.enum(["confirm-scope", "change-scope", "migrate-canvas", "confirm-prototype", "prototype-feedback", "other"]),
   summary: z.string(),
   detail: z.string().optional(),
 });

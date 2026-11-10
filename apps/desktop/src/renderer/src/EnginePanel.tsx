@@ -20,7 +20,7 @@ const STATUS: Record<string, { label: string; tone: string }> = {
   stopped: { label: "已结束", tone: "" },
 };
 const TASK: Record<string, string> = { todo: "○", doing: "…", done: "✓", skipped: "↷" };
-const stepStatus = (s: string | undefined) => (!s ? "" : s === "product-failed" ? "产品启动不了" : (WORK_STATUS_LABEL as Record<string, string>)[s] ?? s);
+const stepStatus = (s: string | undefined) => (!s ? "" : s === "product-failed" ? "产品启动不了" : s === "unchanged" ? "没有改任何文件" : (WORK_STATUS_LABEL as Record<string, string>)[s] ?? s);
 const money = (n: number) => `$${n.toFixed(n < 1 ? 3 : 2)}`;
 
 export function EnginePanel({ version, onChange }: { version: number; onChange: (notice: string) => void }) {
@@ -207,7 +207,7 @@ export function EnginePanel({ version, onChange }: { version: number; onChange: 
               )}
             </>
           ) : (
-            <p className="muted small">第 {info.version} 版的卡片都做完了。下一步：按使用场景验收（M4）。</p>
+            <p className="muted small">第 {info.version} 版的卡片都做完了。下一步：在下面「验收与交付」里按使用场景验收。</p>
           )}
         </>
       )}

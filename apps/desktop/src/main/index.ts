@@ -54,6 +54,12 @@ import {
   versionCards,
   type DecisionOption,
   type EngineLimits,
+  Acceptance,
+  Versions,
+  codeChangedSince,
+  restorePreview,
+  restoreVersion,
+  saveRunConfig,
   proposeRunConfig,
   readRunConfig,
   verifyRunConfig,
@@ -68,6 +74,7 @@ import {
 import { Capability, ranNoTests } from "@agent-together/schema";
 import type { AgentRunner, CanvasEdge, CanvasNode, Memory } from "@agent-together/schema";
 import { Session } from "./session";
+import { openAcceptanceBrowser } from "./acceptance-browser";
 
 const compilers = [claudeCodeCompiler, agentSkillsCompiler, cursorRulesCompiler];
 const runners: Record<string, (model?: string) => AgentRunner> = { "claude-code": claudeCodeRunner, codex: codexRunner, cursor: cursorRunner, "grok-build": grokRunner };
@@ -204,6 +211,7 @@ async function main() {
       session.daemon.memory.refreshAgentFiles(); // older versions mirrored every card's memories
     } catch {}
     attachEngine(session);
+    attachAcceptance(session);
     remember(root);
     win.setTitle(`${session.name} - Agent Together`);
     win.webContents.send("agent-together:project", session.info());
@@ -803,6 +811,16 @@ async function main() {
         if (run.status === "running" && s.busy !== AUTO) s.setBusy(AUTO);
         if (run.status !== "running" && s.busy === AUTO) s.setBusy(null);
         win.webContents.send("agent-together:runState", run);
+        // Changes from acceptance are in: accept again, as the plan says ("修好后再验收一次").
+        if (run.kind === "fix" && run.status === "done" && !run.tasks.some((t) => t.state === "skipped")) {
+          setTimeout(() => {
+            if (session === s && !s.busy) {
+              try {
+                startAcceptance(s);
+              } catch {}
+            }
+          }, 500);
+        }
       },
     });
   }
@@ -845,6 +863,213 @@ async function main() {
     s.engine!.resumeInterrupted();
     return runInfo(s);
   });
+  /*
+   * Acceptance and delivery (phase one, M4): the evidence layers and the scenarios
+   * on a copy of the product in a hidden page of its own, then the user's own walk
+   * through each scenario; failures and "doesn't match" go back to the assistant as
+   * fix tasks; when everything holds, a stable version with its data backup and a
+   * delivery package. Acceptance holds the project lock while it runs.
+   */
+  const ACCEPT = "自动验收";
+  function attachAcceptance(s: Session) {
+    s.acceptance = new Acceptance(s.root, {
+      llm: s.llm,
+      spec: () => new SpecStore(s.root).confirmed(),
+      canvas: () => s.daemon.canvas,
+      runConfig: () => readRunConfig(s.root),
+      serviceMode: () => serviceMode(s),
+      checkpoint: (label) => {
+        if (!s.hasGit) return null;
+        const c = s.checkpoints.create(label, null);
+        return { id: c.id, commit: c.commit };
+      },
+      runTests: () => runProjectTests(s.root, null),
+      openDriver: (dir) => openAcceptanceBrowser(dir),
+      onChange: (record) => win.webContents.send("agent-together:acceptanceState", record),
+    });
+  }
+  const startAcceptance = (s: Session) => {
+    if (s.busy) throw new Error(`正在${s.busy}，等它结束再验收`);
+    if (s.engine?.open) throw new Error("自动制作还没结束，先把它做完或结束");
+    s.setBusy(ACCEPT);
+    try {
+      s.acceptance!.start();
+    } catch (err) {
+      s.setBusy(null);
+      throw err;
+    }
+    void s.acceptance!.settled().finally(() => {
+      if (s.busy === ACCEPT) s.setBusy(null);
+      // Write the results into the spec: which scenarios passed, with which services.
+      const r = s.acceptance?.current;
+      if (r && (r.status === "passed" || r.status === "failed")) {
+        const ok = r.serviceMode === "real" ? "real-passed" : "mock-passed";
+        new SpecStore(s.root).markScenarios(Object.fromEntries(r.scenarios.map((x) => [x.id, x.status === "passed" ? ok : "failed"])));
+      }
+    });
+  };
+  /** Which card a fix goes to: the integration card when the scenario uses it (it may write the cards it connects), else the scenario's last card. */
+  const fixCard = (s: Session, tasks: string[]): string | null => {
+    const ids = new Set(s.daemon.canvas.nodes.map((n) => n.id));
+    if (ids.has("integration") && (tasks.includes("integration") || !tasks.length)) return "integration";
+    return [...tasks].reverse().find((t) => ids.has(t)) ?? (ids.has("integration") ? "integration" : null);
+  };
+  const acceptanceInfo = (s: Session) => {
+    const a = s.acceptance!;
+    const spec = new SpecStore(s.root).confirmed();
+    const record = a.current;
+    const config = readRunConfig(s.root);
+    const versions = new Versions(s.root).list();
+    return {
+      record,
+      running: a.busy,
+      missing: a.missing(),
+      fixes: a.fixes().map((f) => ({ scenarioId: f.scenarioId, card: fixCard(s, f.tasks), task: f.task })),
+      scenarios: (spec?.scenarios ?? []).map((x) => ({ id: x.id, name: x.name, steps: x.steps, expected: x.expected, dataChecks: x.dataChecks, errorChecks: x.errorChecks, input: x.input, status: x.status })),
+      version: spec?.version ?? null,
+      cardsLeft: spec ? versionCards(s.daemon.canvas, spec).length : 0,
+      mockServices: (spec?.services ?? []).filter((v) => v.mode === "mock" || serviceMode(s) === "mock").map((v) => v.name),
+      data: config?.data ?? null,
+      hasRunConfig: !!config,
+      hasLlm: !!s.llm,
+      hasGit: s.hasGit,
+      versions,
+      agents: Object.keys(runners),
+    };
+  };
+  ipcMain.handle("agent-together:acceptanceInfo", () => acceptanceInfo(need()));
+  ipcMain.handle("agent-together:acceptanceStart", () => {
+    const s = need();
+    startAcceptance(s);
+    return acceptanceInfo(s);
+  });
+  ipcMain.handle("agent-together:acceptanceStop", () => {
+    const s = need();
+    s.acceptance!.stop();
+    return acceptanceInfo(s);
+  });
+  ipcMain.handle("agent-together:acceptanceConfirm", (_e, scenarioId: string, ok: boolean, note?: string) => {
+    const s = need();
+    s.acceptance!.confirm(scenarioId, ok, note ?? "");
+    if (!ok) new SpecStore(s.root).decide("acceptance-feedback", `亲手验收 ${scenarioId}：不符合`, note);
+    return acceptanceInfo(s);
+  });
+  ipcMain.handle("agent-together:acceptanceSetData", (_e, data: string[]) => {
+    const s = need();
+    const config = readRunConfig(s.root);
+    if (!config) throw new Error("还不知道怎么启动产品：先在「产品预览」里让它能启动");
+    saveRunConfig(s.root, { ...config, data: data.map((d) => d.trim()).filter((d) => d && !d.includes("..")) });
+    return acceptanceInfo(s);
+  });
+  ipcMain.handle("agent-together:acceptanceForgetPlan", (_e, scenarioId: string) => {
+    const s = need();
+    s.acceptance!.forgetPlan(scenarioId);
+    return acceptanceInfo(s);
+  });
+  ipcMain.handle("agent-together:acceptanceShot", (_e, rel: string) => {
+    const file = need().acceptance!.file(rel);
+    return `data:image/png;base64,${fs.readFileSync(file).toString("base64")}`;
+  });
+  ipcMain.handle("agent-together:acceptanceFix", (_e, agent: string) => {
+    const s = need();
+    if (!runners[agent]) throw new Error("请选择一个助手");
+    if (s.busy) throw new Error(`正在${s.busy}，等它结束再改`);
+    const fixes = s.acceptance!
+      .fixes()
+      .map((f) => {
+        // The bug can be in any card the scenario is built from: the fix may write their files, for this run only.
+        const cards = f.tasks.length ? f.tasks : s.daemon.canvas.nodes.map((n) => n.id);
+        const grants = s.daemon.canvas.nodes.filter((n) => cards.includes(n.id)).flatMap((n) => n.files);
+        return { nodeId: fixCard(s, f.tasks), task: f.task, grants };
+      })
+      .filter((f): f is { nodeId: string; task: string; grants: string[] } => !!f.nodeId);
+    if (!fixes.length) throw new Error("没有要改的地方，或者对不上画布上的卡片");
+    s.engine!.start({ agent, model: loadRaceConfig(s.root).models?.[agent], fixes });
+    return acceptanceInfo(s);
+  });
+  ipcMain.handle("agent-together:versionSave", async (_e, mockAccepted: boolean) => {
+    const s = need();
+    return s.exclusive("保存稳定版本", () => {
+      const a = s.acceptance!;
+      const r = a.current;
+      const spec = new SpecStore(s.root).confirmed();
+      if (!r || !spec) throw new Error("还没有验收");
+      const missing = a.missing();
+      if (missing.length) throw new Error(missing.join("；"));
+      if (!r.checkpoint) throw new Error("这个项目没有用 git，存不了检查点，也就保存不了稳定版本");
+      const config = readRunConfig(s.root);
+      const data = config?.data ?? [];
+      const changed = codeChangedSince(s.root, s.checkpoints, r.checkpoint.commit, data);
+      if (changed.length) throw new Error(`验收之后代码又改过了（${changed.slice(0, 3).join("、")}${changed.length > 3 ? " 等" : ""}），要重新验收`);
+      const mock = acceptanceInfo(s).mockServices;
+      if (mock.length && !mockAccepted) throw new Error(`${mock.join("、")}用的还是示例服务：确认先这样交付，才能保存`);
+      const versions = new Versions(s.root);
+      let pkg: string | null = null;
+      if (r.package) {
+        const target = path.join(versions.dir, `v${spec.version}`, path.basename(r.package.zip));
+        fs.mkdirSync(path.dirname(target), { recursive: true });
+        fs.copyFileSync(a.file(r.package.zip), target);
+        pkg = path.relative(s.root, target).replace(/\\/g, "/");
+      }
+      const done = s.daemon.canvas.nodes.filter((n) => n.status === "done");
+      const record = versions.save(
+        {
+          version: spec.version,
+          savedAt: new Date().toISOString(),
+          name: s.name,
+          goal: spec.goal,
+          scenarios: r.scenarios.map((x) => ({ id: x.id, name: x.name, status: r.serviceMode === "real" ? "real-passed" : "mock-passed" })),
+          cards: done.map((n) => ({ id: n.id, title: n.title })),
+          checkpoint: r.checkpoint,
+          acceptanceId: r.id,
+          layers: r.layers,
+          confirmed: Object.entries(r.user)
+            .filter(([, u]) => u.ok)
+            .map(([id, u]) => ({ id, at: u.at })),
+          serviceMode: r.serviceMode,
+          mockAccepted: mock.length > 0 && mockAccepted,
+          knownLimits: [...(mock.length ? [`${mock.join("、")}用的是示例服务`] : []), ...a.limits()],
+          instructions: "",
+          package: pkg,
+        },
+        data,
+      );
+      const store = new SpecStore(s.root);
+      if (mock.length) store.decide("mock-delivery", `第 ${spec.version} 版先用示例服务交付：${mock.join("、")}`);
+      store.decide("stable-version", `保存了第 ${spec.version} 版稳定版本：${r.scenarios.length} 个场景通过并亲手确认`, `检查点 ${r.checkpoint.id}；数据备份 ${record.data.files} 个文件`);
+      return acceptanceInfo(s);
+    });
+  });
+  ipcMain.handle("agent-together:versionRestorePreview", (_e, version: number) => {
+    const s = need();
+    const record = new Versions(s.root).get(version);
+    if (!record) throw new Error(`没有第 ${version} 版`);
+    return restorePreview(s.root, record, readRunConfig(s.root)?.data ?? []);
+  });
+  ipcMain.handle("agent-together:versionRestore", async (_e, version: number, data: "backup" | "current") => {
+    const s = need();
+    return s.exclusive(`回到第 ${version} 版`, async () => {
+      const record = new Versions(s.root).get(version);
+      if (!record) throw new Error(`没有第 ${version} 版`);
+      await s.product.stop();
+      await s.preview.clear();
+      const currentData = readRunConfig(s.root)?.data ?? [];
+      const { safety } = restoreVersion(s.root, s.checkpoints, record, data, currentData);
+      s.canvasChanged();
+      new SpecStore(s.root).decide("restore-version", `回到第 ${version} 版，${data === "backup" ? "用当时的数据备份" : "保留现在的数据"}`, `回去之前的状态存成了检查点 ${safety}`);
+      // Back means usable: start it once for real.
+      const config = readRunConfig(s.root);
+      const check = config ? await verifyRunConfig(s.root, config, serviceMode(s)) : { ok: false, error: "这个版本里没有启动方式" };
+      return { ok: check.ok, error: check.error ?? null, safety, info: acceptanceInfo(s) };
+    });
+  });
+  ipcMain.handle("agent-together:versionShowPackage", (_e, version: number) => {
+    const s = need();
+    const record = new Versions(s.root).get(version);
+    if (!record?.package) throw new Error("这个版本没有启动包");
+    shell.showItemInFolder(path.join(s.root, record.package));
+  });
+
   ipcMain.handle("agent-together:stopAgent", () => need().running?.stop.abort());
 
   // Memories: approving or retiring one re-syncs the Agent Together block in CLAUDE.md and AGENTS.md.

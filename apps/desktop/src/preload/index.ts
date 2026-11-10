@@ -1,4 +1,4 @@
-import type { DecisionOption, EngineDecision, EngineLimits, RunRecord, StepRecord, ProductStatus, RunConfig, SpecImpact, SpecPlan, CheckedSource, EvolutionReport, Experience, ImportProposal, ModelChoice, ProposedCard, ProposedItem, SetupReport } from "@agent-together/core";
+import type { AcceptanceRecord, BeatResult, Layer, RestorePreview, ScenarioResult, VersionRecord, DecisionOption, EngineDecision, EngineLimits, RunRecord, StepRecord, ProductStatus, RunConfig, SpecImpact, SpecPlan, CheckedSource, EvolutionReport, Experience, ImportProposal, ModelChoice, ProposedCard, ProposedItem, SetupReport } from "@agent-together/core";
 import { contextBridge, ipcRenderer } from "electron";
 import type { PreviewProblem } from "../main/preview";
 import type { AuditOutcome, AuditResult, CanvasPlan, Checkpoint, CompileReport, Judgment, ProjectInfo, RaceReport, TestHistory, TestRun } from "@agent-together/core";
@@ -76,6 +76,24 @@ export type RunInfo = {
   limits: EngineLimits;
 };
 export type { DecisionOption, EngineDecision, EngineLimits, RunRecord, StepRecord };
+/** 验收与交付 (M4): the latest acceptance, what is missing, what goes back to the assistant, the stable versions. */
+export type AcceptanceInfo = {
+  record: AcceptanceRecord | null;
+  running: boolean;
+  missing: string[];
+  fixes: { scenarioId: string | null; card: string | null; task: string }[];
+  scenarios: { id: string; name: string; steps: string[]; expected: string[]; dataChecks: string[]; errorChecks: string[]; input: string; status: string }[];
+  version: number | null;
+  cardsLeft: number;
+  mockServices: string[];
+  data: string[] | null;
+  hasRunConfig: boolean;
+  hasLlm: boolean;
+  hasGit: boolean;
+  versions: VersionRecord[];
+  agents: string[];
+};
+export type { AcceptanceRecord, BeatResult, Layer, RestorePreview, ScenarioResult, VersionRecord };
 export type RunCheck = { ok: boolean; error: string | null; logs: string[]; config: RunConfig | null };
 export type { PreviewProblem, ProductStatus, RunConfig };
 export type SessionInfo = { root: string; name: string; port: number; hasGit: boolean; l2: string | null; activeNodeId: string | null };
@@ -149,6 +167,19 @@ const api = {
   runDecide: (option: DecisionOption) => invoke<RunInfo>("runDecide", option),
   runResumeInterrupted: () => invoke<RunInfo>("runResumeInterrupted"),
   onRunState: (cb: (run: RunRecord) => void) => on("runState", cb),
+  acceptanceInfo: () => invoke<AcceptanceInfo>("acceptanceInfo"),
+  acceptanceStart: () => invoke<AcceptanceInfo>("acceptanceStart"),
+  acceptanceStop: () => invoke<AcceptanceInfo>("acceptanceStop"),
+  acceptanceConfirm: (scenarioId: string, ok: boolean, note?: string) => invoke<AcceptanceInfo>("acceptanceConfirm", scenarioId, ok, note),
+  acceptanceSetData: (data: string[]) => invoke<AcceptanceInfo>("acceptanceSetData", data),
+  acceptanceForgetPlan: (scenarioId: string) => invoke<AcceptanceInfo>("acceptanceForgetPlan", scenarioId),
+  acceptanceShot: (rel: string) => invoke<string>("acceptanceShot", rel),
+  acceptanceFix: (agent: string) => invoke<AcceptanceInfo>("acceptanceFix", agent),
+  onAcceptanceState: (cb: (record: AcceptanceRecord) => void) => on("acceptanceState", cb),
+  versionSave: (mockAccepted: boolean) => invoke<AcceptanceInfo>("versionSave", mockAccepted),
+  versionRestorePreview: (version: number) => invoke<RestorePreview>("versionRestorePreview", version),
+  versionRestore: (version: number, data: "backup" | "current") => invoke<{ ok: boolean; error: string | null; safety: string; info: AcceptanceInfo }>("versionRestore", version, data),
+  versionShowPackage: (version: number) => invoke<void>("versionShowPackage", version),
   onEngineText: (cb: (e: { nodeId: string; text: string }) => void) => on("engineText", cb),
   productState: () => invoke<ProductState>("productState"),
   /** Finds how to start the product and tries it; saved only when the start worked. */

@@ -38,7 +38,7 @@ export interface StepRecord {
   /** The checkpoint taken just before the step: where a retry or a recovery starts from. */
   checkpoint: string | null;
   state: "running" | "passed" | "failed" | "interrupted";
-  status?: WorkStatus | "product-failed";
+  status?: WorkStatus | "product-failed" | "unchanged";
   reasons?: string[];
   summary?: string;
   costUsd?: number;
@@ -75,7 +75,9 @@ export interface RunRecord {
   createdAt: string;
   updatedAt: string;
   status: RunStatus;
-  tasks: { nodeId: string; title: string; state: "todo" | "doing" | "done" | "skipped"; attempts: number }[];
+  /** "build": the version's cards; "fix": changes handed over from acceptance (M4). */
+  kind?: "build" | "fix";
+  tasks: { nodeId: string; title: string; state: "todo" | "doing" | "done" | "skipped"; attempts: number; fix?: string; grants?: string[] }[];
   steps: StepRecord[];
   limits: EngineLimits;
   usage: { calls: number; costUsd: number; callsWithoutCost: number; ms: number };
@@ -176,9 +178,13 @@ export function failureSignature(status: string, outcome: StepOutcome): string {
 
 const tail = (s: string | undefined, n = 1500) => (s ? s.slice(-n) : "");
 
-function taskText(node: CanvasNode, version: number, previous: StepRecord | null): string {
+function taskText(node: CanvasNode, version: number, previous: StepRecord | null, fix?: string, grants: string[] = []): string {
   const todo = node.intent.tasks.length ? `\n\n任务清单：\n${node.intent.tasks.map((t) => `- ${t}`).join("\n")}` : "";
-  const base = `按卡片的目标和验收标准完成「${node.title}」。这是自动制作第 ${version} 版的一步，相关使用场景见下文。做完自己跑一遍项目的测试。${todo}`;
+  // Said in the task, because the card's context only names the card's own files.
+  const allowed = grants.length ? `\n\n这一步除了本卡片的文件，还允许修改这些文件（只在这一步有效，观察者不会把它算作越界）：\n${grants.map((g) => `- ${g}`).join("\n")}` : "";
+  const base = fix
+    ? `第 ${version} 版验收后要改的地方，在「${node.title}」这张卡片上改（相关使用场景见下文）：\n\n${fix}\n\n问题在哪个文件就改哪个文件。改完自己跑一遍项目的测试，原来的测试也要继续通过。${allowed}`
+    : `按卡片的目标和验收标准完成「${node.title}」。这是自动制作第 ${version} 版的一步，相关使用场景见下文。做完自己跑一遍项目的测试。${todo}${allowed}`;
   if (!previous) return base;
   return `${base}
 
@@ -243,10 +249,20 @@ export class Engine {
   }
 
   /** Starts working through this version's cards. */
-  start(opts: { agent: string; model?: string; limits?: Partial<EngineLimits> }): RunRecord {
+  start(opts: { agent: string; model?: string; limits?: Partial<EngineLimits>; fixes?: { nodeId: string; task: string; grants?: string[] }[] }): RunRecord {
     if (this.open) throw new Error("上一次制作还没结束：先继续、暂停后结束，或者放弃它");
     const spec = this.deps.spec();
-    const cards = versionCards(this.deps.canvas(), spec);
+    const canvas = this.deps.canvas();
+    // Fixes: one task per card, its changes together, in canvas order.
+    const fixes = new Map<string, string[]>();
+    const fixGrants = new Map<string, Set<string>>();
+    for (const f of opts.fixes ?? []) {
+      if (!canvas.nodes.some((n) => n.id === f.nodeId)) continue;
+      fixes.set(f.nodeId, [...(fixes.get(f.nodeId) ?? []), f.task]);
+      for (const g of f.grants ?? []) fixGrants.set(f.nodeId, (fixGrants.get(f.nodeId) ?? new Set<string>()).add(g));
+    }
+    if (opts.fixes && !fixes.size) throw new Error("要改的地方对不上画布上的卡片");
+    const cards = opts.fixes ? canvas.nodes.filter((n) => fixes.has(n.id)) : versionCards(canvas, spec);
     if (!cards.length) throw new Error(spec ? "这一版的卡片都已经完成了" : "画布上没有要做的卡片");
     const at = this.now();
     this.record = {
@@ -257,13 +273,16 @@ export class Engine {
       createdAt: at.toISOString(),
       updatedAt: at.toISOString(),
       status: "running",
-      tasks: cards.map((n) => ({ nodeId: n.id, title: n.title, state: "todo", attempts: 0 })),
+      kind: opts.fixes ? "fix" : "build",
+      tasks: cards.map((n) => ({ nodeId: n.id, title: n.title, state: "todo", attempts: 0, ...(fixes.has(n.id) ? { fix: fixes.get(n.id)!.join("\n\n---\n\n") } : {}),
+        ...(fixGrants.has(n.id) ? { grants: [...fixGrants.get(n.id)!] } : {}),
+      })),
       steps: [],
       limits: { ...DEFAULT_LIMITS, ...opts.limits },
       usage: { calls: 0, costUsd: 0, callsWithoutCost: 0, ms: 0 },
       decision: null,
       decisions: [],
-      note: `开始制作第 ${spec?.version ?? 1} 版：${cards.length} 张卡片`,
+      note: opts.fixes ? `按验收结果修改：${cards.length} 张卡片` : `开始制作第 ${spec?.version ?? 1} 版：${cards.length} 张卡片`,
     };
     this.save();
     this.kick();
@@ -303,7 +322,10 @@ export class Engine {
       if (!task) {
         r.status = "done";
         const skipped = r.tasks.filter((t) => t.state === "skipped").length;
-        r.note = `第 ${r.version} 版的卡片都做完了${skipped ? `（跳过了 ${skipped} 张）` : ""}。下一步：按使用场景验收。`;
+        r.note =
+          r.kind === "fix"
+            ? `验收后要改的地方改完了${skipped ? `（跳过了 ${skipped} 张）` : ""}。下一步：重新验收。`
+            : `第 ${r.version} 版的卡片都做完了${skipped ? `（跳过了 ${skipped} 张）` : ""}。下一步：按使用场景验收。`;
         this.save();
         return;
       }
@@ -343,13 +365,14 @@ export class Engine {
         continue;
       }
       const previous = [...r.steps].reverse().find((s) => s.nodeId === node.id && s.state === "failed") ?? null;
-      const grants = integrationGrants(this.deps.canvas(), node.id);
+      // A fix may also write the files it was granted (the scenario's cards), for this run only.
+      const grants = [...new Set([...integrationGrants(this.deps.canvas(), node.id), ...(task.grants ?? [])])].filter((g) => !node.files.includes(g));
       const step: StepRecord = {
         id: `${stamp(this.now())}-${node.id}-${task.attempts}`,
         nodeId: node.id,
         title: node.title,
         attempt: task.attempts,
-        task: taskText(node, r.version, task.attempts > 0 ? previous : null),
+        task: taskText(node, r.version, task.attempts > 0 ? previous : null, task.fix, grants),
         startedAt: this.now().toISOString(),
         checkpoint: this.deps.checkpoint(`自动制作：${node.title} 之前`, node.id),
         state: "running",
@@ -387,9 +410,16 @@ export class Engine {
       }
 
       const verdict = workVerdict({ run: outcome.run, tests: outcome.tests, audit: outcome.audit, auditRequired: this.deps.auditRequired });
-      const reasons = [...verdict.reasons, ...(outcome.productError ? [`产品启动不了：${outcome.productError}`] : [])];
-      const passed = verdict.status === "passed" && !outcome.productError;
-      step.status = passed ? "passed" : verdict.status !== "passed" ? verdict.status : "product-failed";
+      // A fix that changed nothing has not fixed anything, whatever the tests say.
+      const changed = (outcome.audit as { files?: unknown[] } | null)?.files;
+      const unchanged = !!task.fix && Array.isArray(changed) && changed.length === 0;
+      const reasons = [
+        ...verdict.reasons,
+        ...(outcome.productError ? [`产品启动不了：${outcome.productError}`] : []),
+        ...(unchanged ? ["这次没有改任何文件，验收里的问题还在"] : []),
+      ];
+      const passed = verdict.status === "passed" && !outcome.productError && !unchanged;
+      step.status = passed ? "passed" : verdict.status !== "passed" ? verdict.status : outcome.productError ? "product-failed" : "unchanged";
       step.reasons = reasons;
       if (passed) {
         step.state = "passed";

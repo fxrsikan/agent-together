@@ -108,6 +108,14 @@ export class SpecStore {
     return this.load();
   }
 
+  /** Acceptance results per scenario, in the working and the confirmed spec. Progress, not a scope change. */
+  markScenarios(statuses: Record<string, Scenario["status"]>): void {
+    for (const name of ["spec.json", "confirmed.json"]) {
+      const spec = this.read(name, (v) => Spec.parse(v));
+      if (spec) this.write(name, { ...spec, scenarios: spec.scenarios.map((s) => (statuses[s.id] ? { ...s, status: statuses[s.id] } : s)) });
+    }
+  }
+
   conversation(): ChatMessage[] {
     return this.read("conversation.json", (v) => ChatMessage.array().parse(v)) ?? [];
   }

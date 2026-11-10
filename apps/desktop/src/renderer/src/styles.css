@@ -342,3 +342,31 @@ header.bar button.on { border-color: var(--accent); color: var(--accent); }
 .steps ol { margin: 6px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
 .steps ul { margin: 2px 0 0; padding-left: 16px; }
 .tech-toggle { display: block; margin: 0 0 8px; }
+
+/* 验收与交付 (M4) */
+.acceptance { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; background: var(--bg); margin-bottom: 8px; }
+.acceptance h4 { margin: 4px 0; }
+.acceptance h5 { margin: 10px 0 4px; font-size: 12px; }
+.acceptance .decision { border: 1px solid color-mix(in srgb, var(--bad) 35%, var(--line)); border-radius: 8px; padding: 8px; margin: 6px 0; background: color-mix(in srgb, var(--bad) 6%, var(--bg)); }
+.acceptance .decision ul { margin: 4px 0; padding-left: 18px; }
+.acceptance .mark { display: inline-block; width: 1.2em; text-align: center; font-weight: 700; }
+.acceptance .mark.good { color: var(--good); }
+.acceptance .mark.bad, .acceptance .bad { color: var(--bad); }
+.acceptance .mark.warn { color: var(--warn); }
+.acceptance .mark.muted { color: var(--muted); }
+.accept-data { margin: 4px 0 6px; }
+.accept-data input { flex: 1; min-width: 0; }
+.layers { width: 100%; border-collapse: collapse; margin: 4px 0; }
+.layers td { padding: 3px 4px; vertical-align: top; border-top: 1px solid var(--line); }
+.layers .layer-name { white-space: nowrap; font-size: 12px; }
+.accept-scenario, .walk-scenario { border-top: 1px solid var(--line); padding: 4px 0; }
+.accept-scenario summary, .walk-scenario summary { cursor: pointer; font-size: 12px; }
+.beats { margin: 4px 0; padding-left: 4px; list-style: none; font-size: 12px; }
+.beat { margin: 3px 0; }
+.beat .small { margin-left: 1.4em; }
+.accept-shot { display: block; max-width: 100%; margin: 4px 0 4px 1.4em; border: 1px solid var(--line); border-radius: 6px; cursor: zoom-out; }
+.walk-scenario textarea { width: 100%; box-sizing: border-box; }
+.walk-scenario .pre { white-space: pre-wrap; font-size: 11px; background: var(--panel); padding: 4px 6px; border-radius: 6px; margin: 2px 0; }
+.acceptance .check { display: flex; gap: 6px; align-items: flex-start; margin: 6px 0; }
+.versions ul { padding-left: 0; list-style: none; }
+.versions li { border-top: 1px solid var(--line); padding: 4px 0; }

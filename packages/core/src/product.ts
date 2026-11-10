@@ -24,11 +24,19 @@ export interface RunConfig {
   build?: string;
   /** When a start with this configuration last worked. */
   verifiedAt?: string;
+  /**
+   * Where the product keeps its business data (project-relative files, folders or
+   * globs, e.g. "data/" or "manuscript/**"). Code and data are looked at apart: a
+   * stable version backs the data up, acceptance starts without it, a delivery
+   * package leaves it out.
+   */
+  data?: string[];
 }
 
 /** The conventions every agent working on a web product is told (and the product is started with). */
 export const RUN_CONVENTIONS = `- 服务器监听环境变量 PORT 指定的端口（没有时用 3000），只监听本机（127.0.0.1 或 localhost）。
 - 外部服务按环境变量 AT_SERVICE_MODE 切换："mock" 用示例服务（默认），"real" 用真实服务。示例服务和真实服务实现同一个接口，页面不知道用的是哪个。
+- 业务数据放在环境变量 AT_DATA_DIR 指定的文件夹里（没有时用项目里的 data/ 文件夹），不和代码混在一起。
 - 启动命令要能在 Windows 和 macOS 上直接运行（例如 node server.js），不依赖全局安装的工具。`;
 
 export function readRunConfig(root: string): RunConfig | null {
@@ -43,6 +51,7 @@ export function saveRunConfig(root: string, config: RunConfig): RunConfig {
     ...(config.path?.trim() ? { path: config.path.trim().startsWith("/") ? config.path.trim() : `/${config.path.trim()}` } : {}),
     ...(config.build?.trim() ? { build: config.build.trim() } : {}),
     ...(config.verifiedAt ? { verifiedAt: config.verifiedAt } : {}),
+    ...(config.data?.some((d) => d.trim()) ? { data: [...new Set(config.data.map((d) => d.trim().replace(/\\/g, "/")).filter(Boolean))] } : {}),
   };
   writeProjectInfo(root, { run: clean });
   return clean;
@@ -217,7 +226,7 @@ export class ProductProcess {
    * they are missing) and waits until it answers. Resolves with the status: running,
    * or failed with the reason.
    */
-  async start(config: RunConfig, serviceMode: "mock" | "real" = "mock", readyTimeoutMs = 60_000): Promise<ProductStatus> {
+  async start(config: RunConfig, serviceMode: "mock" | "real" = "mock", readyTimeoutMs = 60_000, env: NodeJS.ProcessEnv = {}): Promise<ProductStatus> {
     await this.stop();
     const gen = ++this.generation;
     this.lines = [];
@@ -230,7 +239,7 @@ export class ProductProcess {
       this.set({ state: "starting" });
     }
     const port = await freePort();
-    const child = this.run(config.start, { PORT: String(port), AT_SERVICE_MODE: serviceMode });
+    const child = this.run(config.start, { ...env, PORT: String(port), AT_SERVICE_MODE: serviceMode });
     this.child = child;
     let exited: string | null = null;
     child.on("exit", (code, signal) => {

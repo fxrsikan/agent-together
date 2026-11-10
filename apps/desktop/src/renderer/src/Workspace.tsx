@@ -37,6 +37,7 @@ import { errorText } from "./errors";
 import { RequirementsPanel } from "./RequirementsPanel";
 import { ProductPanel } from "./ProductPanel";
 import { EnginePanel } from "./EnginePanel";
+import { AcceptancePanel } from "./AcceptancePanel";
 
 const nodeTypes = { card: NodeCard };
 const FEED_LIMIT = 100;
@@ -510,6 +511,14 @@ export function Workspace({ info, onClose }: { info: SessionInfo; onClose: () =>
         </div>
         <aside className="side">
           <EnginePanel version={version} onChange={changed} />
+          <AcceptancePanel
+            version={version}
+            onChange={changed}
+            onOpenPreview={() => {
+              setCenterTab("product");
+              void window.agentTogether.productState().then((p) => (p.status.state === "running" ? null : window.agentTogether.productStart().catch(() => null)));
+            }}
+          />
           <button className="link small tech-toggle" onClick={() => setTech((v) => !v)}>
             {tech ? "收起技术详情" : "显示技术详情（角色、设置、检查点、观察者事件）"}
           </button>

@@ -203,6 +203,47 @@ describe("the engine", () => {
     expect(reopened.current!.status).toBe("done");
   });
 
+  it("runs the changes acceptance handed over, one task per card, even on finished cards", async () => {
+    const h = harness(() => pass);
+    for (const n of h.deps.canvas().nodes) n.status = "done";
+    const e = h.engine();
+    e.start({
+      agent: "claude-code",
+      fixes: [
+        { nodeId: "integration", task: "S-02 拆出来是 0 条镜头" },
+        { nodeId: "pages", task: "编辑页底部显示 nullnullnull", grants: ["src/store/**"] },
+        { nodeId: "integration", task: "重启后镜头清单空了" },
+        { nodeId: "nope", task: "x" },
+      ],
+    });
+    await e.settled();
+    const r = e.current!;
+    expect(r).toMatchObject({ kind: "fix", status: "done" });
+    expect(r.note).toContain("重新验收");
+    expect(h.calls.map((c) => c.nodeId)).toEqual(["integration", "pages"]);
+    expect(h.calls[0].task).toContain("S-02 拆出来是 0 条镜头");
+    expect(h.calls[0].task).toContain("重启后镜头清单空了");
+    expect(h.calls[1].task).toContain("nullnullnull");
+    // The integration card is told which other files it may write this step.
+    expect(h.calls[0].task).toContain("还允许修改这些文件");
+    expect(h.calls[0].task).toContain("public/**");
+    expect(h.calls[1].grants).toEqual(["src/store/**"]);
+    expect(h.calls[1].task).toContain("src/store/**");
+    expect(() => h.engine().start({ agent: "claude-code", fixes: [{ nodeId: "nope", task: "x" }] })).toThrow("对不上");
+  });
+
+  it("does not count a fix that changed no files as done", async () => {
+    const same: StepOutcome = { ...pass, audit: { findings: [], files: [] } as never };
+    const h = harness((_id, n) => (n === 1 ? same : { ...pass, audit: { findings: [], files: [{ path: "public/editor/view.js" }] } as never }));
+    const e = h.engine();
+    e.start({ agent: "claude-code", fixes: [{ nodeId: "pages", task: "nullnullnull" }] });
+    await e.settled();
+    expect(h.calls).toHaveLength(2);
+    expect(h.calls[1].task).toContain("这次没有改任何文件");
+    expect(e.current!.steps[0]).toMatchObject({ state: "failed", status: "unchanged" });
+    expect(e.current!.status).toBe("done");
+  });
+
   it("refuses to start when the version's cards are all done", () => {
     const h = harness(() => pass);
     for (const n of h.deps.canvas().nodes) n.status = "done";

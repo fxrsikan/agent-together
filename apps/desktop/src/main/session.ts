@@ -3,7 +3,7 @@ import type { BrowserWindow } from "electron";
 import { installHooks } from "@agent-together/adapter-claude-code";
 import { installCodexHooks } from "@agent-together/adapter-codex";
 import { installCursorHooks } from "@agent-together/adapter-cursor";
-import { allowTestCommands, auditChanges, Checkpoints, createLlm, Daemon, loadLlmConfig, Race, readProjectInfo, writtenPaths, ProductProcess, type Engine, type AuditOutcome, type Llm, type SpecPlan } from "@agent-together/core";
+import { allowTestCommands, auditChanges, Checkpoints, createLlm, Daemon, loadLlmConfig, Race, readProjectInfo, writtenPaths, ProductProcess, type Acceptance, type Engine, type AuditOutcome, type Llm, type SpecPlan } from "@agent-together/core";
 import type { AgentEvent } from "@agent-together/schema";
 import { ProductPreview } from "./preview";
 
@@ -24,6 +24,8 @@ export class Session {
   readonly preview: ProductPreview;
   /** Automatic progress through the version's cards (M3); set up by the main process, which owns the assistants. */
   engine: Engine | null = null;
+  /** Scenario acceptance and delivery (M4); set up by the main process. */
+  acceptance: Acceptance | null = null;
   /** The agent running in the app, if any; one at a time. */
   running: { nodeId: string; agent: string; stop: AbortController } | null = null;
   /** Per node: the checkpoint taken before its last dispatch and the events the observer saw since. */
@@ -153,6 +155,7 @@ export class Session {
   async close() {
     // The run stays "running" on disk: next time it opens as interrupted, to resume from a safe step.
     this.engine?.halt();
+    this.acceptance?.stop();
     this.running?.stop.abort();
     await this.product.stop();
     this.preview.destroy();

@@ -53,3 +53,6 @@ export { draftRole, roleFromDraft, rolesFromDraft } from "./roles.js";
 export { listModels, parseCursorModels, parseGrokModels, projectModels, readCodexModels, saveProjectModels, saveRaceAgents, type ModelAgent, type ModelChoice } from "./models.js";
 export { checkSource, evidenceFor, guessTestCommand, parseImportProposal, projectDigest, staleSources, understandProject, understandPrompt, type CheckedSource, type ImportProposal, type ProposedCard, type ProposedItem, type SourceRef } from "./understand.js";
 export * from "./engine.js";
+export * from "./acceptance.js";
+export * from "./acceptance-run.js";
+export * from "./delivery.js";

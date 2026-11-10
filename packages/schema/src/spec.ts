@@ -92,7 +92,7 @@ export type ChatMessage = z.infer<typeof ChatMessage>;
 export const Decision = z.object({
   id: z.string(),
   at: z.string(),
-  kind: z.enum(["confirm-scope", "change-scope", "migrate-canvas", "confirm-prototype", "prototype-feedback", "other"]),
+  kind: z.enum(["confirm-scope", "change-scope", "migrate-canvas", "confirm-prototype", "prototype-feedback", "acceptance-feedback", "mock-delivery", "stable-version", "restore-version", "other"]),
   summary: z.string(),
   detail: z.string().optional(),
 });

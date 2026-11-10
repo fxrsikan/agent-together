@@ -8,7 +8,7 @@ import type { RunConfig } from "./product.js";
 const DATA_GITIGNORE = ["runtime.json", "events/", "context/", "races/", "tests.json", "runs/", ""].join("\n");
 
 /** Hook configs hold absolute paths to this machine's hook program, so a new project keeps them out of git. */
-const PROJECT_GITIGNORE = ["node_modules/", ".claude/settings.local.json", ".codex/hooks.json", ".cursor/hooks.json", ".cursor/cli.json", ""].join("\n");
+const PROJECT_GITIGNORE = ["node_modules/", ".claude/settings.local.json", ".codex/hooks.json", ".cursor/hooks.json", ".cursor/cli.json", ".agent-together/acceptance/", ".agent-together/versions/", ""].join("\n");
 
 export interface ProjectInfo {
   name: string;
